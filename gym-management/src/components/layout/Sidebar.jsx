@@ -1,15 +1,23 @@
-import React from 'react';
+﻿import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useAuthStore } from '../../store/useAuthStore';
 
 export default function Sidebar() {
   const location = useLocation();
+  const { profile } = useAuthStore();
 
-  const menuItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: '📊' },
-    { path: '/members', label: 'Quản lý học viên', icon: '👥' },
+  const baseItems = [
+    { path: '/members', label: 'Quản lý hội viên', icon: '👥' },
     { path: '/inventory', label: 'Kho nước & Bán hàng', icon: '📦' },
     { path: '/shifts', label: 'Quản lý ca làm', icon: '⏰' },
   ];
+
+  const adminItems = [
+    { path: '/dashboard', label: 'Dashboard', icon: '📊' },
+    { path: '/staff', label: 'Nhân viên & Lương', icon: '🧾' },
+  ];
+
+  const menuItems = profile?.role === 'staff' ? baseItems : [...adminItems, ...baseItems];
 
   return (
     <aside className="sidebar">

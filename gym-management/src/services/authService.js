@@ -46,6 +46,20 @@ export const authService = {
     }
   },
 
+  async getProfile(userId) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') return null;
+      throw new Error(error.message);
+    }
+    return data;
+  },
+
   async resetPassword(email) {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email);
