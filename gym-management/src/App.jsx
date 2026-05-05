@@ -1,10 +1,10 @@
-﻿import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+﻿import { useEffect, useState } from 'react';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import './App.css';
 
+import ProtectedRoute from './components/layout/ProtectedRoute';
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
-import ProtectedRoute from './components/layout/ProtectedRoute';
 
 import Login from './pages/Login/Login';
 import Dashboard from './pages/Dashboard/Dashboard';
@@ -12,9 +12,11 @@ import Members from './pages/Members/Members';
 import Inventory from './pages/Inventory/Inventory';
 import Shifts from './pages/Shifts/Shifts';
 import Staff from './pages/Staff/Staff';
+
 import { useAuthStore } from './store/useAuthStore';
 
 function App() {
+  const [isSidebarOpen, setSidebarOpen] = useState(false);
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
   const profile = useAuthStore((state) => state.profile);
 
@@ -31,21 +33,28 @@ function App() {
           path="/*"
           element={
             <ProtectedRoute>
-              <div className="app-layout">
-                <Sidebar />
-                <div className="main-content">
-                  <Header />
-                  <div className="page-content">
+              <div className="modern-shell">
+                <Sidebar isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)} />
+                <div className="modern-main">
+                  <Header onMenuToggle={() => setSidebarOpen((prev) => !prev)} />
+                  <div className="modern-content">
                     <Routes>
                       <Route path="/dashboard" element={<Dashboard />} />
                       <Route path="/members" element={<Members />} />
                       <Route path="/inventory" element={<Inventory />} />
                       <Route path="/shifts" element={<Shifts />} />
                       <Route path="/staff" element={<Staff />} />
-                      <Route path="/" element={<Navigate to={profile?.role === 'staff' ? '/members' : '/dashboard'} replace />} />
+                      <Route
+                        path="/"
+                        element={<Navigate to={profile?.role === 'staff' ? '/members' : '/dashboard'} replace />}
+                      />
                     </Routes>
                   </div>
                 </div>
+
+                {isSidebarOpen && (
+                  <div className="mobile-overlay" onClick={() => setSidebarOpen(false)} aria-hidden="true" />
+                )}
               </div>
             </ProtectedRoute>
           }
@@ -56,3 +65,4 @@ function App() {
 }
 
 export default App;
+

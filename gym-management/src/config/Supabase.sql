@@ -41,3 +41,14 @@ CREATE TABLE shifts (
   status TEXT DEFAULT 'open' CHECK (status IN ('open', 'closed')),
   note TEXT
 );
+-- 5. B?ng luu l?ch s? thay d?i c?a h?i viên
+CREATE TABLE member_logs (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  member_id UUID REFERENCES members(id) ON DELETE CASCADE,
+  action TEXT NOT NULL,
+  changed_by UUID REFERENCES auth.users(id),
+  before_data JSONB,
+  after_data JSONB,
+  note TEXT,
+  changed_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);

@@ -1,34 +1,30 @@
-import React from 'react';
-
-export default function Table({ columns, data, loading = false, actions }) {
+﻿export default function Table({ columns, data, loading = false, actions }) {
   if (loading) {
-    return <div className="table-loading">Đang tải dữ liệu...</div>;
+    return <div className="table-empty-cell" style={{ padding: 16 }}>Dang tai du lieu...</div>;
   }
 
-  if (data.length === 0) {
-    return <div className="table-empty">Không có dữ liệu</div>;
+  if (!data || data.length === 0) {
+    return <div className="table-empty-cell" style={{ padding: 16 }}>Khong co du lieu</div>;
   }
 
   return (
-    <div className="table-container">
-      <table className="table">
+    <div className="modern-table-wrap">
+      <table className="modern-table">
         <thead>
           <tr>
             {columns.map((col) => (
               <th key={col.key}>{col.label}</th>
             ))}
-            {actions && <th>Hành động</th>}
+            {actions && <th>Hanh dong</th>}
           </tr>
         </thead>
         <tbody>
-          {data.map((row, idx) => (
-            <tr key={idx}>
+          {data.map((row) => (
+            <tr key={row.id || row.shift_name || JSON.stringify(row)}>
               {columns.map((col) => (
-                <td key={col.key}>
-                  {col.render ? col.render(row[col.key], row) : row[col.key]}
-                </td>
+                <td key={col.key}>{col.render ? col.render(row[col.key], row) : row[col.key]}</td>
               ))}
-              {actions && <td className="actions-cell">{actions(row)}</td>}
+              {actions && <td>{actions(row)}</td>}
             </tr>
           ))}
         </tbody>

@@ -1,45 +1,59 @@
-import { useEffect } from 'react';
-import { useAuthStore } from '../store/useAuthStore';
+﻿import { useCallback, useEffect } from 'react';
 import { authService } from '../services/authService';
 import { shiftService } from '../services/shiftService';
+import { useAuthStore } from '../store/useAuthStore';
 
 export function useAuth() {
-  const { user, profile, assignedShift, loading, setUser, setProfile, setAssignedShift, setLoading } = useAuthStore();
+  const {
+    user,
+    profile,
+    assignedShift,
+    loading,
+    setUser,
+    setProfile,
+    setAssignedShift,
+    setLoading,
+  } = useAuthStore();
+
+  const checkUser = useCallback(async () => {
+    setLoading(true);
+    try {
+      const currentUser = await authService.getCurrentUser();
+      let currentProfile = null;
+
+      if (currentUser?.id) {
+        currentProfile = await authService.getProfile(currentUser.id);
+      }
+
+      setUser(currentUser);
+      setProfile(currentProfile);
+    } finally {
+      setLoading(false);
+    }
+  }, [setLoading, setProfile, setUser]);
 
   useEffect(() => {
     checkUser();
-  }, []);
-
-  const checkUser = async () => {
-    setLoading(true);
-    const currentUser = await authService.getCurrentUser();
-    let currentProfile = null;
-    if (currentUser?.id) {
-      currentProfile = await authService.getProfile(currentUser.id);
-    }
-    setUser(currentUser);
-    setProfile(currentProfile);
-    setLoading(false);
-  };
+  }, [checkUser]);
 
   const login = async (email, password) => {
     setLoading(true);
     try {
-      const { user } = await authService.login(email, password);
-      const currentProfile = await authService.getProfile(user.id);
+      const { user: currentUser } = await authService.login(email, password);
+      const currentProfile = await authService.getProfile(currentUser.id);
 
       if (currentProfile?.role === 'staff') {
         const shiftCheck = await shiftService.validateShiftForLogin();
         if (!shiftCheck.valid) {
           await authService.logout();
-          throw new Error('Bạn chưa có ca làm hợp lệ ở thời điểm hiện tại.');
+          throw new Error('Chưa có ca trực đang mở. Vui lòng liên hệ quản lý để mở ca.');
         }
         setAssignedShift(shiftCheck.shift);
       }
 
-      setUser(user);
+      setUser(currentUser);
       setProfile(currentProfile);
-      return user;
+      return currentUser;
     } finally {
       setLoading(false);
     }
@@ -59,3 +73,4 @@ export function useAuth() {
 
   return { user, profile, assignedShift, loading, login, logout };
 }
+

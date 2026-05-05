@@ -1,101 +1,99 @@
-﻿import React, { useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
+import { CreditCard, Plus, Search } from 'lucide-react';
 import { useMembers } from '../../hooks/useMembers';
-import Table from '../../components/ui/Table';
-import Button from '../../components/ui/Button';
-import Modal from '../../components/ui/Modal';
-import Input from '../../components/ui/Input';
-import { useAuthStore } from '../../store/useAuthStore';
+import { memberService } from '../../services/memberService';
 import { memberLogService } from '../../services/memberLogService';
+import { useAuthStore } from '../../store/useAuthStore';
+
+function getStatus(endDate) {
+  const today = new Date();
+  const target = new Date(endDate);
+  return target >= new Date(today.toDateString()) ? 'Active' : 'Expired';
+}
+
+function addMonths(baseDate, months) {
+  const next = new Date(baseDate);
+  next.setMonth(next.getMonth() + Number(months || 1));
+  return next;
+}
 
 const initialForm = {
   full_name: '',
   package_type: '1',
-  start_date: '',
-  end_date: '',
   fee: '',
   payment_method: 'TM',
   fingerprint_status: false,
   note: '',
 };
 
-function addMonths(startDate, months) {
-  const d = new Date(startDate);
-  d.setMonth(d.getMonth() + Number(months || 1));
-  return d.toISOString().slice(0, 10);
-}
-
 export default function Members() {
-  const { user, profile } = useAuthStore();
+  const { user } = useAuthStore();
   const { members, loading, addMember, updateMember } = useMembers();
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isLogOpen, setIsLogOpen] = useState(false);
-  const [selectedMember, setSelectedMember] = useState(null);
-  const [logs, setLogs] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
-  const [formData, setFormData] = useState(initialForm);
+  const [showModal, setShowModal] = useState(false);
+  const [editingMember, setEditingMember] = useState(null);
+  const [form, setForm] = useState(initialForm);
 
-  const columns = useMemo(
-    () => [
-      { key: 'full_name', label: 'Họ tên' },
-      { key: 'package_type', label: 'Gói (tháng)' },
-      { key: 'start_date', label: 'Ngày bắt đầu' },
-      { key: 'end_date', label: 'Ngày kết thúc' },
-      { key: 'fee', label: 'Học phí', render: (v) => Number(v || 0).toLocaleString('vi-VN') + 'đ' },
-      { key: 'payment_method', label: 'Thanh toán' },
-      { key: 'fingerprint_status', label: 'Vân tay', render: (v) => (v ? 'Đã có' : 'Chưa có') },
-    ],
-    [],
-  );
+  const filtered = useMemo(() => {
+    return members.filter((m) => {
+      const keyword = searchTerm.toLowerCase();
+      return (
+        (m.full_name || '').toLowerCase().includes(keyword)
+        || String(m.id || '').toLowerCase().includes(keyword)
+      );
+    });
+  }, [members, searchTerm]);
 
-  const openCreateForm = () => {
-    setSelectedMember(null);
-    const today = new Date().toISOString().slice(0, 10);
-    setFormData({ ...initialForm, start_date: today, end_date: addMonths(today, 1) });
+  const openCreateModal = () => {
+    setEditingMember(null);
+    setForm(initialForm);
     setError('');
-    setIsFormOpen(true);
+    setShowModal(true);
   };
 
-  const openDetail = (member) => {
-    setSelectedMember(member);
-    setFormData({
+  const openEditModal = (member) => {
+    setEditingMember(member);
+    setForm({
       full_name: member.full_name || '',
       package_type: String(member.package_type || 1),
-      start_date: member.start_date || '',
-      end_date: member.end_date || '',
-      fee: String(member.fee || ''),
+      fee: String(member.fee || 0),
       payment_method: member.payment_method || 'TM',
       fingerprint_status: Boolean(member.fingerprint_status),
       note: member.note || '',
     });
     setError('');
-    setIsFormOpen(true);
+    setShowModal(true);
   };
 
-  const createPayload = () => ({
-    full_name: formData.full_name,
-    package_type: Number(formData.package_type || 1),
-    start_date: formData.start_date,
-    end_date: formData.end_date,
-    fee: Number(formData.fee || 0),
-    payment_method: formData.payment_method,
-    fingerprint_status: Boolean(formData.fingerprint_status),
-    note: formData.note,
-  });
-
-  const handleSaveMember = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setError('');
+
     try {
-      const payload = createPayload();
-      if (selectedMember?.id) {
-        const beforeData = selectedMember;
-        const updated = await updateMember(selectedMember.id, payload);
+      const now = new Date();
+      const startDate = now.toISOString().slice(0, 10);
+      const endDate = addMonths(now, Number(form.package_type || 1)).toISOString().slice(0, 10);
+      const payload = {
+        full_name: form.full_name,
+        package_type: Number(form.package_type || 1),
+        start_date: editingMember?.start_date || startDate,
+        end_date: editingMember?.end_date || endDate,
+        fee: Number(form.fee || 0),
+        payment_method: form.payment_method,
+        fingerprint_status: Boolean(form.fingerprint_status),
+        note: form.note,
+      };
+
+      if (editingMember?.id) {
+        const updated = await updateMember(editingMember.id, payload);
         await memberLogService.createLog({
-          memberId: selectedMember.id,
+          memberId: editingMember.id,
           action: 'update_member',
           changedBy: user?.id,
-          beforeData,
+          beforeData: editingMember,
           afterData: updated,
-          note: 'Cập nhật hội viên',
+          note: 'Cập nhật thông tin hội viên',
         });
       } else {
         const created = await addMember(payload);
@@ -104,145 +102,174 @@ export default function Members() {
           action: 'create_member',
           changedBy: user?.id,
           afterData: created,
-          note: 'Tạo hội viên mới',
+          note: 'Thêm hội viên mới',
         });
       }
-      setIsFormOpen(false);
-      setSelectedMember(null);
-    } catch (e) {
-      setError(e.message);
+
+      setShowModal(false);
+      setForm(initialForm);
+      setEditingMember(null);
+    } catch (err) {
+      setError(err.message);
     }
   };
 
-  const handleRenew = async (row) => {
-    try {
-      const startDate = new Date().toISOString().slice(0, 10);
-      const endDate = addMonths(startDate, row.package_type || 1);
-      const updated = await updateMember(row.id, { start_date: startDate, end_date: endDate });
-      await memberLogService.createLog({
-        memberId: row.id,
-        action: 'renew_member',
-        changedBy: user?.id,
-        beforeData: row,
-        afterData: updated,
-        note: 'Gia hạn theo gói hiện tại',
-      });
-    } catch (e) {
-      setError(e.message);
-    }
-  };
-
-  const handleOpenLogs = async () => {
+  const handleRenew = async (member) => {
     setError('');
     try {
-      const data = await memberLogService.getLogs();
-      setLogs(data);
-      setIsLogOpen(true);
-    } catch (e) {
-      setError(e.message);
+      const updated = await memberService.renewMember(member);
+      await updateMember(member.id, {
+        start_date: updated.start_date,
+        end_date: updated.end_date,
+        note: updated.note,
+      });
+
+      await memberLogService.createLog({
+        memberId: member.id,
+        action: 'renew_member',
+        changedBy: user?.id,
+        beforeData: member,
+        afterData: updated,
+        note: 'Gia hạn hội viên',
+      });
+    } catch (err) {
+      setError(err.message);
     }
   };
 
   return (
-    <div className="members-page">
-      <div className="page-header">
-        <h1>Quản lý hội viên</h1>
-        <div style={{ display: 'flex', gap: 10 }}>
-          {profile?.role === 'admin' && (
-            <Button variant="secondary" onClick={handleOpenLogs}>
-              Xem logs
-            </Button>
-          )}
-          <Button onClick={openCreateForm}>+ Thêm hội viên</Button>
+    <div className="modern-stack">
+      <div className="modern-toolbar">
+        <div className="search-box">
+          <Search size={16} />
+          <input
+            type="text"
+            value={searchTerm}
+            placeholder="Tìm theo tên hoặc ID..."
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
+        <button type="button" className="primary-btn" onClick={openCreateModal}>
+          <Plus size={16} /> Thêm hội viên
+        </button>
       </div>
 
-      {error && <div className="alert alert-error">{error}</div>}
+      {error && <div className="modern-error">{error}</div>}
 
-      <Table
-        columns={columns}
-        data={members}
-        loading={loading}
-        actions={(row) => (
-          <div className="action-buttons">
-            <Button variant="secondary" size="sm" onClick={() => openDetail(row)}>
-              Chi tiết
-            </Button>
-            <Button size="sm" onClick={() => handleRenew(row)}>
-              Gia hạn
-            </Button>
+      <div className="modern-table-wrap">
+        <table className="modern-table">
+          <thead>
+            <tr>
+              <th>Hội viên</th>
+              <th>Gói/Hạn</th>
+              <th>Phí</th>
+              <th>Trạng thái</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {!loading && filtered.length === 0 && (
+              <tr>
+                <td colSpan={5} className="table-empty-cell">Không có dữ liệu</td>
+              </tr>
+            )}
+            {filtered.map((m) => {
+              const status = getStatus(m.end_date);
+              return (
+                <tr key={m.id}>
+                  <td>
+                    <p className="cell-main">{m.full_name}</p>
+                    <p className="cell-sub">ID: {m.id}</p>
+                  </td>
+                  <td>
+                    <p className="cell-main">{m.package_type} tháng</p>
+                    <p className="cell-sub">Hết hạn: {m.end_date}</p>
+                  </td>
+                  <td>
+                    <p className="cell-main">{Number(m.fee || 0).toLocaleString('vi-VN')}đ</p>
+                    <span className={`pay-badge ${m.payment_method === 'TM' ? 'cash' : 'transfer'}`}>
+                      {m.payment_method}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`status-badge ${status === 'Active' ? 'active' : 'expired'}`}>
+                      {status === 'Active' ? 'Đang tập' : 'Hết hạn'}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="table-actions">
+                      <button type="button" className="link-btn" onClick={() => openEditModal(m)}>
+                        Chi tiết
+                      </button>
+                      <button type="button" className="link-btn" onClick={() => handleRenew(m)}>
+                        <CreditCard size={14} /> Gia hạn
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {showModal && (
+        <div className="modal-backdrop" onClick={() => setShowModal(false)}>
+          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
+            <h3>{editingMember ? 'Chi tiết hội viên' : 'Thêm hội viên mới'}</h3>
+            <form className="modern-form" onSubmit={handleSubmit}>
+              <input
+                value={form.full_name}
+                onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                placeholder="Họ tên hội viên"
+                required
+              />
+              <div className="form-grid-2">
+                <input
+                  type="number"
+                  value={form.package_type}
+                  onChange={(e) => setForm({ ...form, package_type: e.target.value })}
+                  placeholder="Gói (tháng)"
+                  required
+                />
+                <input
+                  type="number"
+                  value={form.fee}
+                  onChange={(e) => setForm({ ...form, fee: e.target.value })}
+                  placeholder="Học phí"
+                  required
+                />
+              </div>
+              <select
+                value={form.payment_method}
+                onChange={(e) => setForm({ ...form, payment_method: e.target.value })}
+              >
+                <option value="TM">TM - Tiền mặt</option>
+                <option value="R">R - Chuyển khoản</option>
+              </select>
+              <label className="check-row">
+                <input
+                  type="checkbox"
+                  checked={form.fingerprint_status}
+                  onChange={(e) => setForm({ ...form, fingerprint_status: e.target.checked })}
+                />
+                Đã đăng ký vân tay
+              </label>
+              <textarea
+                rows={3}
+                value={form.note}
+                onChange={(e) => setForm({ ...form, note: e.target.value })}
+                placeholder="Ghi chú"
+              />
+              <div className="modal-actions">
+                <button type="button" className="ghost-btn" onClick={() => setShowModal(false)}>Hủy</button>
+                <button type="submit" className="primary-btn">Lưu</button>
+              </div>
+            </form>
           </div>
-        )}
-      />
-
-      <Modal
-        isOpen={isFormOpen}
-        title={selectedMember ? 'Chi tiết hội viên' : 'Thêm hội viên'}
-        onClose={() => setIsFormOpen(false)}
-        onConfirm={handleSaveMember}
-      >
-        <Input label="Họ tên" value={formData.full_name} onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} />
-        <Input
-          label="Gói tập (tháng)"
-          type="number"
-          value={formData.package_type}
-          onChange={(e) => {
-            const packageType = e.target.value;
-            setFormData({
-              ...formData,
-              package_type: packageType,
-              end_date: formData.start_date ? addMonths(formData.start_date, packageType) : formData.end_date,
-            });
-          }}
-        />
-        <Input
-          label="Ngày bắt đầu"
-          type="date"
-          value={formData.start_date}
-          onChange={(e) => {
-            const startDate = e.target.value;
-            setFormData({
-              ...formData,
-              start_date: startDate,
-              end_date: startDate ? addMonths(startDate, formData.package_type) : formData.end_date,
-            });
-          }}
-        />
-        <Input label="Ngày kết thúc" type="date" value={formData.end_date} onChange={(e) => setFormData({ ...formData, end_date: e.target.value })} />
-        <Input label="Học phí" type="number" value={formData.fee} onChange={(e) => setFormData({ ...formData, fee: e.target.value })} />
-        <div className="form-group">
-          <label>Phương thức thanh toán</label>
-          <select className="input" value={formData.payment_method} onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}>
-            <option value="TM">TM - Tiền mặt</option>
-            <option value="R">R - Chuyển khoản</option>
-          </select>
         </div>
-        <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <input
-            id="fingerprint_status"
-            type="checkbox"
-            checked={formData.fingerprint_status}
-            onChange={(e) => setFormData({ ...formData, fingerprint_status: e.target.checked })}
-          />
-          <label htmlFor="fingerprint_status">Đã đăng ký vân tay</label>
-        </div>
-        <Input label="Ghi chú" value={formData.note} onChange={(e) => setFormData({ ...formData, note: e.target.value })} />
-      </Modal>
-
-      <Modal isOpen={isLogOpen} title="Lịch sử logs hội viên" onClose={() => setIsLogOpen(false)}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {logs.length === 0 && <div>Chưa có logs</div>}
-          {logs.map((log) => (
-            <div key={log.id} style={{ border: '1px solid #eee', borderRadius: 8, padding: 10 }}>
-              <div><strong>Action:</strong> {log.action}</div>
-              <div><strong>Member ID:</strong> {log.member_id}</div>
-              <div><strong>By:</strong> {log.changed_by}</div>
-              <div><strong>At:</strong> {new Date(log.changed_at).toLocaleString('vi-VN')}</div>
-              <div><strong>Note:</strong> {log.note || '-'}</div>
-            </div>
-          ))}
-        </div>
-      </Modal>
+      )}
     </div>
   );
 }
+

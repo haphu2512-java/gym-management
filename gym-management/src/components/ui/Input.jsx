@@ -1,5 +1,4 @@
-import React from 'react';
-
+﻿
 export default function Input({
   label,
   type = 'text',
@@ -33,3 +32,4 @@ export default function Input({
     </div>
   );
 }
+

@@ -1,20 +1,42 @@
-﻿import React from 'react';
-import { useAuthStore } from '../../store/useAuthStore';
+﻿import { LayoutDashboard } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 
-export default function Header() {
-  const { user, profile, assignedShift, logout } = useAuthStore();
+const titleMap = {
+  '/dashboard': 'Tổng quan hệ thống',
+  '/members': 'Danh sách hội viên',
+  '/inventory': 'Kho & Bán hàng',
+  '/shifts': 'Quản lý ca trực',
+  '/staff': 'Nhân viên & tính lương',
+};
+
+function formatDate() {
+  return new Date().toLocaleDateString('vi-VN');
+}
+
+export default function Header({ onMenuToggle }) {
+  const location = useLocation();
+  const title = titleMap[location.pathname] || 'Gym Management';
 
   return (
-    <header className="header">
-      <div className="header-content">
-        <h2>
-          Xin chào, {user?.email || 'Guest'} ({profile?.role || 'unknown'})
-          {assignedShift?.id ? ` | Ca: ${assignedShift.start_time}-${assignedShift.end_time}` : ''}
-        </h2>
-        <button onClick={logout} className="btn-logout">
-          Đăng xuất
+    <header className="modern-header">
+      <div className="mobile-topbar">
+        <h1>MAX POWER</h1>
+        <button type="button" onClick={onMenuToggle}>
+          <LayoutDashboard size={18} />
         </button>
+      </div>
+
+      <div className="desktop-title-row">
+        <div>
+          <h2>{title}</h2>
+          <p>Chào buổi sáng! Hôm nay là ngày {formatDate()}</p>
+        </div>
+        <div className="system-status">
+          <span className="status-dot" />
+          <span>Hệ thống: Sẵn sàng</span>
+        </div>
       </div>
     </header>
   );
 }
+

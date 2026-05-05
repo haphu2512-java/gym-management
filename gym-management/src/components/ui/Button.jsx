@@ -1,5 +1,4 @@
-import React from 'react';
-
+﻿
 export default function Button({
   children,
   variant = 'primary',
@@ -24,3 +23,4 @@ export default function Button({
     </button>
   );
 }
+
