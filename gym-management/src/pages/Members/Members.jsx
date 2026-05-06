@@ -50,15 +50,16 @@ export default function Members() {
     });
   }, [members, searchTerm, filterStatus]);
 
-  const handleVerifyPayment = async (member) => {
+  const handleTogglePaymentVerification = async (member) => {
     try {
-      const updated = await updateMember(member.id, { is_payment_verified: true });
+      const newStatus = !member.is_payment_verified;
+      const updated = await updateMember(member.id, { is_payment_verified: newStatus });
       await staffLogService.logAction({
         staffId: user?.id,
-        action: 'Duyệt thanh toán',
+        action: newStatus ? 'Duyệt thanh toán' : 'Hủy duyệt thanh toán',
         targetItem: updated.full_name,
-        details: { memberId: member.id },
-        note: 'Admin duyệt thanh toán chuyển khoản',
+        details: { memberId: member.id, status: newStatus },
+        note: newStatus ? 'Admin duyệt thanh toán chuyển khoản' : 'Admin hủy duyệt thanh toán chuyển khoản',
       });
     } catch (err) {
       setError(err.message);
@@ -256,10 +257,31 @@ export default function Members() {
                       <button type="button" className="link-btn" onClick={() => openRenewModal(m)}>
                         <CreditCard size={14} /> Gia hạn
                       </button>
-                      {profile?.role === 'admin' && m.payment_method === 'CK' && !m.is_payment_verified && (
-                        <button type="button" className="link-btn" style={{ color: '#16a34a' }} onClick={() => handleVerifyPayment(m)}>
-                          Duyệt CK
-                        </button>
+                      {profile?.role === 'admin' && m.payment_method === 'CK' && (
+                        <label 
+                          style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '6px', 
+                            cursor: 'pointer', 
+                            color: m.is_payment_verified ? '#16a34a' : '#ef4444', 
+                            background: m.is_payment_verified ? '#f0fdf4' : '#fef2f2',
+                            padding: '4px 8px',
+                            borderRadius: '8px',
+                            border: '1px solid currentColor',
+                            fontSize: '13px',
+                            fontWeight: '700',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <input 
+                            type="checkbox" 
+                            checked={m.is_payment_verified} 
+                            onChange={() => handleTogglePaymentVerification(m)}
+                            style={{ cursor: 'pointer', width: '15px', height: '15px' }}
+                          />
+                          {m.is_payment_verified ? 'Đã duyệt' : 'Duyệt CK'}
+                        </label>
                       )}
                     </div>
                   </td>

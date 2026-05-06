@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
 import { productService } from '../../services/productService';
 import { useAuthStore } from '../../store/useAuthStore';
-
 import { staffLogService } from '../../services/staffLogService';
+import { shiftService } from '../../services/shiftService';
 
 export default function Inventory() {
   const { user, profile, assignedShift } = useAuthStore();
@@ -14,7 +14,31 @@ export default function Inventory() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [form, setForm] = useState({ name: '', price: '', stock_quantity: '', note: '' });
 
-  const loadProducts = async () => {
+  // Doanh thu nước của ca hiện tại
+  const [drinkRevenue, setDrinkRevenue] = useState(0);
+  const [activeShift, setActiveShift] = useState(assignedShift || null);
+
+  // Xác nhận xóa
+  const [deletingProduct, setDeletingProduct] = useState(null);
+
+  // Lấy ca đang mở nếu chưa có trong store
+  useEffect(() => {
+    const fetchShift = async () => {
+      try {
+        const { shift } = await shiftService.validateShiftForLogin();
+        setActiveShift(shift);
+        if (shift) {
+          const rev = await productService.getDrinkRevenueForShift(shift.id);
+          setDrinkRevenue(rev);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchShift();
+  }, []);
+
+  const loadProducts = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -25,11 +49,11 @@ export default function Inventory() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadProducts();
-  }, []);
+  }, [loadProducts]);
 
   const handleOpenCreate = () => {
     setEditingProduct(null);
@@ -39,11 +63,11 @@ export default function Inventory() {
 
   const handleOpenEdit = (product) => {
     setEditingProduct(product);
-    setForm({ 
-      name: product.name, 
-      price: String(product.price), 
-      stock_quantity: String(product.stock_quantity), 
-      note: product.note || '' 
+    setForm({
+      name: product.name,
+      price: String(product.price),
+      stock_quantity: String(product.stock_quantity),
+      note: product.note || ''
     });
     setShowModal(true);
   };
@@ -78,7 +102,7 @@ export default function Inventory() {
           note: 'Admin thêm sản phẩm mới',
         });
       }
-      
+
       setShowModal(false);
       setEditingProduct(null);
       setForm({ name: '', price: '', stock_quantity: '', note: '' });
@@ -88,13 +112,42 @@ export default function Inventory() {
     }
   };
 
+  // Bán 1 chai — cập nhật doanh thu ngay sau khi bán
   const handleSell = async (product) => {
     setError('');
     try {
-      const updated = await productService.sellOneBottle(product, assignedShift?.id, user?.id);
+      const shiftId = activeShift?.id || null;
+      const updated = await productService.sellOneBottle(product, shiftId, user?.id);
       setProducts((prev) => prev.map((item) => (item.id === product.id ? updated : item)));
+
+      // Cập nhật doanh thu nước real-time
+      if (shiftId) {
+        const rev = await productService.getDrinkRevenueForShift(shiftId);
+        setDrinkRevenue(rev);
+      }
     } catch (err) {
       setError(err.message);
+    }
+  };
+
+  // Xóa sản phẩm (chỉ admin)
+  const handleConfirmDelete = async () => {
+    if (!deletingProduct) return;
+    setError('');
+    try {
+      await productService.deleteProduct(deletingProduct.id);
+      await staffLogService.logAction({
+        staffId: user?.id,
+        action: 'Xóa sản phẩm',
+        targetItem: deletingProduct.name,
+        details: { id: deletingProduct.id },
+        note: 'Admin xóa sản phẩm khỏi kho',
+      });
+      setDeletingProduct(null);
+      await loadProducts();
+    } catch (err) {
+      setError(err.message);
+      setDeletingProduct(null);
     }
   };
 
@@ -102,14 +155,29 @@ export default function Inventory() {
     <div className="modern-stack">
       <div className="modern-toolbar">
         <div>
-          <h3 className="modern-title">Kho nước & bán hàng</h3>
+          <h3 className="modern-title">Kho nước &amp; bán hàng</h3>
           <p className="muted-text">Quản lý tồn kho theo thời gian thực.</p>
         </div>
-        {profile?.role === 'admin' && (
-          <button type="button" className="primary-btn" onClick={handleOpenCreate}>
-            <Plus size={16} /> Thêm sản phẩm
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {/* Doanh thu nước ca hiện tại */}
+          <div style={{
+            background: '#ecfdf5',
+            border: '1px solid #a7f3d0',
+            borderRadius: '12px',
+            padding: '8px 14px',
+            fontSize: '13px',
+            fontWeight: '800',
+            color: '#047857',
+          }}>
+            DT Nước ({activeShift?.shift_name || 'Chưa mở ca'}): {drinkRevenue.toLocaleString('vi-VN')}đ
+          </div>
+
+          {profile?.role === 'admin' && (
+            <button type="button" className="primary-btn" onClick={handleOpenCreate}>
+              <Plus size={16} /> Thêm sản phẩm
+            </button>
+          )}
+        </div>
       </div>
 
       {error && <div className="modern-error">{error}</div>}
@@ -135,6 +203,7 @@ export default function Inventory() {
               <tr key={item.id}>
                 <td>
                   <p className="cell-main">{item.name}</p>
+                  {item.note && <p className="cell-sub">{item.note}</p>}
                 </td>
                 <td>
                   <p className="cell-main">{Number(item.price || 0).toLocaleString('vi-VN')}đ</p>
@@ -155,13 +224,23 @@ export default function Inventory() {
                       <Plus size={14} style={{ marginRight: '4px' }} /> Bán 1
                     </button>
                     {profile?.role === 'admin' && (
-                      <button
-                        type="button"
-                        className="ghost-btn"
-                        onClick={() => handleOpenEdit(item)}
-                      >
-                        Nhập / Sửa
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          className="ghost-btn"
+                          onClick={() => handleOpenEdit(item)}
+                        >
+                          Nhập / Sửa
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost-btn"
+                          style={{ color: '#dc2626', background: '#fef2f2' }}
+                          onClick={() => setDeletingProduct(item)}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </>
                     )}
                   </div>
                 </td>
@@ -171,6 +250,7 @@ export default function Inventory() {
         </table>
       </div>
 
+      {/* Modal thêm/sửa sản phẩm */}
       {showModal && (
         <div className="modal-backdrop" onClick={() => setShowModal(false)}>
           <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
@@ -212,8 +292,30 @@ export default function Inventory() {
           </div>
         </div>
       )}
+
+      {/* Modal xác nhận xóa sản phẩm */}
+      {deletingProduct && (
+        <div className="modal-backdrop" onClick={() => setDeletingProduct(null)}>
+          <div className="modal-panel" style={{ maxWidth: '380px' }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ color: '#dc2626' }}>Xác nhận xóa sản phẩm</h3>
+            <p>
+              Bạn có chắc muốn xóa sản phẩm <strong>{deletingProduct.name}</strong> khỏi kho?
+              Hành động này sẽ xóa toàn bộ dữ liệu liên quan và không thể hoàn tác.
+            </p>
+            <div className="modal-actions">
+              <button type="button" className="ghost-btn" onClick={() => setDeletingProduct(null)}>Hủy</button>
+              <button
+                type="button"
+                className="primary-btn"
+                style={{ background: '#dc2626' }}
+                onClick={handleConfirmDelete}
+              >
+                Xóa sản phẩm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
-

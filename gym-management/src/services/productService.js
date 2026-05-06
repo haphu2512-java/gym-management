@@ -1,4 +1,4 @@
-﻿import supabase from '../config/supabase';
+import supabase from '../config/supabase';
 import { staffLogService } from './staffLogService';
 
 const PRODUCT_TABLE = 'products';
@@ -66,6 +66,16 @@ export const productService = {
   async deleteProduct(id) {
     const { error } = await supabase.from(PRODUCT_TABLE).delete().eq('id', id);
     if (error) throw new Error(error.message);
+  },
+
+  async getDrinkRevenueForShift(shiftId) {
+    if (!shiftId) return 0;
+    const { data, error } = await supabase
+      .from('sales_logs')
+      .select('total_price')
+      .eq('shift_id', shiftId);
+    if (error) throw new Error(error.message);
+    return data.reduce((sum, item) => sum + Number(item.total_price || 0), 0);
   },
 };
 

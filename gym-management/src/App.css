@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   color: #1f2937;
   background: #f6f8fb;
@@ -731,6 +731,12 @@ a {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  /* Dashboard 4-stat grid: 2x2 on tablet, 4x1 on desktop */
+  .dashboard-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+
   .modern-toolbar {
     flex-direction: row;
     justify-content: space-between;
@@ -751,3 +757,4 @@ a {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+

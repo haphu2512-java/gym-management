@@ -1,6 +1,8 @@
-﻿import { useEffect, useMemo, useState } from 'react';
-import { TrendingUp, UserCheck, UserX } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Droplets, TrendingUp, UserCheck, UserX } from 'lucide-react';
 import { memberService } from '../../services/memberService';
+import { productService } from '../../services/productService';
+import { shiftService } from '../../services/shiftService';
 
 function getMemberStatus(endDate) {
   if (!endDate) return 'Expired';
@@ -13,6 +15,8 @@ export default function Dashboard() {
   const [members, setMembers] = useState([]);
   const [recentMembers, setRecentMembers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [drinkRevenue, setDrinkRevenue] = useState(0);
+  const [activeShift, setActiveShift] = useState(null);
 
   useEffect(() => {
     const load = async () => {
@@ -20,10 +24,18 @@ export default function Dashboard() {
       try {
         const [data, recent] = await Promise.all([
           memberService.getAllMembers(),
-          memberService.getRecentMembers(3)
+          memberService.getRecentMembers(5)
         ]);
         setMembers(data);
         setRecentMembers(recent);
+
+        // Lấy doanh thu nước ca hiện tại
+        const { shift } = await shiftService.validateShiftForLogin();
+        setActiveShift(shift);
+        if (shift) {
+          const rev = await productService.getDrinkRevenueForShift(shift.id);
+          setDrinkRevenue(rev);
+        }
       } finally {
         setLoading(false);
       }
@@ -35,16 +47,30 @@ export default function Dashboard() {
   const stats = useMemo(() => {
     const activeCount = members.filter((m) => getMemberStatus(m.end_date) === 'Active').length;
     const expiredCount = members.filter((m) => getMemberStatus(m.end_date) === 'Expired').length;
-    const totalRevenue = members.reduce((sum, m) => sum + Number(m.fee || 0), 0);
+    // Chỉ tính hội viên đã được xác nhận thanh toán (không tính CK chờ duyệt)
+    const memberRevenue = members
+      .filter((m) => m.is_payment_verified || m.payment_method === 'TM')
+      .reduce((sum, m) => sum + Number(m.fee || 0), 0);
+    const pendingCkCount = members.filter(
+      (m) => m.payment_method === 'CK' && !m.is_payment_verified
+    ).length;
 
-    return { activeCount, expiredCount, totalRevenue };
+    return { activeCount, expiredCount, memberRevenue, pendingCkCount };
   }, [members]);
 
   return (
     <div className="modern-stack">
       {loading && <div className="modern-info">Đang tải dữ liệu...</div>}
 
-      <div className="modern-grid-3">
+      {/* Thông báo có CK chờ duyệt */}
+      {stats.pendingCkCount > 0 && (
+        <div className="modern-info">
+          ⚠️ Có <strong>{stats.pendingCkCount}</strong> hội viên thanh toán CK đang chờ duyệt.
+        </div>
+      )}
+
+      {/* Stats grid — 4 thẻ */}
+      <div className="dashboard-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
         <div className="modern-card stat-card-modern">
           <div className="stat-icon-wrap blue"><UserCheck size={22} /></div>
           <div>
@@ -64,14 +90,33 @@ export default function Dashboard() {
         <div className="modern-card stat-card-modern">
           <div className="stat-icon-wrap green"><TrendingUp size={22} /></div>
           <div>
-            <p className="stat-label-modern">Doanh thu (dự tính)</p>
-            <p className="stat-value-modern">{stats.totalRevenue.toLocaleString('vi-VN')}đ</p>
+            <p className="stat-label-modern">Doanh thu hội viên</p>
+            <p className="stat-value-modern" style={{ fontSize: '20px' }}>
+              {stats.memberRevenue.toLocaleString('vi-VN')}đ
+            </p>
+            <p className="cell-sub">(Đã xác nhận thanh toán)</p>
+          </div>
+        </div>
+
+        <div className="modern-card stat-card-modern">
+          <div className="stat-icon-wrap" style={{ background: '#ecfdf5', color: '#059669' }}>
+            <Droplets size={22} />
+          </div>
+          <div>
+            <p className="stat-label-modern">
+              Doanh thu nước{activeShift ? ` – ${activeShift.shift_name}` : ''}
+            </p>
+            <p className="stat-value-modern" style={{ fontSize: '20px', color: '#059669' }}>
+              {drinkRevenue.toLocaleString('vi-VN')}đ
+            </p>
+            <p className="cell-sub">{activeShift ? 'Ca đang mở' : 'Chưa có ca nào đang mở'}</p>
           </div>
         </div>
       </div>
 
+      {/* Hội viên đăng ký gần đây */}
       <div className="modern-card">
-        <h3 className="modern-title">Gia hạn gần đây</h3>
+        <h3 className="modern-title">Hội viên đăng ký / gia hạn gần đây</h3>
         <div className="modern-list">
           {recentMembers.length === 0 && <p className="muted-text">Chưa có dữ liệu hội viên.</p>}
           {recentMembers.map((m) => (
@@ -79,7 +124,15 @@ export default function Dashboard() {
               <div className="member-avatar">{(m.full_name || 'U').charAt(0).toUpperCase()}</div>
               <div className="flex-1">
                 <p className="member-name">{m.full_name}</p>
-                <p className="member-meta">Gói {m.package_type} tháng - {m.payment_method === 'TM' ? 'Tiền mặt' : 'Chuyển khoản'}</p>
+                <p className="member-meta">
+                  Gói {m.package_type} tháng – {m.payment_method === 'TM' ? 'Tiền mặt' : 'Chuyển khoản'}
+                  {m.payment_method === 'CK' && !m.is_payment_verified && (
+                    <span style={{
+                      marginLeft: '6px', background: '#fef08a', color: '#854d0e',
+                      borderRadius: '999px', padding: '2px 7px', fontSize: '11px', fontWeight: '800'
+                    }}>Chờ duyệt</span>
+                  )}
+                </p>
               </div>
               <p className="member-fee">+{Number(m.fee || 0).toLocaleString('vi-VN')}đ</p>
             </div>
@@ -89,4 +142,3 @@ export default function Dashboard() {
     </div>
   );
 }
-
