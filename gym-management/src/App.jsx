@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import './App.css';
 
@@ -12,6 +12,7 @@ import Members from './pages/Members/Members';
 import Inventory from './pages/Inventory/Inventory';
 import Shifts from './pages/Shifts/Shifts';
 import Staff from './pages/Staff/Staff';
+import Logs from './pages/Logs/Logs';
 
 import { useAuthStore } from './store/useAuthStore';
 
@@ -55,6 +56,14 @@ function App() {
                         element={
                           <ProtectedRoute allowedRoles={['admin']}>
                             <Staff />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/logs"
+                        element={
+                          <ProtectedRoute allowedRoles={['admin']}>
+                            <Logs />
                           </ProtectedRoute>
                         }
                       />

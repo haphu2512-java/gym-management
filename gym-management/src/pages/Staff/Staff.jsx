@@ -1,135 +1,267 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { staffService } from '../../services/staffService';
 import { useAuthStore } from '../../store/useAuthStore';
+
+const DAYS = ['Mon', 'Tues', 'Wed', 'Thur', 'Fri', 'Sat', 'Sun'];
+const SHIFTS = ['Ca 1', 'Ca 2', 'Ca 3', 'Ca 4', 'Ca 5'];
 
 export default function Staff() {
   const { profile } = useAuthStore();
   const [staffs, setStaffs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showSalaryModal, setShowSalaryModal] = useState(false);
-  const [selectedStaff, setSelectedStaff] = useState(null);
-  const [salary, setSalary] = useState({
-    base_salary: '0',
-    work_days: '26',
-    overtime_hours: '0',
-    overtime_rate: '0',
-    bonus: '0',
-    deduction: '0',
+
+  // LocalStorage state for Schedule
+  const [schedule, setSchedule] = useState(() => JSON.parse(localStorage.getItem('gym_schedule')) || {});
+  
+  // Shift Rates Config
+  const [rates, setRates] = useState(() => JSON.parse(localStorage.getItem('gym_rates')) || {
+    'Ca 1_CT': 68000, 'Ca 1_TV': 62000,
+    'Ca 2_CT': 66000, 'Ca 2_TV': 60000,
+    'Ca 3_CT': 66000, 'Ca 3_TV': 60000,
+    'Ca 4_CT': 66000, 'Ca 4_TV': 60000,
+    'Ca 5_CT': 66000, 'Ca 5_TV': 60000,
   });
+
+  // Staff Types (CT = Chính thức, TV = Thử việc)
+  const [staffTypes, setStaffTypes] = useState(() => JSON.parse(localStorage.getItem('gym_staff_types')) || {});
+
+  // Adjustments
+  const [adjustments, setAdjustments] = useState(() => JSON.parse(localStorage.getItem('gym_adjustments')) || {});
+
+  useEffect(() => {
+    localStorage.setItem('gym_schedule', JSON.stringify(schedule));
+    localStorage.setItem('gym_rates', JSON.stringify(rates));
+    localStorage.setItem('gym_staff_types', JSON.stringify(staffTypes));
+    localStorage.setItem('gym_adjustments', JSON.stringify(adjustments));
+  }, [schedule, rates, staffTypes, adjustments]);
 
   useEffect(() => {
     if (profile?.role !== 'admin') return;
-
     const load = async () => {
       setLoading(true);
-      setError('');
       try {
         const data = await staffService.getStaffs();
         setStaffs(data);
+        
+        // Initialize default types if not exist
+        setStaffTypes(prev => {
+          const next = { ...prev };
+          data.forEach(s => {
+            if (!next[s.id]) next[s.id] = 'CT';
+          });
+          return next;
+        });
       } catch (e) {
         setError(e.message);
       } finally {
         setLoading(false);
       }
     };
-
     load();
   }, [profile?.role]);
 
-  const result = useMemo(() => {
-    const baseSalary = Number(salary.base_salary || 0);
-    const workDays = Number(salary.work_days || 0);
-    const overtimeHours = Number(salary.overtime_hours || 0);
-    const overtimeRate = Number(salary.overtime_rate || 0);
-    const bonus = Number(salary.bonus || 0);
-    const deduction = Number(salary.deduction || 0);
+  // Handlers
+  const updateSchedule = (shift, day, value) => {
+    setSchedule(prev => ({ ...prev, [`${shift}-${day}`]: value }));
+  };
 
-    const daySalary = workDays > 0 ? baseSalary / workDays : 0;
-    const overtimeSalary = overtimeHours * overtimeRate;
-    const total = baseSalary + overtimeSalary + bonus - deduction;
-    return { daySalary, overtimeSalary, total };
-  }, [salary]);
+  const updateRate = (key, val) => {
+    setRates(prev => ({ ...prev, [key]: Number(val) || 0 }));
+  };
+
+  const updateStaffType = (staffId, val) => {
+    setStaffTypes(prev => ({ ...prev, [staffId]: val }));
+  };
+
+  const updateAdj = (staffId, field, val) => {
+    setAdjustments(prev => ({
+      ...prev,
+      [staffId]: { ...(prev[staffId] || {}), [field]: Number(val) || 0 }
+    }));
+  };
+
+  // Calculations
+  const calculations = useMemo(() => {
+    const counts = {}; 
+    staffs.forEach(s => counts[s.id] = { 'Ca 1': 0, 'Ca 2': 0, 'Ca 3': 0, 'Ca 4': 0, 'Ca 5': 0 });
+
+    Object.entries(schedule).forEach(([key, staffId]) => {
+      if (!staffId) return;
+      const [shift] = key.split('-');
+      if (counts[staffId] && counts[staffId][shift] !== undefined) {
+        counts[staffId][shift]++;
+      }
+    });
+
+    const results = staffs.map(s => {
+      const type = staffTypes[s.id] || 'CT';
+      let baseSalary = 0;
+      
+      SHIFTS.forEach(shift => {
+        const count = counts[s.id][shift];
+        const rateKey = `${shift}_${type}`;
+        baseSalary += count * (rates[rateKey] || 0);
+      });
+
+      const adj = adjustments[s.id] || { commission: 0, others: 0, shortage: 0, penalty: 0 };
+      const commission = adj.commission || 0;
+      const others = adj.others || 0;
+      const shortage = adj.shortage || 0;
+      const penalty = adj.penalty || 0;
+
+      const finalSalary = baseSalary + commission + others - shortage - penalty;
+
+      return {
+        ...s,
+        type,
+        counts: counts[s.id],
+        baseSalary,
+        adj,
+        finalSalary
+      };
+    });
+
+    return results;
+  }, [staffs, schedule, staffTypes, rates, adjustments]);
 
   if (profile?.role !== 'admin') {
     return <div className="modern-error">Chỉ admin được truy cập mục quản lý nhân viên.</div>;
   }
 
-  return (
-    <div className="modern-stack">
-      <div className="modern-card">
-        <h3 className="modern-title">Quản lý nhân viên & tính lương</h3>
-        {error && <div className="modern-error">{error}</div>}
-        {loading && <div className="modern-info">Đang tải nhân viên...</div>}
+  const inputStyle = { width: '100%', padding: '6px', border: '1px solid #e2e8f0', borderRadius: '4px', outline: 'none' };
 
-        <div className="modern-table-wrap">
-          <table className="modern-table">
-            <thead>
-              <tr>
-                <th>Nhân viên</th>
-                <th>Vai trò</th>
-                <th>Ngày tạo</th>
-                <th>Ghi chú</th>
-                <th>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {staffs.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="table-empty-cell">Không có dữ liệu nhân viên</td>
-                </tr>
-              )}
-              {staffs.map((item) => (
-                <tr key={item.id}>
-                  <td className="cell-main">{item.full_name}</td>
-                  <td>{item.role}</td>
-                  <td>{new Date(item.created_at).toLocaleDateString('vi-VN')}</td>
-                  <td>{item.note || '-'}</td>
-                  <td>
-                    <button
-                      type="button"
-                      className="link-btn"
-                      onClick={() => {
-                        setSelectedStaff(item);
-                        setShowSalaryModal(true);
-                      }}
-                    >
-                      Tính lương
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+  return (
+    <div className="modern-stack max-width-full" style={{ maxWidth: '100%' }}>
+      <div className="modern-toolbar">
+        <div>
+          <h3 className="modern-title">Quản lý Ca làm & Bảng lương</h3>
+          <p className="muted-text">Mô phỏng Excel: Xếp ca, cài đặt đơn giá và tính toán tự động.</p>
         </div>
+        <button className="ghost-btn" onClick={() => {
+           if(window.confirm('Bạn có chắc muốn xóa sạch bảng xếp ca tuần này?')) setSchedule({});
+        }}>Xóa lịch tuần</button>
       </div>
 
-      {showSalaryModal && (
-        <div className="modal-backdrop" onClick={() => setShowSalaryModal(false)}>
-          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
-            <h3>Tính lương: {selectedStaff?.full_name || ''}</h3>
-            <div className="modern-form">
-              <input type="number" placeholder="Lương cơ bản" value={salary.base_salary} onChange={(e) => setSalary({ ...salary, base_salary: e.target.value })} />
-              <input type="number" placeholder="Số ngày công chuẩn" value={salary.work_days} onChange={(e) => setSalary({ ...salary, work_days: e.target.value })} />
-              <input type="number" placeholder="Số giờ OT" value={salary.overtime_hours} onChange={(e) => setSalary({ ...salary, overtime_hours: e.target.value })} />
-              <input type="number" placeholder="Đơn giá OT" value={salary.overtime_rate} onChange={(e) => setSalary({ ...salary, overtime_rate: e.target.value })} />
-              <input type="number" placeholder="Thưởng" value={salary.bonus} onChange={(e) => setSalary({ ...salary, bonus: e.target.value })} />
-              <input type="number" placeholder="Khấu trừ" value={salary.deduction} onChange={(e) => setSalary({ ...salary, deduction: e.target.value })} />
+      {loading && <div className="modern-info">Đang tải dữ liệu nhân viên...</div>}
+      
+      {/* 1. Schedule Table */}
+      <div className="modern-card" style={{ overflowX: 'auto', padding: '16px' }}>
+        <h4 style={{ marginBottom: '16px', color: '#0f172a', fontWeight: 600 }}>1. Bảng Xếp Ca Tuần</h4>
+        <table className="modern-table" style={{ minWidth: '800px', border: '1px solid #e2e8f0' }}>
+          <thead>
+            <tr>
+              <th style={{ width: '80px', background: '#f8fafc', borderRight: '1px solid #e2e8f0' }}>Ca \ Thứ</th>
+              {DAYS.map(d => <th key={d} style={{ textAlign: 'center', background: '#f1f5f9', borderRight: '1px solid #e2e8f0' }}>{d}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {SHIFTS.map(shift => (
+              <tr key={shift}>
+                <td style={{ fontWeight: 'bold', background: '#f8fafc', borderRight: '1px solid #e2e8f0' }}>{shift}</td>
+                {DAYS.map(day => (
+                  <td key={day} style={{ padding: '0', borderRight: '1px solid #e2e8f0' }}>
+                    <select 
+                      style={{ width: '100%', padding: '8px', border: 'none', background: schedule[`${shift}-${day}`] ? '#eff6ff' : 'transparent', outline: 'none', fontWeight: schedule[`${shift}-${day}`] ? 'bold' : 'normal', color: schedule[`${shift}-${day}`] ? '#1d4ed8' : '#64748b' }}
+                      value={schedule[`${shift}-${day}`] || ''}
+                      onChange={(e) => updateSchedule(shift, day, e.target.value)}
+                    >
+                      <option value="">-</option>
+                      {staffs.map(s => <option key={s.id} value={s.id}>{s.full_name}</option>)}
+                    </select>
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-              <div className="modern-success">
-                Lương/ngày: {result.daySalary.toLocaleString('vi-VN')}đ<br />
-                Tiền OT: {result.overtimeSalary.toLocaleString('vi-VN')}đ<br />
-                Tổng lương: {result.total.toLocaleString('vi-VN')}đ
-              </div>
+      {/* 2. Rates Config Table */}
+      <div className="modern-card" style={{ overflowX: 'auto', padding: '16px' }}>
+        <h4 style={{ marginBottom: '16px', color: '#0f172a', fontWeight: 600 }}>2. Bảng Chấm Công & Khai Báo Đơn Giá</h4>
+        <table className="modern-table" style={{ minWidth: '1100px', fontSize: '13px', border: '1px solid #e2e8f0' }}>
+          <thead>
+            <tr>
+              <th rowSpan={2} style={{ background: '#f8fafc', borderRight: '1px solid #e2e8f0' }}>Nhân viên</th>
+              <th rowSpan={2} style={{ background: '#f8fafc', width: '110px', borderRight: '1px solid #e2e8f0' }}>Loại</th>
+              {SHIFTS.map(s => (
+                <th colSpan={2} key={s} style={{ textAlign: 'center', borderRight: '2px solid #cbd5e1', background: '#f8fafc' }}>{s}</th>
+              ))}
+              <th rowSpan={2} style={{ background: '#f8fafc', textAlign: 'right' }}>Tiền Ca (VND)</th>
+            </tr>
+            <tr>
+              {SHIFTS.map(s => (
+                <td colSpan={2} key={s} style={{ padding: 0, borderRight: '2px solid #cbd5e1' }}>
+                  <div style={{ display: 'flex' }}>
+                    <div style={{ flex: 1, padding: '4px', background: '#f1f5f9', borderRight: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>Chính thức</div>
+                      <input type="number" style={{ width: '100%', padding: '4px', fontSize: '12px', border: '1px solid #cbd5e1', borderRadius: '4px' }} value={rates[`${s}_CT`]} onChange={e => updateRate(`${s}_CT`, e.target.value)} />
+                    </div>
+                    <div style={{ flex: 1, padding: '4px', background: '#f1f5f9' }}>
+                      <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>Thử việc</div>
+                      <input type="number" style={{ width: '100%', padding: '4px', fontSize: '12px', border: '1px solid #cbd5e1', borderRadius: '4px' }} value={rates[`${s}_TV`]} onChange={e => updateRate(`${s}_TV`, e.target.value)} />
+                    </div>
+                  </div>
+                </td>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {calculations.map(calc => (
+              <tr key={calc.id}>
+                <td style={{ fontWeight: 'bold', borderRight: '1px solid #e2e8f0' }}>{calc.full_name}</td>
+                <td style={{ borderRight: '1px solid #e2e8f0' }}>
+                  <select value={calc.type} onChange={e => updateStaffType(calc.id, e.target.value)} style={{ padding: '4px', width: '100%', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
+                    <option value="CT">Chính thức</option>
+                    <option value="TV">Thử việc</option>
+                  </select>
+                </td>
+                {SHIFTS.map(s => (
+                  <td colSpan={2} key={s} style={{ borderRight: '2px solid #cbd5e1', textAlign: 'center', background: calc.counts[s] > 0 ? '#e0f2fe' : 'transparent', fontWeight: calc.counts[s] > 0 ? 'bold' : 'normal' }}>
+                    {calc.counts[s] > 0 ? calc.counts[s] : '-'}
+                  </td>
+                ))}
+                <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#0ea5e9', fontSize: '14px' }}>
+                  {calc.baseSalary.toLocaleString('vi-VN')}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-              <div className="modal-actions">
-                <button type="button" className="ghost-btn" onClick={() => setShowSalaryModal(false)}>Đóng</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 3. Final Salary Table */}
+      <div className="modern-card" style={{ overflowX: 'auto', padding: '16px' }}>
+        <h4 style={{ marginBottom: '16px', color: '#0f172a', fontWeight: 600 }}>3. Bảng Kết Lương</h4>
+        <table className="modern-table" style={{ width: '100%', border: '1px solid #e2e8f0' }}>
+          <thead>
+            <tr>
+              <th style={{ background: '#fef3c7', borderRight: '1px solid #e2e8f0' }}>Nhân viên</th>
+              <th style={{ background: '#fef3c7', borderRight: '1px solid #e2e8f0' }}>Hoa hồng</th>
+              <th style={{ background: '#fef3c7', borderRight: '1px solid #e2e8f0' }}>Khoản khác</th>
+              <th style={{ background: '#fef3c7', borderRight: '1px solid #e2e8f0' }}>Hao hụt</th>
+              <th style={{ background: '#fef3c7', borderRight: '1px solid #e2e8f0' }}>Khoản phạt</th>
+              <th style={{ background: '#fef3c7', textAlign: 'right' }}>Thực Lãnh</th>
+            </tr>
+          </thead>
+          <tbody>
+            {calculations.map(calc => (
+              <tr key={calc.id}>
+                <td style={{ fontWeight: 'bold', borderRight: '1px solid #e2e8f0' }}>{calc.full_name}</td>
+                <td style={{ borderRight: '1px solid #e2e8f0' }}><input type="number" style={inputStyle} value={calc.adj.commission || ''} onChange={e => updateAdj(calc.id, 'commission', e.target.value)} placeholder="0" /></td>
+                <td style={{ borderRight: '1px solid #e2e8f0' }}><input type="number" style={inputStyle} value={calc.adj.others || ''} onChange={e => updateAdj(calc.id, 'others', e.target.value)} placeholder="0" /></td>
+                <td style={{ borderRight: '1px solid #e2e8f0' }}><input type="number" style={inputStyle} value={calc.adj.shortage || ''} onChange={e => updateAdj(calc.id, 'shortage', e.target.value)} placeholder="0" /></td>
+                <td style={{ borderRight: '1px solid #e2e8f0' }}><input type="number" style={inputStyle} value={calc.adj.penalty || ''} onChange={e => updateAdj(calc.id, 'penalty', e.target.value)} placeholder="0" /></td>
+                <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#16a34a', fontSize: '16px', background: '#f0fdf4' }}>
+                  {calc.finalSalary.toLocaleString('vi-VN')}đ
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
     </div>
   );
 }
-

@@ -1,5 +1,5 @@
-﻿import { Link, useLocation } from 'react-router-dom';
-import { Clock, Droplets, LayoutDashboard, LogOut, Users, WalletCards } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { Clock, Droplets, LayoutDashboard, LogOut, Users, WalletCards, ScrollText } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 
 const icons = {
@@ -8,6 +8,7 @@ const icons = {
   inventory: Droplets,
   shifts: Clock,
   staff: WalletCards,
+  logs: ScrollText,
 };
 
 export default function Sidebar({ isOpen, onClose }) {
@@ -22,7 +23,11 @@ export default function Sidebar({ isOpen, onClose }) {
   ];
 
   const menuItems = profile?.role === 'admin'
-    ? [...baseItems, { key: 'staff', path: '/staff', label: 'Nhân Viên & Lương' }]
+    ? [
+        ...baseItems, 
+        { key: 'staff', path: '/staff', label: 'Nhân Viên & Lương' },
+        { key: 'logs', path: '/logs', label: 'Nhật Ký Hoạt Động' }
+      ]
     : baseItems.filter((item) => item.key !== 'dashboard');
 
   return (

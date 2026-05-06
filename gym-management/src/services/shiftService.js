@@ -1,9 +1,9 @@
-﻿import supabase from '../config/supabase';
+import supabase from '../config/supabase';
 import { staffLogService } from './staffLogService';
 
 const SHIFT_TABLE = 'shifts';
 
-const DEFAULT_SHIFTS = ['Ca 1 (5h-9h)', 'Ca 2 (9h-13h)', 'Ca 3 (13h-17h)', 'Ca 4 (17h-21h)', 'Ca 5 (21h-23h)'];
+const DEFAULT_SHIFTS = ['Ca 1', 'Ca 2', 'Ca 3', 'Ca 4', 'Ca 5'];
 
 function formatDateKey(date = new Date()) {
   return date.toISOString().slice(0, 10);
@@ -48,8 +48,20 @@ export const shiftService = {
   },
 
   async openShift({ shiftName, startingCash = 0, note = '', staffId = null }) {
+    const shiftTimeMap = {
+      'Ca 1': { start: '05:00:00', end: '09:00:00' },
+      'Ca 2': { start: '09:00:00', end: '13:00:00' },
+      'Ca 3': { start: '13:00:00', end: '17:00:00' },
+      'Ca 4': { start: '17:00:00', end: '21:00:00' },
+      'Ca 5': { start: '21:00:00', end: '23:00:00' },
+    };
+
+    const times = shiftTimeMap[shiftName] || { start: '00:00:00', end: '00:00:00' };
+
     const payload = {
       shift_name: shiftName,
+      default_start: times.start,
+      default_end: times.end,
       start_time: new Date().toISOString(),
       starting_cash: Number(startingCash || 0),
       status: 'open',

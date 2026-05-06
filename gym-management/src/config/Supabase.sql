@@ -51,7 +51,7 @@ CREATE TABLE shifts (
 -- 5. Bảng lưu nhật ký hoạt động của nhân viên (Staff Logs) thay cho member_logs
 CREATE TABLE staff_logs (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  staff_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  staff_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
   action TEXT NOT NULL,
   target_item TEXT, -- Có thể lưu tên hội viên, tên sản phẩm, ... bị tác động
   details JSONB, -- Lưu object before/after nếu cần
@@ -64,7 +64,7 @@ CREATE TABLE sales_logs (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   product_id UUID REFERENCES products(id) ON DELETE CASCADE,
   shift_id UUID REFERENCES shifts(id) ON DELETE SET NULL,
-  sold_by UUID REFERENCES auth.users(id),
+  sold_by UUID REFERENCES profiles(id),
   quantity INT DEFAULT 1,
   total_price NUMERIC NOT NULL,
   sold_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
