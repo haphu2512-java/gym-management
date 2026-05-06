@@ -31,16 +31,7 @@ CREATE TABLE products (
 );
 
 -- 4. Bảng quản lý ca làm việc (5 ca)
--- CREATE TABLE shifts (
---   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
---   shift_name TEXT NOT NULL, -- Ca 1, Ca 2, Ca 3, Ca 4, Ca 5
---   start_time TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
---   end_time TIMESTAMP WITH TIME ZONE,
---   starting_cash NUMERIC DEFAULT 0,
---   ending_cash NUMERIC,
---   status TEXT DEFAULT 'open' CHECK (status IN ('open', 'closed')),
---   note TEXT
--- );
+
 
 CREATE TABLE shifts (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -76,3 +67,44 @@ CREATE TABLE sales_logs (
   total_price NUMERIC NOT NULL,
   sold_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
+
+-- CREATE TABLE shifts (
+--   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+--   shift_name TEXT NOT NULL, -- Ca 1, Ca 2, Ca 3, Ca 4, Ca 5
+--   start_time TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+--   end_time TIMESTAMP WITH TIME ZONE,
+--   starting_cash NUMERIC DEFAULT 0,
+--   ending_cash NUMERIC,
+--   status TEXT DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+--   note TEXT
+-- );
+
+
+-- 1. Cho phép mọi thao tác cho người dùng đã đăng nhập trên bảng 'shifts'
+ALTER TABLE shifts ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Cho phép người dùng đã đăng nhập thao tác trên shifts" 
+ON shifts FOR ALL 
+TO authenticated 
+USING (true) 
+WITH CHECK (true);
+
+-- 2. Tương tự cho các bảng khác để không bị lỗi tương tự
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Cho phép người dùng đã đăng nhập thao tác trên profiles" 
+ON profiles FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+ALTER TABLE members ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Cho phép người dùng đã đăng nhập thao tác trên members" 
+ON members FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Cho phép người dùng đã đăng nhập thao tác trên products" 
+ON products FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+ALTER TABLE staff_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Cho phép người dùng đã đăng nhập thao tác trên staff_logs" 
+ON staff_logs FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+ALTER TABLE sales_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Cho phép người dùng đã đăng nhập thao tác trên sales_logs" 
+ON sales_logs FOR ALL TO authenticated USING (true) WITH CHECK (true);
