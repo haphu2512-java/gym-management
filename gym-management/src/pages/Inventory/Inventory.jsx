@@ -1,9 +1,10 @@
-﻿/* eslint-disable react-hooks/set-state-in-effect */
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { productService } from '../../services/productService';
+import { useAuthStore } from '../../store/useAuthStore';
 
 export default function Inventory() {
+  const { user, assignedShift } = useAuthStore();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -48,7 +49,7 @@ export default function Inventory() {
   const handleSell = async (product) => {
     setError('');
     try {
-      const updated = await productService.sellOneBottle(product);
+      const updated = await productService.sellOneBottle(product, assignedShift?.id, user?.id);
       setProducts((prev) => prev.map((item) => (item.id === product.id ? updated : item)));
     } catch (err) {
       setError(err.message);

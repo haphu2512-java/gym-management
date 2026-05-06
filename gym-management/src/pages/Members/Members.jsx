@@ -11,11 +11,7 @@ function getStatus(endDate) {
   return target >= new Date(today.toDateString()) ? 'Active' : 'Expired';
 }
 
-function addMonths(baseDate, months) {
-  const next = new Date(baseDate);
-  next.setMonth(next.getMonth() + Number(months || 1));
-  return next;
-}
+import { addMonths } from '../../utils/formatters';
 
 const initialForm = {
   full_name: '',
@@ -34,6 +30,10 @@ export default function Members() {
   const [showModal, setShowModal] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
   const [form, setForm] = useState(initialForm);
+
+  const [showRenewModal, setShowRenewModal] = useState(false);
+  const [renewingMember, setRenewingMember] = useState(null);
+  const [renewForm, setRenewForm] = useState({ package_type: '1', fee: '' });
 
   const filtered = useMemo(() => {
     return members.filter((m) => {
@@ -114,24 +114,41 @@ export default function Members() {
     }
   };
 
-  const handleRenew = async (member) => {
+  const openRenewModal = (member) => {
+    setRenewingMember(member);
+    setRenewForm({ package_type: '1', fee: '' });
+    setError('');
+    setShowRenewModal(true);
+  };
+
+  const handleRenew = async (e) => {
+    e.preventDefault();
+    if (!renewingMember) return;
     setError('');
     try {
-      const updated = await memberService.renewMember(member);
-      await updateMember(member.id, {
+      const updated = await memberService.renewMember(
+        renewingMember,
+        renewForm.package_type,
+        renewForm.fee
+      );
+      await updateMember(renewingMember.id, {
         start_date: updated.start_date,
         end_date: updated.end_date,
+        package_type: updated.package_type,
+        fee: updated.fee,
         note: updated.note,
       });
 
       await memberLogService.createLog({
-        memberId: member.id,
+        memberId: renewingMember.id,
         action: 'renew_member',
         changedBy: user?.id,
-        beforeData: member,
+        beforeData: renewingMember,
         afterData: updated,
         note: 'Gia hạn hội viên',
       });
+      setShowRenewModal(false);
+      setRenewingMember(null);
     } catch (err) {
       setError(err.message);
     }
@@ -201,7 +218,7 @@ export default function Members() {
                       <button type="button" className="link-btn" onClick={() => openEditModal(m)}>
                         Chi tiết
                       </button>
-                      <button type="button" className="link-btn" onClick={() => handleRenew(m)}>
+                      <button type="button" className="link-btn" onClick={() => openRenewModal(m)}>
                         <CreditCard size={14} /> Gia hạn
                       </button>
                     </div>
@@ -264,6 +281,36 @@ export default function Members() {
               <div className="modal-actions">
                 <button type="button" className="ghost-btn" onClick={() => setShowModal(false)}>Hủy</button>
                 <button type="submit" className="primary-btn">Lưu</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showRenewModal && (
+        <div className="modal-backdrop" onClick={() => setShowRenewModal(false)}>
+          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
+            <h3>Gia hạn hội viên: {renewingMember?.full_name}</h3>
+            <form className="modern-form" onSubmit={handleRenew}>
+              <div className="form-grid-2">
+                <input
+                  type="number"
+                  value={renewForm.package_type}
+                  onChange={(e) => setRenewForm({ ...renewForm, package_type: e.target.value })}
+                  placeholder="Gói (tháng)"
+                  required
+                />
+                <input
+                  type="number"
+                  value={renewForm.fee}
+                  onChange={(e) => setRenewForm({ ...renewForm, fee: e.target.value })}
+                  placeholder="Học phí"
+                  required
+                />
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="ghost-btn" onClick={() => setShowRenewModal(false)}>Hủy</button>
+                <button type="submit" className="primary-btn">Xác nhận</button>
               </div>
             </form>
           </div>

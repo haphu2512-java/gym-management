@@ -31,17 +31,31 @@ CREATE TABLE products (
 );
 
 -- 4. Bảng quản lý ca làm việc (5 ca)
+-- CREATE TABLE shifts (
+--   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+--   shift_name TEXT NOT NULL, -- Ca 1, Ca 2, Ca 3, Ca 4, Ca 5
+--   start_time TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+--   end_time TIMESTAMP WITH TIME ZONE,
+--   starting_cash NUMERIC DEFAULT 0,
+--   ending_cash NUMERIC,
+--   status TEXT DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+--   note TEXT
+-- );
+
 CREATE TABLE shifts (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  shift_name TEXT NOT NULL, -- Ca 1, Ca 2, Ca 3, Ca 4, Ca 5
-  start_time TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  end_time TIMESTAMP WITH TIME ZONE,
+  shift_name TEXT NOT NULL,       -- Ca 1, Ca 2, Ca 3, Ca 4, Ca 5
+  default_start TIME NOT NULL,    -- Giờ bắt đầu quy định (Ví dụ: 05:00:00)
+  default_end TIME NOT NULL,      -- Giờ kết thúc quy định (Ví dụ: 08:00:00)
+  start_time TIMESTAMP WITH TIME ZONE, -- Thực tế bấm MỞ CA (Hệ thống tự lấy NOW())
+  end_time TIMESTAMP WITH TIME ZONE,   -- Thực tế bấm KẾT CA (Hệ thống tự lấy NOW())
   starting_cash NUMERIC DEFAULT 0,
   ending_cash NUMERIC,
-  status TEXT DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+  status TEXT DEFAULT 'closed' CHECK (status IN ('open', 'closed')), -- Mặc định đóng, khi nào nhân viên bấm mới 'open'
   note TEXT
 );
--- 5. B?ng luu l?ch s? thay d?i c?a h?i vi�n
+
+-- 5. Bảng luu lịch sử thay đổi của hội viên
 CREATE TABLE member_logs (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   member_id UUID REFERENCES members(id) ON DELETE CASCADE,
@@ -51,4 +65,15 @@ CREATE TABLE member_logs (
   after_data JSONB,
   note TEXT,
   changed_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
+-- 6. Bảng luu giao dich ban hang
+CREATE TABLE sales_logs (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  product_id UUID REFERENCES products(id) ON DELETE CASCADE,
+  shift_id UUID REFERENCES shifts(id) ON DELETE SET NULL,
+  sold_by UUID REFERENCES auth.users(id),
+  quantity INT DEFAULT 1,
+  total_price NUMERIC NOT NULL,
+  sold_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );

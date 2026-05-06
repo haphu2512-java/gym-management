@@ -23,9 +23,11 @@ export const shiftService = {
   },
 
   async getTodayShifts() {
-    const dayKey = formatDateKey();
-    const start = `${dayKey}T00:00:00.000Z`;
-    const end = `${dayKey}T23:59:59.999Z`;
+    const now = new Date();
+    const startObj = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const endObj = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const start = startObj.toISOString();
+    const end = endObj.toISOString();
 
     const { data, error } = await supabase
       .from(SHIFT_TABLE)

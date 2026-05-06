@@ -57,3 +57,9 @@ export const getStatusColor = (status) => {
   };
   return statusMap[status?.toLowerCase()] || 'secondary';
 };
+
+export const addMonths = (dateInput, months) => {
+  const d = new Date(dateInput);
+  d.setMonth(d.getMonth() + Number(months || 1));
+  return d;
+};

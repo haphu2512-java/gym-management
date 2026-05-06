@@ -26,13 +26,32 @@ export const productService = {
     return data;
   },
 
-  async sellOneBottle(product) {
+  async sellOneBottle(product, shiftId, userId) {
     const currentStock = Number(product.stock_quantity || 0);
     if (currentStock <= 0) {
       throw new Error('Sản phẩm đã hết hàng.');
     }
 
-    return this.updateProduct(product.id, { stock_quantity: currentStock - 1 });
+    const { data: updatedProduct, error: updateError } = await supabase
+      .from(PRODUCT_TABLE)
+      .update({ stock_quantity: currentStock - 1 })
+      .eq('id', product.id)
+      .select()
+      .single();
+
+    if (updateError) throw new Error(updateError.message);
+
+    const { error: logError } = await supabase.from('sales_logs').insert([{
+      product_id: product.id,
+      shift_id: shiftId || null,
+      sold_by: userId || null,
+      quantity: 1,
+      total_price: Number(product.price || 0)
+    }]);
+
+    if (logError) console.error('Failed to log sale:', logError);
+
+    return updatedProduct;
   },
 
   async deleteProduct(id) {
@@ -40,3 +59,4 @@ export const productService = {
     if (error) throw new Error(error.message);
   },
 };
+

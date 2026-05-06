@@ -6,12 +6,6 @@ function toDateOnly(date) {
   return date.toISOString().slice(0, 10);
 }
 
-function addMonths(baseDate, months) {
-  const next = new Date(baseDate);
-  next.setMonth(next.getMonth() + Number(months || 1));
-  return next;
-}
-
 export const memberService = {
   async getAllMembers() {
     const { data, error } = await supabase.from(TABLE_NAME).select('*').order('created_at', { ascending: false });
@@ -41,15 +35,20 @@ export const memberService = {
     return data;
   },
 
-  async renewMember(member) {
+  async renewMember(member, months, fee) {
     const now = new Date();
     const currentEnd = member.end_date ? new Date(member.end_date) : null;
     const startBase = currentEnd && currentEnd > now ? currentEnd : now;
-    const newEnd = addMonths(startBase, member.package_type || 1);
+
+    // Calculate new end date
+    const newEnd = new Date(startBase);
+    newEnd.setMonth(newEnd.getMonth() + Number(months || 1));
 
     const updated = await this.updateMember(member.id, {
       start_date: toDateOnly(now),
       end_date: toDateOnly(newEnd),
+      package_type: Number(months || 1),
+      fee: Number(fee || 0),
       note: `Gia hạn ngày ${toDateOnly(now)}`,
     });
 

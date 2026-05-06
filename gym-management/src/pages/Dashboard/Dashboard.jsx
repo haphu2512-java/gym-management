@@ -11,14 +11,19 @@ function getMemberStatus(endDate) {
 
 export default function Dashboard() {
   const [members, setMembers] = useState([]);
+  const [recentMembers, setRecentMembers] = useState([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       try {
-        const data = await memberService.getAllMembers();
+        const [data, recent] = await Promise.all([
+          memberService.getAllMembers(),
+          memberService.getRecentMembers(3)
+        ]);
         setMembers(data);
+        setRecentMembers(recent);
       } finally {
         setLoading(false);
       }
@@ -34,8 +39,6 @@ export default function Dashboard() {
 
     return { activeCount, expiredCount, totalRevenue };
   }, [members]);
-
-  const recentMembers = members.slice(0, 3);
 
   return (
     <div className="modern-stack">

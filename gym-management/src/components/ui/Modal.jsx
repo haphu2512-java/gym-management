@@ -1,5 +1,4 @@
-﻿
-export default function Modal({ isOpen, title, children, onClose, onConfirm, confirmText = 'XÃ¡c nháº­n', cancelText = 'Há»§y' }) {
+﻿export default function Modal({ isOpen, title, children, onClose, onConfirm, confirmText = 'Xác nhận', cancelText = 'Hủy' }) {
   if (!isOpen) return null;
 
   return (
@@ -7,7 +6,7 @@ export default function Modal({ isOpen, title, children, onClose, onConfirm, con
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>{title}</h3>
-          <button className="modal-close" onClick={onClose}>âœ•</button>
+          <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
           {children}
@@ -22,4 +21,3 @@ export default function Modal({ isOpen, title, children, onClose, onConfirm, con
     </div>
   );
 }
-

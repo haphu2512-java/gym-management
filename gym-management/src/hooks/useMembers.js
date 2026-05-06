@@ -1,5 +1,4 @@
-﻿/* eslint-disable react-hooks/set-state-in-effect */
-import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useState } from 'react';
 import { memberService } from '../services/memberService';
 
 export function useMembers() {
@@ -57,4 +56,3 @@ export function useMembers() {
 
   return { members, loading, error, fetchMembers, addMember, updateMember, deleteMember };
 }
-

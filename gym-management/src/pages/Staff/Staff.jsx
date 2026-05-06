@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
-import supabase from '../../config/supabase';
+import { staffService } from '../../services/staffService';
 import { useAuthStore } from '../../store/useAuthStore';
 
 export default function Staff() {
@@ -25,13 +25,8 @@ export default function Staff() {
       setLoading(true);
       setError('');
       try {
-        const { data, error: queryError } = await supabase
-          .from('profiles')
-          .select('id, full_name, role, created_at, note')
-          .order('created_at', { ascending: false });
-
-        if (queryError) throw queryError;
-        setStaffs((data || []).filter((item) => item.role === 'staff'));
+        const data = await staffService.getStaffs();
+        setStaffs(data);
       } catch (e) {
         setError(e.message);
       } finally {

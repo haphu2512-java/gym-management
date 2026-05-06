@@ -39,11 +39,25 @@ function App() {
                   <Header onMenuToggle={() => setSidebarOpen((prev) => !prev)} />
                   <div className="modern-content">
                     <Routes>
-                      <Route path="/dashboard" element={<Dashboard />} />
+                      <Route
+                        path="/dashboard"
+                        element={
+                          <ProtectedRoute allowedRoles={['admin']}>
+                            <Dashboard />
+                          </ProtectedRoute>
+                        }
+                      />
                       <Route path="/members" element={<Members />} />
                       <Route path="/inventory" element={<Inventory />} />
                       <Route path="/shifts" element={<Shifts />} />
-                      <Route path="/staff" element={<Staff />} />
+                      <Route
+                        path="/staff"
+                        element={
+                          <ProtectedRoute allowedRoles={['admin']}>
+                            <Staff />
+                          </ProtectedRoute>
+                        }
+                      />
                       <Route
                         path="/"
                         element={<Navigate to={profile?.role === 'staff' ? '/members' : '/dashboard'} replace />}

@@ -1,5 +1,4 @@
-﻿/* eslint-disable react-hooks/set-state-in-effect */
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { Clock } from 'lucide-react';
 import { shiftService } from '../../services/shiftService';
 
@@ -155,5 +154,3 @@ export default function Shifts() {
     </div>
   );
 }
-
-

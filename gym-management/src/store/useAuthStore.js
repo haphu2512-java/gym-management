@@ -28,6 +28,21 @@ export const useAuthStore = create((set) => ({
     }
   },
 
+  login: async (email, password) => {
+    set({ loading: true });
+    try {
+      const user = await authService.login(email, password);
+      let profile = null;
+      if (user?.id) {
+        profile = await authService.getProfile(user.id);
+      }
+      set({ user, profile, loading: false });
+    } catch (error) {
+      set({ error: error.message, loading: false });
+      throw error;
+    }
+  },
+
   logout: async () => {
     try {
       await authService.logout();
