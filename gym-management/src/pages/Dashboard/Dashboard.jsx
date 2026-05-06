@@ -3,6 +3,7 @@ import { Droplets, TrendingUp, UserCheck, UserX } from 'lucide-react';
 import { memberService } from '../../services/memberService';
 import { productService } from '../../services/productService';
 import { shiftService } from '../../services/shiftService';
+import { paymentService } from '../../services/paymentService';
 
 function getMemberStatus(endDate) {
   if (!endDate) return 'Expired';
@@ -16,18 +17,21 @@ export default function Dashboard() {
   const [recentMembers, setRecentMembers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [drinkRevenue, setDrinkRevenue] = useState(0);
+  const [membershipRevenue, setMembershipRevenue] = useState(0);
   const [activeShift, setActiveShift] = useState(null);
 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       try {
-        const [data, recent] = await Promise.all([
+        const [data, recent, totalMemberRev] = await Promise.all([
           memberService.getAllMembers(),
-          memberService.getRecentMembers(5)
+          memberService.getRecentMembers(5),
+          paymentService.getTotalMemberRevenue()
         ]);
         setMembers(data);
         setRecentMembers(recent);
+        setMembershipRevenue(totalMemberRev);
 
         // Lấy doanh thu nước ca hiện tại
         const { shift } = await shiftService.validateShiftForLogin();
@@ -47,16 +51,16 @@ export default function Dashboard() {
   const stats = useMemo(() => {
     const activeCount = members.filter((m) => getMemberStatus(m.end_date) === 'Active').length;
     const expiredCount = members.filter((m) => getMemberStatus(m.end_date) === 'Expired').length;
-    // Chỉ tính hội viên đã được xác nhận thanh toán (không tính CK chờ duyệt)
-    const memberRevenue = members
-      .filter((m) => m.is_payment_verified || m.payment_method === 'TM')
-      .reduce((sum, m) => sum + Number(m.fee || 0), 0);
+    
+    // Member revenue is now tracked via payment logs
+    const memberRevenue = membershipRevenue;
+
     const pendingCkCount = members.filter(
       (m) => m.payment_method === 'CK' && !m.is_payment_verified
     ).length;
 
     return { activeCount, expiredCount, memberRevenue, pendingCkCount };
-  }, [members]);
+  }, [members, membershipRevenue]);
 
   return (
     <div className="modern-stack">

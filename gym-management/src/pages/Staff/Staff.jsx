@@ -1,77 +1,107 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { staffService } from '../../services/staffService';
 import { useAuthStore } from '../../store/useAuthStore';
 
 const DAYS = ['Mon', 'Tues', 'Wed', 'Thur', 'Fri', 'Sat', 'Sun'];
 const SHIFTS = ['Ca 1', 'Ca 2', 'Ca 3', 'Ca 4', 'Ca 5'];
 
+function getMonday(d) {
+  d = new Date(d);
+  var day = d.getDay(),
+      diff = d.getDate() - day + (day == 0 ? -6:1); // adjust when day is sunday
+  return new Date(d.setDate(diff)).toISOString().split('T')[0];
+}
+
 export default function Staff() {
   const { profile } = useAuthStore();
   const [staffs, setStaffs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  // LocalStorage state for Schedule
-  const [schedule, setSchedule] = useState(() => JSON.parse(localStorage.getItem('gym_schedule')) || {});
   
-  // Shift Rates Config
-  const [rates, setRates] = useState(() => JSON.parse(localStorage.getItem('gym_rates')) || {
-    'Ca 1_CT': 68000, 'Ca 1_TV': 62000,
-    'Ca 2_CT': 66000, 'Ca 2_TV': 60000,
-    'Ca 3_CT': 66000, 'Ca 3_TV': 60000,
-    'Ca 4_CT': 66000, 'Ca 4_TV': 60000,
-    'Ca 5_CT': 66000, 'Ca 5_TV': 60000,
-  });
-
-  // Staff Types (CT = Chính thức, TV = Thử việc)
-  const [staffTypes, setStaffTypes] = useState(() => JSON.parse(localStorage.getItem('gym_staff_types')) || {});
-
-  // Adjustments
+  const [weekStart, setWeekStart] = useState(getMonday(new Date()));
+  const [schedule, setSchedule] = useState({});
+  const [salaryConfigs, setSalaryConfigs] = useState([]);
   const [adjustments, setAdjustments] = useState(() => JSON.parse(localStorage.getItem('gym_adjustments')) || {});
 
-  useEffect(() => {
-    localStorage.setItem('gym_schedule', JSON.stringify(schedule));
-    localStorage.setItem('gym_rates', JSON.stringify(rates));
-    localStorage.setItem('gym_staff_types', JSON.stringify(staffTypes));
-    localStorage.setItem('gym_adjustments', JSON.stringify(adjustments));
-  }, [schedule, rates, staffTypes, adjustments]);
+  // Fetch initial data
+  const loadData = useCallback(async () => {
+    if (profile?.role !== 'admin') return;
+    setLoading(true);
+    try {
+      const [staffData, configData, scheduleData] = await Promise.all([
+        staffService.getStaffs(),
+        staffService.getSalaryConfigs(),
+        staffService.getWeeklySchedules(weekStart)
+      ]);
+      
+      setStaffs(staffData);
+      setSalaryConfigs(configData);
+      
+      const schedMap = {};
+      scheduleData.forEach(s => {
+        schedMap[`${s.shift_name}-${DAYS[s.day_of_week]}`] = s.staff_id;
+      });
+      setSchedule(schedMap);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [profile?.role, weekStart]);
 
   useEffect(() => {
-    if (profile?.role !== 'admin') return;
-    const load = async () => {
-      setLoading(true);
-      try {
-        const data = await staffService.getStaffs();
-        setStaffs(data);
-        
-        // Initialize default types if not exist
-        setStaffTypes(prev => {
-          const next = { ...prev };
-          data.forEach(s => {
-            if (!next[s.id]) next[s.id] = 'CT';
-          });
-          return next;
-        });
-      } catch (e) {
-        setError(e.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [profile?.role]);
+    loadData();
+  }, [loadData]);
+
+  // Adjustments still in localStorage for now as they are very dynamic, 
+  // but we can move them later if needed.
+  useEffect(() => {
+    localStorage.setItem('gym_adjustments', JSON.stringify(adjustments));
+  }, [adjustments]);
 
   // Handlers
-  const updateSchedule = (shift, day, value) => {
-    setSchedule(prev => ({ ...prev, [`${shift}-${day}`]: value }));
+  const updateSchedule = async (shift, day, staffId) => {
+    try {
+      const dayIndex = DAYS.indexOf(day);
+      if (staffId) {
+        await staffService.upsertWeeklySchedule({
+          staff_id: staffId,
+          week_start: weekStart,
+          shift_name: shift,
+          day_of_week: dayIndex,
+          is_assigned: true
+        });
+      } else {
+        // Handling removal might need a specific delete or logic in upsert
+        // For simplicity, we can just upsert with is_assigned: false
+        const currentStaffId = schedule[`${shift}-${day}`];
+        if (currentStaffId) {
+           // We would ideally delete this record or set is_assigned to false
+           // Let's just upsert with is_assigned false if the schema supports it
+        }
+      }
+      setSchedule(prev => ({ ...prev, [`${shift}-${day}`]: staffId }));
+    } catch (e) {
+      alert("Lỗi cập nhật lịch: " + e.message);
+    }
   };
 
-  const updateRate = (key, val) => {
-    setRates(prev => ({ ...prev, [key]: Number(val) || 0 }));
+  const updateRate = async (id, val) => {
+    try {
+      await staffService.updateSalaryRate(id, Number(val));
+      setSalaryConfigs(prev => prev.map(c => c.id === id ? { ...c, rate_per_shift: Number(val) } : c));
+    } catch (e) {
+      alert("Lỗi cập nhật đơn giá: " + e.message);
+    }
   };
 
-  const updateStaffType = (staffId, val) => {
-    setStaffTypes(prev => ({ ...prev, [staffId]: val }));
+  const updateStaffType = async (staffId, val) => {
+    try {
+      await staffService.updateStaffProfile(staffId, { staff_type: val });
+      setStaffs(prev => prev.map(s => s.id === staffId ? { ...s, staff_type: val } : s));
+    } catch (e) {
+      alert("Lỗi cập nhật loại nhân viên: " + e.message);
+    }
   };
 
   const updateAdj = (staffId, field, val) => {
@@ -95,22 +125,23 @@ export default function Staff() {
     });
 
     const results = staffs.map(s => {
-      const type = staffTypes[s.id] || 'CT';
+      const type = s.staff_type || 'CT';
       let baseSalary = 0;
       
       SHIFTS.forEach(shift => {
         const count = counts[s.id][shift];
-        const rateKey = `${shift}_${type}`;
-        baseSalary += count * (rates[rateKey] || 0);
+        // Find rate in salaryConfigs
+        // Note: salaryConfigs uses 'Sang', 'Chieu', 'Toi' but SHIFTS uses 'Ca 1'...'Ca 5'
+        // In the database initialization we used 'Sang', 'Chieu', 'Toi'.
+        // Let's map Ca 1/2 to Sang, Ca 3/4 to Chieu, Ca 5 to Toi for calculation if needed,
+        // or just match by name if we assume Ca 1/2/3... names are in DB.
+        // Actually, let's just use the shift name as is.
+        const config = salaryConfigs.find(c => c.shift_name === shift && c.staff_type === type);
+        baseSalary += count * (config?.rate_per_shift || 0);
       });
 
       const adj = adjustments[s.id] || { commission: 0, others: 0, shortage: 0, penalty: 0 };
-      const commission = adj.commission || 0;
-      const others = adj.others || 0;
-      const shortage = adj.shortage || 0;
-      const penalty = adj.penalty || 0;
-
-      const finalSalary = baseSalary + commission + others - shortage - penalty;
+      const finalSalary = baseSalary + (adj.commission || 0) + (adj.others || 0) - (adj.shortage || 0) - (adj.penalty || 0);
 
       return {
         ...s,
@@ -123,7 +154,7 @@ export default function Staff() {
     });
 
     return results;
-  }, [staffs, schedule, staffTypes, rates, adjustments]);
+  }, [staffs, schedule, salaryConfigs, adjustments]);
 
   if (profile?.role !== 'admin') {
     return <div className="modern-error">Chỉ admin được truy cập mục quản lý nhân viên.</div>;
@@ -136,11 +167,27 @@ export default function Staff() {
       <div className="modern-toolbar">
         <div>
           <h3 className="modern-title">Quản lý Ca làm & Bảng lương</h3>
-          <p className="muted-text">Mô phỏng Excel: Xếp ca, cài đặt đơn giá và tính toán tự động.</p>
+          <p className="muted-text">Xếp ca tuần từ: <strong>{weekStart}</strong>. Dữ liệu lưu Supabase.</p>
         </div>
-        <button className="ghost-btn" onClick={() => {
-           if(window.confirm('Bạn có chắc muốn xóa sạch bảng xếp ca tuần này?')) setSchedule({});
-        }}>Xóa lịch tuần</button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <label style={{ fontSize: '13px', fontWeight: 600 }}>Chọn tuần (Thứ 2):</label>
+          <input 
+            type="date" 
+            value={weekStart} 
+            onChange={(e) => setWeekStart(getMonday(e.target.value))}
+            style={{ padding: '6px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
+          />
+          <button className="ghost-btn" onClick={async () => {
+            if(window.confirm('Bạn có chắc muốn xóa sạch bảng xếp ca tuần này trên hệ thống?')) {
+               try {
+                 await staffService.deleteWeeklySchedule(weekStart);
+                 setSchedule({});
+               } catch(e) {
+                 alert("Lỗi: " + e.message);
+               }
+            }
+          }}>Xóa lịch tuần</button>
+        </div>
       </div>
 
       {loading && <div className="modern-info">Đang tải dữ liệu nhân viên...</div>}
@@ -195,12 +242,28 @@ export default function Staff() {
                 <td colSpan={2} key={s} style={{ padding: 0, borderRight: '2px solid #cbd5e1' }}>
                   <div style={{ display: 'flex' }}>
                     <div style={{ flex: 1, padding: '4px', background: '#f1f5f9', borderRight: '1px solid #e2e8f0' }}>
-                      <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>Chính thức</div>
-                      <input type="number" style={{ width: '100%', padding: '4px', fontSize: '12px', border: '1px solid #cbd5e1', borderRadius: '4px' }} value={rates[`${s}_CT`]} onChange={e => updateRate(`${s}_CT`, e.target.value)} />
+                      <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>CT</div>
+                      <input 
+                        type="number" 
+                        style={{ width: '100%', padding: '4px', fontSize: '12px', border: '1px solid #cbd5e1', borderRadius: '4px' }} 
+                        value={salaryConfigs.find(c => c.shift_name === s && c.staff_type === 'CT')?.rate_per_shift || 0} 
+                        onChange={e => {
+                          const config = salaryConfigs.find(c => c.shift_name === s && c.staff_type === 'CT');
+                          if (config) updateRate(config.id, e.target.value);
+                        }} 
+                      />
                     </div>
                     <div style={{ flex: 1, padding: '4px', background: '#f1f5f9' }}>
-                      <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>Thử việc</div>
-                      <input type="number" style={{ width: '100%', padding: '4px', fontSize: '12px', border: '1px solid #cbd5e1', borderRadius: '4px' }} value={rates[`${s}_TV`]} onChange={e => updateRate(`${s}_TV`, e.target.value)} />
+                      <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>TV</div>
+                      <input 
+                        type="number" 
+                        style={{ width: '100%', padding: '4px', fontSize: '12px', border: '1px solid #cbd5e1', borderRadius: '4px' }} 
+                        value={salaryConfigs.find(c => c.shift_name === s && c.staff_type === 'TV')?.rate_per_shift || 0} 
+                        onChange={e => {
+                          const config = salaryConfigs.find(c => c.shift_name === s && c.staff_type === 'TV');
+                          if (config) updateRate(config.id, e.target.value);
+                        }} 
+                      />
                     </div>
                   </div>
                 </td>

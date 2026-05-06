@@ -16,6 +16,7 @@ export const shiftService = {
     const { data, error } = await supabase
       .from(SHIFT_TABLE)
       .select('*')
+      .not('start_time', 'is', null)
       .order('start_time', { ascending: false })
       .limit(limit);
 
@@ -65,6 +66,7 @@ export const shiftService = {
       start_time: new Date().toISOString(),
       starting_cash: Number(startingCash || 0),
       status: 'open',
+      opened_by: staffId, // Added this
       note,
     };
 

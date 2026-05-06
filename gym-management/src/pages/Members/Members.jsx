@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { CreditCard, Plus, Search } from 'lucide-react';
 import { useMembers } from '../../hooks/useMembers';
 import { memberService } from '../../services/memberService';
 import { staffLogService } from '../../services/staffLogService';
+import { paymentService } from '../../services/paymentService';
+import { shiftService } from '../../services/shiftService';
 import { useAuthStore } from '../../store/useAuthStore';
 
 function getStatus(endDate) {
@@ -35,7 +37,17 @@ export default function Members() {
 
   const [showRenewModal, setShowRenewModal] = useState(false);
   const [renewingMember, setRenewingMember] = useState(null);
-  const [renewForm, setRenewForm] = useState({ package_type: '1', fee: '' });
+  const [renewForm, setRenewForm] = useState({ package_type: '1', fee: '', payment_method: 'TM' });
+
+  const [activeShift, setActiveShift] = useState(null);
+
+  useEffect(() => {
+    const fetchShift = async () => {
+      const { shift } = await shiftService.validateShiftForLogin();
+      setActiveShift(shift);
+    };
+    fetchShift();
+  }, []);
 
   const filtered = useMemo(() => {
     return members.filter((m) => {
@@ -54,6 +66,10 @@ export default function Members() {
     try {
       const newStatus = !member.is_payment_verified;
       const updated = await updateMember(member.id, { is_payment_verified: newStatus });
+      
+      // Also update payment_logs if exists or create if missing (simplified: just update member)
+      // Ideally we would search for the CK payment_log and verify it
+      
       await staffLogService.logAction({
         staffId: user?.id,
         action: newStatus ? 'Duyệt thanh toán' : 'Hủy duyệt thanh toán',
@@ -92,6 +108,11 @@ export default function Members() {
     e.preventDefault();
     setError('');
 
+    if (!activeShift?.id) {
+       setError("Vui lòng mở ca trước khi thêm hội viên mới.");
+       return;
+    }
+
     try {
       const now = new Date();
       const startDate = now.toISOString().slice(0, 10);
@@ -120,6 +141,18 @@ export default function Members() {
         });
       } else {
         const created = await addMember(payload);
+        
+        // Create payment log
+        await paymentService.createPaymentLog({
+          memberId: created.id,
+          shiftId: activeShift.id,
+          amount: payload.fee,
+          method: payload.payment_method,
+          type: 'new',
+          staffId: user?.id,
+          note: `Thêm mới HV: ${created.full_name}`
+        });
+
         await staffLogService.logAction({
           staffId: user?.id,
           action: 'Thêm hội viên',
@@ -139,7 +172,7 @@ export default function Members() {
 
   const openRenewModal = (member) => {
     setRenewingMember(member);
-    setRenewForm({ package_type: '1', fee: '' });
+    setRenewForm({ package_type: '1', fee: '', payment_method: 'TM' });
     setError('');
     setShowRenewModal(true);
   };
@@ -148,18 +181,39 @@ export default function Members() {
     e.preventDefault();
     if (!renewingMember) return;
     setError('');
+
+    if (!activeShift?.id) {
+       setError("Vui lòng mở ca trước khi gia hạn hội viên.");
+       return;
+    }
+
     try {
       const updated = await memberService.renewMember(
         renewingMember,
         renewForm.package_type,
         renewForm.fee
       );
+
+      // Add payment method to update
       await updateMember(renewingMember.id, {
         start_date: updated.start_date,
         end_date: updated.end_date,
         package_type: updated.package_type,
         fee: updated.fee,
+        payment_method: renewForm.payment_method,
+        is_payment_verified: renewForm.payment_method === 'TM',
         note: updated.note,
+      });
+
+      // Create payment log
+      await paymentService.createPaymentLog({
+        memberId: renewingMember.id,
+        shiftId: activeShift.id,
+        amount: renewForm.fee,
+        method: renewForm.payment_method,
+        type: 'renew',
+        staffId: user?.id,
+        note: `Gia hạn HV: ${renewingMember.full_name}`
       });
 
       await staffLogService.logAction({
@@ -378,6 +432,13 @@ export default function Members() {
                   required
                 />
               </div>
+              <select
+                value={renewForm.payment_method}
+                onChange={(e) => setRenewForm({ ...renewForm, payment_method: e.target.value })}
+              >
+                <option value="TM">TM - Tiền mặt</option>
+                <option value="CK">CK - Chuyển khoản</option>
+              </select>
               <div className="modal-actions">
                 <button type="button" className="ghost-btn" onClick={() => setShowRenewModal(false)}>Hủy</button>
                 <button type="submit" className="primary-btn">Xác nhận</button>

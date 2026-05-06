@@ -115,8 +115,14 @@ export default function Inventory() {
   // Bán 1 chai — cập nhật doanh thu ngay sau khi bán
   const handleSell = async (product) => {
     setError('');
+    const shiftId = activeShift?.id || null;
+
+    if (!shiftId) {
+      setError('Vui lòng mở ca làm việc trước khi thực hiện bán hàng.');
+      return;
+    }
+
     try {
-      const shiftId = activeShift?.id || null;
       const updated = await productService.sellOneBottle(product, shiftId, user?.id);
       setProducts((prev) => prev.map((item) => (item.id === product.id ? updated : item)));
 
