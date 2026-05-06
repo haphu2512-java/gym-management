@@ -1,4 +1,5 @@
 ﻿import supabase from '../config/supabase';
+import { staffLogService } from './staffLogService';
 
 const PRODUCT_TABLE = 'products';
 
@@ -50,6 +51,14 @@ export const productService = {
     }]);
 
     if (logError) console.error('Failed to log sale:', logError);
+
+    await staffLogService.logAction({
+      staffId: userId,
+      action: 'Bán hàng',
+      targetItem: product.name,
+      details: { price: product.price, shift_id: shiftId },
+      note: 'Bán 1 chai ' + product.name
+    });
 
     return updatedProduct;
   },

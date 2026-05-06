@@ -1,6 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
 import { Clock } from 'lucide-react';
 import { shiftService } from '../../services/shiftService';
+import { useAuthStore } from '../../store/useAuthStore';
 
 function formatDateTime(value) {
   if (!value) return '-';
@@ -8,6 +9,7 @@ function formatDateTime(value) {
 }
 
 export default function Shifts() {
+  const { user } = useAuthStore();
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -50,12 +52,15 @@ export default function Shifts() {
           shiftId: activeShift.id,
           endingCash: Number(form.ending_cash || 0),
           note: form.note,
+          staffId: user?.id,
+          shiftName: activeShift.shift_name,
         });
       } else {
         await shiftService.openShift({
           shiftName: form.shift_name,
           startingCash: Number(form.starting_cash || 0),
           note: form.note,
+          staffId: user?.id,
         });
       }
 

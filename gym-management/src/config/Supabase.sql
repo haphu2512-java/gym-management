@@ -55,16 +55,15 @@ CREATE TABLE shifts (
   note TEXT
 );
 
--- 5. Bảng luu lịch sử thay đổi của hội viên
-CREATE TABLE member_logs (
+-- 5. Bảng lưu nhật ký hoạt động của nhân viên (Staff Logs) thay cho member_logs
+CREATE TABLE staff_logs (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  member_id UUID REFERENCES members(id) ON DELETE CASCADE,
+  staff_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   action TEXT NOT NULL,
-  changed_by UUID REFERENCES auth.users(id),
-  before_data JSONB,
-  after_data JSONB,
+  target_item TEXT, -- Có thể lưu tên hội viên, tên sản phẩm, ... bị tác động
+  details JSONB, -- Lưu object before/after nếu cần
   note TEXT,
-  changed_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
 -- 6. Bảng luu giao dich ban hang

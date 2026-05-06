@@ -2,7 +2,7 @@
 import { CreditCard, Plus, Search } from 'lucide-react';
 import { useMembers } from '../../hooks/useMembers';
 import { memberService } from '../../services/memberService';
-import { memberLogService } from '../../services/memberLogService';
+import { staffLogService } from '../../services/staffLogService';
 import { useAuthStore } from '../../store/useAuthStore';
 
 function getStatus(endDate) {
@@ -87,21 +87,20 @@ export default function Members() {
 
       if (editingMember?.id) {
         const updated = await updateMember(editingMember.id, payload);
-        await memberLogService.createLog({
-          memberId: editingMember.id,
-          action: 'update_member',
-          changedBy: user?.id,
-          beforeData: editingMember,
-          afterData: updated,
+        await staffLogService.logAction({
+          staffId: user?.id,
+          action: 'Cập nhật hội viên',
+          targetItem: updated.full_name,
+          details: { before: editingMember, after: updated },
           note: 'Cập nhật thông tin hội viên',
         });
       } else {
         const created = await addMember(payload);
-        await memberLogService.createLog({
-          memberId: created.id,
-          action: 'create_member',
-          changedBy: user?.id,
-          afterData: created,
+        await staffLogService.logAction({
+          staffId: user?.id,
+          action: 'Thêm hội viên',
+          targetItem: created.full_name,
+          details: { after: created },
           note: 'Thêm hội viên mới',
         });
       }
@@ -139,13 +138,12 @@ export default function Members() {
         note: updated.note,
       });
 
-      await memberLogService.createLog({
-        memberId: renewingMember.id,
-        action: 'renew_member',
-        changedBy: user?.id,
-        beforeData: renewingMember,
-        afterData: updated,
-        note: 'Gia hạn hội viên',
+      await staffLogService.logAction({
+        staffId: user?.id,
+        action: 'Gia hạn hội viên',
+        targetItem: renewingMember.full_name,
+        details: { before: renewingMember, after: updated },
+        note: `Gia hạn thêm ${updated.package_type} tháng`,
       });
       setShowRenewModal(false);
       setRenewingMember(null);

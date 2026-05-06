@@ -1,4 +1,5 @@
 ﻿import supabase from '../config/supabase';
+import { staffLogService } from './staffLogService';
 
 const SHIFT_TABLE = 'shifts';
 
@@ -46,7 +47,7 @@ export const shiftService = {
     return { valid: Boolean(active), shift: active || null };
   },
 
-  async openShift({ shiftName, startingCash = 0, note = '' }) {
+  async openShift({ shiftName, startingCash = 0, note = '', staffId = null }) {
     const payload = {
       shift_name: shiftName,
       start_time: new Date().toISOString(),
@@ -57,10 +58,19 @@ export const shiftService = {
 
     const { data, error } = await supabase.from(SHIFT_TABLE).insert([payload]).select().single();
     if (error) throw new Error(error.message);
+
+    await staffLogService.logAction({
+      staffId,
+      action: 'Mở ca trực',
+      targetItem: shiftName,
+      details: { startingCash },
+      note: note || 'Mở ca mới',
+    });
+
     return data;
   },
 
-  async closeShift({ shiftId, endingCash = 0, note = '' }) {
+  async closeShift({ shiftId, endingCash = 0, note = '', staffId = null, shiftName = '' }) {
     const { data, error } = await supabase
       .from(SHIFT_TABLE)
       .update({
@@ -74,6 +84,15 @@ export const shiftService = {
       .single();
 
     if (error) throw new Error(error.message);
+
+    await staffLogService.logAction({
+      staffId,
+      action: 'Chốt ca trực',
+      targetItem: shiftName || data.shift_name,
+      details: { endingCash },
+      note: note || 'Chốt ca kết thúc',
+    });
+
     return data;
   },
 };
