@@ -10,12 +10,14 @@ CREATE TABLE profiles (
 -- 2. Bảng quản lý hội viên
 CREATE TABLE members (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  member_code TEXT UNIQUE NOT NULL, -- Mã hội viên tự nhập (ví dụ: HV001, 0987...)
   full_name TEXT NOT NULL,
   package_type INT NOT NULL, -- Số tháng đăng ký (1, 3, 12...)
   start_date DATE NOT NULL,
   end_date DATE NOT NULL,
   fee NUMERIC NOT NULL,
-  payment_method TEXT CHECK (payment_method IN ('TM', 'R')), -- TM: Tiền mặt, R: Chuyển khoản
+  payment_method TEXT CHECK (payment_method IN ('TM', 'CK')), -- TM: Tiền mặt, CK: Chuyển khoản
+  is_payment_verified BOOLEAN DEFAULT FALSE, -- Trạng thái duyệt chuyển khoản (Admin mới được tick)
   fingerprint_status BOOLEAN DEFAULT FALSE,
   note TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL

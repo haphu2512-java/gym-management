@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { CreditCard, Plus, Search } from 'lucide-react';
 import { useMembers } from '../../hooks/useMembers';
 import { memberService } from '../../services/memberService';
@@ -14,6 +14,7 @@ function getStatus(endDate) {
 import { addMonths } from '../../utils/formatters';
 
 const initialForm = {
+  member_code: '',
   full_name: '',
   package_type: '1',
   fee: '',
@@ -23,9 +24,10 @@ const initialForm = {
 };
 
 export default function Members() {
-  const { user } = useAuthStore();
+  const { user, profile } = useAuthStore();
   const { members, loading, addMember, updateMember } = useMembers();
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
@@ -38,12 +40,30 @@ export default function Members() {
   const filtered = useMemo(() => {
     return members.filter((m) => {
       const keyword = searchTerm.toLowerCase();
-      return (
-        (m.full_name || '').toLowerCase().includes(keyword)
-        || String(m.id || '').toLowerCase().includes(keyword)
-      );
+      const matchSearch = (m.full_name || '').toLowerCase().includes(keyword)
+        || (m.member_code || '').toLowerCase().includes(keyword);
+        
+      if (filterStatus === 'pending_ck') {
+        return matchSearch && m.payment_method === 'CK' && !m.is_payment_verified;
+      }
+      return matchSearch;
     });
-  }, [members, searchTerm]);
+  }, [members, searchTerm, filterStatus]);
+
+  const handleVerifyPayment = async (member) => {
+    try {
+      const updated = await updateMember(member.id, { is_payment_verified: true });
+      await staffLogService.logAction({
+        staffId: user?.id,
+        action: 'Duyệt thanh toán',
+        targetItem: updated.full_name,
+        details: { memberId: member.id },
+        note: 'Admin duyệt thanh toán chuyển khoản',
+      });
+    } catch (err) {
+      setError(err.message);
+    }
+  };
 
   const openCreateModal = () => {
     setEditingMember(null);
@@ -55,6 +75,7 @@ export default function Members() {
   const openEditModal = (member) => {
     setEditingMember(member);
     setForm({
+      member_code: member.member_code || '',
       full_name: member.full_name || '',
       package_type: String(member.package_type || 1),
       fee: String(member.fee || 0),
@@ -75,12 +96,14 @@ export default function Members() {
       const startDate = now.toISOString().slice(0, 10);
       const endDate = addMonths(now, Number(form.package_type || 1)).toISOString().slice(0, 10);
       const payload = {
+        member_code: form.member_code,
         full_name: form.full_name,
         package_type: Number(form.package_type || 1),
         start_date: editingMember?.start_date || startDate,
         end_date: editingMember?.end_date || endDate,
         fee: Number(form.fee || 0),
         payment_method: form.payment_method,
+        is_payment_verified: form.payment_method === 'TM' ? true : (editingMember ? editingMember.is_payment_verified : false),
         fingerprint_status: Boolean(form.fingerprint_status),
         note: form.note,
       };
@@ -160,10 +183,21 @@ export default function Members() {
           <input
             type="text"
             value={searchTerm}
-            placeholder="Tìm theo tên hoặc ID..."
+            placeholder="Tìm theo tên hoặc Mã HV..."
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+        
+        {profile?.role === 'admin' && (
+          <select 
+            value={filterStatus} 
+            onChange={(e) => setFilterStatus(e.target.value)}
+            style={{ padding: '8px', borderRadius: '6px', border: '1px solid #ddd' }}
+          >
+            <option value="all">Tất cả</option>
+            <option value="pending_ck">Chờ duyệt CK</option>
+          </select>
+        )}
         <button type="button" className="primary-btn" onClick={openCreateModal}>
           <Plus size={16} /> Thêm hội viên
         </button>
@@ -194,7 +228,7 @@ export default function Members() {
                 <tr key={m.id}>
                   <td>
                     <p className="cell-main">{m.full_name}</p>
-                    <p className="cell-sub">ID: {m.id}</p>
+                    <p className="cell-sub">Mã: {m.member_code}</p>
                   </td>
                   <td>
                     <p className="cell-main">{m.package_type} tháng</p>
@@ -205,6 +239,9 @@ export default function Members() {
                     <span className={`pay-badge ${m.payment_method === 'TM' ? 'cash' : 'transfer'}`}>
                       {m.payment_method}
                     </span>
+                    {m.payment_method === 'CK' && !m.is_payment_verified && (
+                      <span className="pay-badge" style={{ background: '#fef08a', color: '#854d0e', marginLeft: '4px' }}>Chờ duyệt</span>
+                    )}
                   </td>
                   <td>
                     <span className={`status-badge ${status === 'Active' ? 'active' : 'expired'}`}>
@@ -219,6 +256,11 @@ export default function Members() {
                       <button type="button" className="link-btn" onClick={() => openRenewModal(m)}>
                         <CreditCard size={14} /> Gia hạn
                       </button>
+                      {profile?.role === 'admin' && m.payment_method === 'CK' && !m.is_payment_verified && (
+                        <button type="button" className="link-btn" style={{ color: '#16a34a' }} onClick={() => handleVerifyPayment(m)}>
+                          Duyệt CK
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -233,12 +275,20 @@ export default function Members() {
           <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
             <h3>{editingMember ? 'Chi tiết hội viên' : 'Thêm hội viên mới'}</h3>
             <form className="modern-form" onSubmit={handleSubmit}>
-              <input
-                value={form.full_name}
-                onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                placeholder="Họ tên hội viên"
-                required
-              />
+              <div className="form-grid-2">
+                <input
+                  value={form.member_code}
+                  onChange={(e) => setForm({ ...form, member_code: e.target.value })}
+                  placeholder="Mã hội viên"
+                  required
+                />
+                <input
+                  value={form.full_name}
+                  onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                  placeholder="Họ tên hội viên"
+                  required
+                />
+              </div>
               <div className="form-grid-2">
                 <input
                   type="number"
@@ -260,7 +310,7 @@ export default function Members() {
                 onChange={(e) => setForm({ ...form, payment_method: e.target.value })}
               >
                 <option value="TM">TM - Tiền mặt</option>
-                <option value="R">R - Chuyển khoản</option>
+                <option value="CK">CK - Chuyển khoản</option>
               </select>
               <label className="check-row">
                 <input

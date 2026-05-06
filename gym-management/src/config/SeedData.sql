@@ -2,7 +2,7 @@ DO $$
 DECLARE
   -- Tự động tìm ID từ bảng auth.users dựa trên email bạn đã tạo ở giao diện
   uuid_nhu      UUID := (SELECT id FROM auth.users WHERE email = 'nhu.manager@gymmanage.com' LIMIT 1); 
-  uuid_tramanh  UUID := (SELECT id FROM auth.users WHERE email = 'tramanh.manager@gymmanage.com' LIMIT 1);
+  uuid_tramanh  UUID := (SELECT id FROM auth.users WHERE email = 'tramanh.staff@gymmanage.com' LIMIT 1);
   uuid_phu      UUID := (SELECT id FROM auth.users WHERE email = 'phu.staff@gymmanage.com' LIMIT 1);
 
   -- Khai báo các biến tạm để liên kết dữ liệu logic giữa các bảng
@@ -22,7 +22,7 @@ BEGIN
 
   -- Kiểm tra xem bạn đã tạo User trên giao diện chưa để tránh lỗi trống dữ liệu
   IF uuid_nhu IS NULL OR uuid_tramanh IS NULL OR uuid_phu IS NULL THEN
-    RAISE EXCEPTION 'LỖI: Bạn chưa tạo đầy đủ 3 tài khoản email (nhu.manager@gymmanage.com, tramanh.manager@gymmanage.com, phu.staff@gymmanage.com) trên giao diện Supabase Auth. Hãy tạo chúng trước rồi chạy lại lệnh này nhé!';
+    RAISE EXCEPTION 'LỖI: Bạn chưa tạo đầy đủ 3 tài khoản email (nhu.manager@gymmanage.com, tramanh.staff@gymmanage.com, phu.staff@gymmanage.com) trên giao diện Supabase Auth. Hãy tạo chúng trước rồi chạy lại lệnh này nhé!';
   END IF;
 
   -- ======================================================
@@ -35,7 +35,7 @@ BEGIN
   -- ======================================================
   INSERT INTO profiles (id, full_name, role, note) VALUES 
     (uuid_nhu, 'Như', 'admin', 'Quản lý hệ thống'),
-    (uuid_tramanh, 'Trâm Anh', 'admin', 'Quản lý hệ thống'),
+    (uuid_tramanh, 'Trâm Anh', 'staff', 'Nhân viên trực ca'),
     (uuid_phu, 'Phú', 'staff', 'Nhân viên trực ca');
 
   -- ======================================================
@@ -66,9 +66,9 @@ BEGIN
   -- ======================================================
   -- 5. NẠP DỮ LIỆU BẢNG MEMBERS (Hội viên mẫu)
   -- ======================================================
-  INSERT INTO members (id, full_name, package_type, start_date, end_date, fee, payment_method, fingerprint_status, note) VALUES 
-    (id_khach1, 'Phạm Minh Hoàng', 1, '2026-05-01', '2026-06-01', 500000, 'TM', TRUE, 'Khách hay đi ca sáng'),
-    (id_khach2, 'Hoàng Thùy Linh', 3, '2026-05-01', '2026-08-01', 1350000, 'R', TRUE, 'Đã check vân tay');
+  INSERT INTO members (id, member_code, full_name, package_type, start_date, end_date, fee, payment_method, is_payment_verified, fingerprint_status, note) VALUES 
+    (id_khach1, 'HV001', 'Phạm Minh Hoàng', 1, '2026-05-01', '2026-06-01', 500000, 'TM', TRUE, TRUE, 'Khách hay đi ca sáng'),
+    (id_khach2, 'HV002', 'Hoàng Thùy Linh', 3, '2026-05-01', '2026-08-01', 1350000, 'CK', FALSE, TRUE, 'Đã check vân tay');
 
   -- ======================================================
   -- 6. NẠP DỮ LIỆU BẢNG STAFF_LOGS (Nhật ký hoạt động)
