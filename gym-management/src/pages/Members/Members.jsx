@@ -5,6 +5,7 @@ import { memberService } from '../../services/memberService';
 import { staffLogService } from '../../services/staffLogService';
 import { paymentService } from '../../services/paymentService';
 import { shiftService } from '../../services/shiftService';
+import { memberLogService } from '../../services/memberLogService';
 import { useAuthStore } from '../../store/useAuthStore';
 
 function getStatus(endDate) {
@@ -41,6 +42,10 @@ export default function Members() {
 
   const [activeShift, setActiveShift] = useState(null);
 
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historyLogs, setHistoryLogs] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
   useEffect(() => {
     const fetchShift = async () => {
       const { shift } = await shiftService.validateShiftForLogin();
@@ -48,6 +53,20 @@ export default function Members() {
     };
     fetchShift();
   }, []);
+
+  const openHistoryModal = async (member) => {
+    setRenewingMember(member);
+    setShowHistoryModal(true);
+    setHistoryLoading(true);
+    try {
+      const logs = await memberLogService.getLogsByMember(member.id);
+      setHistoryLogs(logs);
+    } catch (err) {
+      setError("Không thể tải lịch sử: " + err.message);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
 
   const filtered = useMemo(() => {
     return members.filter((m) => {
@@ -67,9 +86,14 @@ export default function Members() {
       const newStatus = !member.is_payment_verified;
       const updated = await updateMember(member.id, { is_payment_verified: newStatus });
       
-      // Also update payment_logs if exists or create if missing (simplified: just update member)
-      // Ideally we would search for the CK payment_log and verify it
-      
+      await memberLogService.logAction({
+        memberId: member.id,
+        staffId: user?.id,
+        action: 'VERIFY_PAYMENT',
+        details: { status: newStatus },
+        note: newStatus ? 'Duyệt thanh toán chuyển khoản' : 'Hủy duyệt thanh toán chuyển khoản'
+      });
+
       await staffLogService.logAction({
         staffId: user?.id,
         action: newStatus ? 'Duyệt thanh toán' : 'Hủy duyệt thanh toán',
@@ -132,6 +156,15 @@ export default function Members() {
 
       if (editingMember?.id) {
         const updated = await updateMember(editingMember.id, payload);
+        
+        await memberLogService.logAction({
+          memberId: editingMember.id,
+          staffId: user?.id,
+          action: 'UPDATE',
+          details: { before: editingMember, after: updated },
+          note: 'Cập nhật thông tin hội viên'
+        });
+
         await staffLogService.logAction({
           staffId: user?.id,
           action: 'Cập nhật hội viên',
@@ -142,6 +175,14 @@ export default function Members() {
       } else {
         const created = await addMember(payload);
         
+        await memberLogService.logAction({
+          memberId: created.id,
+          staffId: user?.id,
+          action: 'CREATE',
+          details: { after: created },
+          note: 'Thêm hội viên mới'
+        });
+
         // Create payment log
         await paymentService.createPaymentLog({
           memberId: created.id,
@@ -214,6 +255,14 @@ export default function Members() {
         type: 'renew',
         staffId: user?.id,
         note: `Gia hạn HV: ${renewingMember.full_name}`
+      });
+
+      await memberLogService.logAction({
+        memberId: renewingMember.id,
+        staffId: user?.id,
+        action: 'RENEW',
+        details: { before: renewingMember, after: updated },
+        note: `Gia hạn thêm ${updated.package_type} tháng`
       });
 
       await staffLogService.logAction({
@@ -307,6 +356,9 @@ export default function Members() {
                     <div className="table-actions">
                       <button type="button" className="link-btn" onClick={() => openEditModal(m)}>
                         Chi tiết
+                      </button>
+                      <button type="button" className="link-btn" onClick={() => openHistoryModal(m)}>
+                        Lịch sử
                       </button>
                       <button type="button" className="link-btn" onClick={() => openRenewModal(m)}>
                         <CreditCard size={14} /> Gia hạn
@@ -444,6 +496,61 @@ export default function Members() {
                 <button type="submit" className="primary-btn">Xác nhận</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showHistoryModal && (
+        <div className="modal-backdrop" onClick={() => setShowHistoryModal(false)}>
+          <div className="modal-panel" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0 }}>Lịch sử hội viên: {renewingMember?.full_name}</h3>
+              <button className="ghost-btn" onClick={() => setShowHistoryModal(false)}>Đóng</button>
+            </div>
+            
+            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+              {historyLoading && <div className="modern-info">Đang tải lịch sử...</div>}
+              {!historyLoading && historyLogs.length === 0 && <p className="muted-text">Chưa có lịch sử ghi nhận.</p>}
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {historyLogs.map(log => (
+                  <div key={log.id} style={{ padding: '12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <strong style={{ color: '#0f172a' }}>
+                        {log.action === 'CREATE' && '🆕 Đăng ký mới'}
+                        {log.action === 'UPDATE' && '📝 Cập nhật thông tin'}
+                        {log.action === 'RENEW' && '⏳ Gia hạn thẻ'}
+                        {log.action === 'VERIFY_PAYMENT' && '✅ Duyệt thanh toán'}
+                      </strong>
+                      <span className="muted-text">{new Date(log.created_at).toLocaleString('vi-VN')}</span>
+                    </div>
+                    <p style={{ margin: '4px 0', color: '#475569' }}>{log.note}</p>
+                    <div className="muted-text" style={{ fontSize: '11px', marginTop: '4px' }}>
+                      Thực hiện bởi: {log.profiles?.full_name || 'Hệ thống'}
+                    </div>
+                    
+                    {/* Hiển thị chi tiết thay đổi nếu là UPDATE hoặc RENEW */}
+                    {(log.action === 'UPDATE' || log.action === 'RENEW') && log.details?.before && log.details?.after && (
+                      <div style={{ marginTop: '8px', padding: '8px', background: '#f8fafc', borderRadius: '4px', fontSize: '12px' }}>
+                        {log.details.before.package_type !== log.details.after.package_type && (
+                          <div>Gói: {log.details.before.package_type} → {log.details.after.package_type} tháng</div>
+                        )}
+                        {log.details.before.end_date !== log.details.after.end_date && (
+                          <div>Hạn dùng: {log.details.before.end_date} → {log.details.after.end_date}</div>
+                        )}
+                        {log.details.before.fee !== log.details.after.fee && (
+                          <div>Phí: {Number(log.details.before.fee).toLocaleString()}đ → {Number(log.details.after.fee).toLocaleString()}đ</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="modal-actions" style={{ marginTop: '20px' }}>
+              <button className="primary-btn" onClick={() => setShowHistoryModal(false)}>Hoàn tất</button>
+            </div>
           </div>
         </div>
       )}

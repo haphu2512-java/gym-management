@@ -85,7 +85,18 @@ CREATE TABLE IF NOT EXISTS payment_logs (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
--- 8. Cấu hình lương theo ca
+-- 8. Bảng nhật ký thay đổi hội viên (Member Logs)
+CREATE TABLE IF NOT EXISTS member_logs (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  member_id UUID REFERENCES members(id) ON DELETE CASCADE,
+  staff_id UUID REFERENCES profiles(id),
+  action TEXT NOT NULL, -- 'CREATE', 'UPDATE', 'RENEW', 'VERIFY_PAYMENT'
+  details JSONB,        -- { "old": ..., "new": ... }
+  note TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
+-- 9. Cấu hình lương theo ca
 CREATE TABLE IF NOT EXISTS salary_configs (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   shift_name TEXT NOT NULL, -- Ca 1, Ca 2...
@@ -125,6 +136,9 @@ CREATE POLICY "Public Sales Logs Access" ON sales_logs FOR ALL TO authenticated 
 
 ALTER TABLE payment_logs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public Payment Logs Access" ON payment_logs FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+ALTER TABLE member_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public Member Logs Access" ON member_logs FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
 ALTER TABLE salary_configs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public Salary Configs Access" ON salary_configs FOR ALL TO authenticated USING (true) WITH CHECK (true);
