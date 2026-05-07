@@ -4,9 +4,11 @@ import { productService } from '../../services/productService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { staffLogService } from '../../services/staffLogService';
 import { shiftService } from '../../services/shiftService';
+import { useToast, ToastContainer } from '../../components/ui/Toast';
 
 export default function Inventory() {
   const { user, profile, assignedShift } = useAuthStore();
+  const { showError, showSuccess, toasts } = useToast();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -118,21 +120,27 @@ export default function Inventory() {
     const shiftId = activeShift?.id || null;
 
     if (!shiftId) {
-      setError('Vui lòng mở ca làm việc trước khi thực hiện bán hàng.');
+      showError('Vui lòng mở ca làm việc trước khi thực hiện bán hàng.');
       return;
     }
 
     try {
-      const updated = await productService.sellOneBottle(product, shiftId, user?.id);
-      setProducts((prev) => prev.map((item) => (item.id === product.id ? updated : item)));
+      const result = await productService.sellOneBottle(product, shiftId, user?.id);
+
+      // Update local state
+      setProducts((prev) => prev.map((item) =>
+        (item.id === product.id ? { ...item, stock_quantity: item.stock_quantity - 1 } : item)
+      ));
 
       // Cập nhật doanh thu nước real-time
       if (shiftId) {
         const rev = await productService.getDrinkRevenueForShift(shiftId);
         setDrinkRevenue(rev);
       }
+
+      showSuccess(`Đã bán ${product.name} thành công!`);
     } catch (err) {
-      setError(err.message);
+      showError(`Bán hàng thất bại: ${err.message}`);
     }
   };
 
@@ -151,8 +159,9 @@ export default function Inventory() {
       });
       setDeletingProduct(null);
       await loadProducts();
+      showSuccess(`Đã xóa sản phẩm ${deletingProduct.name} thành công!`);
     } catch (err) {
-      setError(err.message);
+      showError(`Xóa sản phẩm thất bại: ${err.message}`);
       setDeletingProduct(null);
     }
   };
@@ -322,6 +331,8 @@ export default function Inventory() {
           </div>
         </div>
       )}
+
+      <ToastContainer toasts={toasts} />
     </div>
   );
 }

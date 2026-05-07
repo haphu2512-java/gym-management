@@ -6,8 +6,12 @@ export const paymentService = {
   async getRecentPayments(limit = 20) {
     const { data, error } = await supabase
       .from(TABLE_NAME)
-      .select('*, members(full_name), profiles(full_name)')
-      .order('paid_at', { ascending: false })
+      .select(`
+        *,
+        members!inner(full_name),
+        profiles!payment_logs_staff_id_fkey(full_name)
+      `)
+      .order('created_at', { ascending: false })
       .limit(limit);
     if (error) throw error;
     return data || [];
@@ -19,7 +23,7 @@ export const paymentService = {
       .insert([{
         member_id: memberId,
         shift_id: shiftId,
-        collected_by: staffId,
+        staff_id: staffId,
         amount: Number(amount),
         payment_method: method,
         payment_type: type,
@@ -32,14 +36,16 @@ export const paymentService = {
     return data;
   },
 
-  async verifyPayment(id) {
-    const { data, error } = await supabase
-      .from(TABLE_NAME)
-      .update({ is_verified: true })
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
+  async verifyPayment(paymentId, adminId) {
+    // Use atomic verification function
+    const { data, error } = await supabase.rpc('verify_payment_atomic', {
+      p_payment_id: paymentId,
+      p_admin_id: adminId
+    });
+
+    if (error) throw new Error('Xác thực thanh toán thất bại: ' + error.message);
+    if (!data.success) throw new Error(data.error || 'Xác thực thanh toán thất bại');
+
     return data;
   },
 
@@ -50,5 +56,19 @@ export const paymentService = {
       .eq('is_verified', true);
     if (error) throw error;
     return data.reduce((sum, p) => sum + Number(p.amount), 0);
+  },
+
+  async getPaymentsByShift(shiftId, paymentMethod = null, isVerified = null) {
+    let query = supabase
+      .from(TABLE_NAME)
+      .select('amount')
+      .eq('shift_id', shiftId);
+
+    if (paymentMethod) query = query.eq('payment_method', paymentMethod);
+    if (isVerified !== null) query = query.eq('is_verified', isVerified);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
   }
 };

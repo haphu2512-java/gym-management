@@ -3,7 +3,6 @@ import { CreditCard, Plus, Search } from 'lucide-react';
 import { useMembers } from '../../hooks/useMembers';
 import { memberService } from '../../services/memberService';
 import { staffLogService } from '../../services/staffLogService';
-import { paymentService } from '../../services/paymentService';
 import { shiftService } from '../../services/shiftService';
 import { memberLogService } from '../../services/memberLogService';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -12,6 +11,16 @@ function getStatus(endDate) {
   const today = new Date();
   const target = new Date(endDate);
   return target >= new Date(today.toDateString()) ? 'Active' : 'Expired';
+}
+
+function getMemberStatus(endDate) {
+  const today = new Date();
+  const end = new Date(endDate);
+  const daysLeft = Math.ceil((end - today) / (1000 * 60 * 60 * 24));
+
+  if (daysLeft < 0) return { status: 'expired', color: 'bg-red-100 text-red-800' };
+  if (daysLeft <= 7) return { status: 'warning', color: 'bg-yellow-100 text-yellow-800' };
+  return { status: 'active', color: 'bg-green-100 text-green-800' };
 }
 
 import { addMonths } from '../../utils/formatters';
@@ -152,7 +161,14 @@ export default function Members() {
         is_payment_verified: form.payment_method === 'TM' ? true : (editingMember ? editingMember.is_payment_verified : false),
         fingerprint_status: Boolean(form.fingerprint_status),
         note: form.note,
+        shift_id: activeShift.id,
+        staff_id: user?.id,
       };
+
+      if (payload.package_type < 1 || payload.package_type > 36) {
+        setError('Goi tap tu 1 den 36 thang.');
+        return;
+      }
 
       if (editingMember?.id) {
         const updated = await updateMember(editingMember.id, payload);
@@ -173,34 +189,7 @@ export default function Members() {
           note: 'Cập nhật thông tin hội viên',
         });
       } else {
-        const created = await addMember(payload);
-        
-        await memberLogService.logAction({
-          memberId: created.id,
-          staffId: user?.id,
-          action: 'CREATE',
-          details: { after: created },
-          note: 'Thêm hội viên mới'
-        });
-
-        // Create payment log
-        await paymentService.createPaymentLog({
-          memberId: created.id,
-          shiftId: activeShift.id,
-          amount: payload.fee,
-          method: payload.payment_method,
-          type: 'new',
-          staffId: user?.id,
-          note: `Thêm mới HV: ${created.full_name}`
-        });
-
-        await staffLogService.logAction({
-          staffId: user?.id,
-          action: 'Thêm hội viên',
-          targetItem: created.full_name,
-          details: { after: created },
-          note: 'Thêm hội viên mới',
-        });
+        await addMember(payload);
       }
 
       setShowModal(false);
@@ -229,48 +218,34 @@ export default function Members() {
     }
 
     try {
-      const updated = await memberService.renewMember(
-        renewingMember,
-        renewForm.package_type,
-        renewForm.fee
-      );
+      const packageType = Number(renewForm.package_type || 0);
+      if (packageType < 1 || packageType > 36) {
+        setError('Goi tap tu 1 den 36 thang.');
+        return;
+      }
 
-      // Add payment method to update
-      await updateMember(renewingMember.id, {
-        start_date: updated.start_date,
-        end_date: updated.end_date,
-        package_type: updated.package_type,
-        fee: updated.fee,
-        payment_method: renewForm.payment_method,
-        is_payment_verified: renewForm.payment_method === 'TM',
-        note: updated.note,
-      });
-
-      // Create payment log
-      await paymentService.createPaymentLog({
-        memberId: renewingMember.id,
-        shiftId: activeShift.id,
-        amount: renewForm.fee,
-        method: renewForm.payment_method,
-        type: 'renew',
+      const updated = await memberService.renewMember(renewingMember.id, {
+        packageType,
+        fee: Number(renewForm.fee || 0),
+        paymentMethod: renewForm.payment_method,
         staffId: user?.id,
-        note: `Gia hạn HV: ${renewingMember.full_name}`
+        shiftId: activeShift.id,
       });
 
       await memberLogService.logAction({
         memberId: renewingMember.id,
         staffId: user?.id,
         action: 'RENEW',
-        details: { before: renewingMember, after: updated },
-        note: `Gia hạn thêm ${updated.package_type} tháng`
+        details: { before: renewingMember, after: updated.member },
+        note: `Gia han them ${updated.member.package_type} thang`
       });
 
       await staffLogService.logAction({
         staffId: user?.id,
-        action: 'Gia hạn hội viên',
+        action: 'Gia han hoi vien',
         targetItem: renewingMember.full_name,
-        details: { before: renewingMember, after: updated },
-        note: `Gia hạn thêm ${updated.package_type} tháng`,
+        details: { before: renewingMember, after: updated.member },
+        note: `Gia han them ${updated.member.package_type} thang`,
       });
       setShowRenewModal(false);
       setRenewingMember(null);
@@ -328,8 +303,9 @@ export default function Members() {
             )}
             {filtered.map((m) => {
               const status = getStatus(m.end_date);
+              const { color } = getMemberStatus(m.end_date);
               return (
-                <tr key={m.id}>
+                <tr key={m.id} className={`border-b ${color}`}>
                   <td>
                     <p className="cell-main">{m.full_name}</p>
                     <p className="cell-sub">Mã: {m.member_code}</p>
@@ -557,4 +533,5 @@ export default function Members() {
     </div>
   );
 }
+
 

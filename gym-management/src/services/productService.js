@@ -5,7 +5,11 @@ const PRODUCT_TABLE = 'products';
 
 export const productService = {
   async getAllProducts() {
-    const { data, error } = await supabase.from(PRODUCT_TABLE).select('*').order('name');
+    const { data, error } = await supabase
+      .from(PRODUCT_TABLE)
+      .select('*')
+      .is('deleted_at', null)
+      .order('name');
     if (error) throw new Error(error.message);
     return data || [];
   },
@@ -28,43 +32,27 @@ export const productService = {
   },
 
   async sellOneBottle(product, shiftId, userId) {
-    const currentStock = Number(product.stock_quantity || 0);
-    if (currentStock <= 0) {
-      throw new Error('Sản phẩm đã hết hàng.');
-    }
-
-    const { data: updatedProduct, error: updateError } = await supabase
-      .from(PRODUCT_TABLE)
-      .update({ stock_quantity: currentStock - 1 })
-      .eq('id', product.id)
-      .select()
-      .single();
-
-    if (updateError) throw new Error(updateError.message);
-
-    const { error: logError } = await supabase.from('sales_logs').insert([{
-      product_id: product.id,
-      shift_id: shiftId || null,
-      sold_by: userId || null,
-      quantity: 1,
-      total_price: Number(product.price || 0)
-    }]);
-
-    if (logError) console.error('Failed to log sale:', logError);
-
-    await staffLogService.logAction({
-      staffId: userId,
-      action: 'Bán hàng',
-      targetItem: product.name,
-      details: { price: product.price, shift_id: shiftId },
-      note: 'Bán 1 chai ' + product.name
+    // Use atomic transaction function
+    const { data, error } = await supabase.rpc('sell_bottle_transaction', {
+      p_product_id: product.id,
+      p_shift_id: shiftId,
+      p_staff_id: userId,
+      p_quantity: 1,
+      p_total_price: Number(product.price || 0)
     });
 
-    return updatedProduct;
+    if (error) throw new Error('Bán hàng thất bại: ' + error.message);
+    if (!data.success) throw new Error(data.error || 'Bán hàng thất bại');
+
+    return data;
   },
 
   async deleteProduct(id) {
-    const { error } = await supabase.from(PRODUCT_TABLE).delete().eq('id', id);
+    // Use soft delete instead of hard delete
+    const { error } = await supabase
+      .from(PRODUCT_TABLE)
+      .update({ deleted_at: new Date() })
+      .eq('id', id);
     if (error) throw new Error(error.message);
   },
 
