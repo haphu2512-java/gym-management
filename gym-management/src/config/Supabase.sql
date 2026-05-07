@@ -8,20 +8,15 @@ CREATE TABLE IF NOT EXISTS profiles (
   note TEXT
 );
 
--- 2. Bảng quản lý hội viên
+-- 2. Bảng quản lý hội viên (Chỉ lưu thông tin cơ bản)
 CREATE TABLE IF NOT EXISTS members (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   member_code TEXT UNIQUE NOT NULL,
   full_name TEXT NOT NULL,
-  package_type INT NOT NULL, 
-  start_date DATE NOT NULL,
-  end_date DATE NOT NULL,
-  fee NUMERIC NOT NULL,
-  payment_method TEXT CHECK (payment_method IN ('TM', 'CK')),
-  is_payment_verified BOOLEAN DEFAULT FALSE,
   fingerprint_status BOOLEAN DEFAULT FALSE,
   note TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+  deleted_at TIMESTAMP
 );
 
 -- 3. Bảng quản lý kho nước
@@ -87,16 +82,61 @@ CREATE TABLE IF NOT EXISTS payment_logs (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
--- 8. Bảng nhật ký thay đổi hội viên (Member Logs)
+-- 8. Bảng nhật ký thay đổi hội viên (Member Logs - Lưu lịch sử gia hạn/đăng ký)
 CREATE TABLE IF NOT EXISTS member_logs (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   member_id UUID REFERENCES members(id) ON DELETE CASCADE,
   staff_id UUID REFERENCES profiles(id),
   action TEXT NOT NULL, -- 'CREATE', 'UPDATE', 'RENEW', 'VERIFY_PAYMENT'
+  
+  -- Thông tin gói tập tại thời điểm log
+  package_type INT,
+  start_date DATE,
+  end_date DATE,
+  fee NUMERIC,
+  payment_method TEXT CHECK (payment_method IN ('TM', 'CK')),
+  is_payment_verified BOOLEAN DEFAULT FALSE,
+
   details JSONB,        -- { "old": ..., "new": ... }
   note TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
+
+-- View để lấy trạng thái hiện tại của hội viên (Ưu tiên lấy từ Log Gia hạn/Tạo mới)
+CREATE OR REPLACE VIEW member_current_status AS
+WITH LatestMembership AS (
+    -- Chỉ lấy thông tin gói tập từ bản ghi CREATE hoặc RENEW mới nhất
+    -- (Hoặc UPDATE nếu bản ghi đó có chứa thông tin gói tập)
+    SELECT DISTINCT ON (member_id)
+      member_id,
+      package_type,
+      start_date,
+      end_date,
+      fee,
+      payment_method,
+      is_payment_verified
+    FROM member_logs
+    WHERE action IN ('CREATE', 'RENEW', 'UPDATE')
+      AND package_type IS NOT NULL -- Đảm bảo bản ghi log này có chứa thông tin gói tập
+    ORDER BY member_id, created_at DESC
+)
+SELECT 
+  m.id,
+  m.member_code,
+  m.full_name,
+  m.fingerprint_status,
+  m.note,
+  m.created_at,
+  m.deleted_at,
+  lm.package_type,
+  lm.start_date,
+  lm.end_date,
+  lm.fee,
+  lm.payment_method,
+  COALESCE(lm.is_payment_verified, FALSE) as is_payment_verified
+FROM members m
+LEFT JOIN LatestMembership lm ON m.id = lm.member_id
+WHERE m.deleted_at IS NULL;
 
 -- 9. Cấu hình lương theo ca
 CREATE TABLE IF NOT EXISTS salary_configs (
@@ -270,10 +310,8 @@ CREATE POLICY "staff_logs_select" ON staff_logs FOR SELECT TO authenticated USIN
 );
 CREATE POLICY "staff_logs_insert" ON staff_logs FOR INSERT TO authenticated WITH CHECK (true);
 
--- MEMBER_LOGS: Only admins can view
-CREATE POLICY "member_logs_select" ON member_logs FOR SELECT TO authenticated USING (
-  (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
-);
+-- MEMBER_LOGS: All authenticated can view (required for member_current_status view)
+CREATE POLICY "member_logs_select" ON member_logs FOR SELECT TO authenticated USING (true);
 CREATE POLICY "member_logs_insert" ON member_logs FOR INSERT TO authenticated WITH CHECK (true);
 
 -- SALARY_CONFIGS: Only admins can modify
@@ -381,23 +419,31 @@ RETURNS JSON AS $$
 DECLARE
   v_member_id UUID;
   v_payment_id UUID;
+  v_start_date DATE := NOW()::DATE;
+  v_end_date DATE := (NOW() + (p_package_type || ' months')::INTERVAL)::DATE;
+  v_is_verified BOOLEAN := (p_payment_method = 'TM');
 BEGIN
-  -- Create member
-  INSERT INTO members (member_code, full_name, package_type, fee, start_date, end_date, payment_method, is_payment_verified)
-  VALUES (p_code, p_name, p_package_type, p_fee, NOW()::DATE,
-          (NOW() + (p_package_type || ' months')::INTERVAL)::DATE, p_payment_method,
-          (p_payment_method = 'TM'))
+  -- Create member (Chỉ thông tin cơ bản)
+  INSERT INTO members (member_code, full_name)
+  VALUES (p_code, p_name)
   RETURNING id INTO v_member_id;
 
   -- Create payment log
   INSERT INTO payment_logs (member_id, shift_id, staff_id, amount, payment_method, payment_type, is_verified)
-  VALUES (v_member_id, p_shift_id, p_staff_id, p_fee, p_payment_method, 'new', (p_payment_method = 'TM'))
+  VALUES (v_member_id, p_shift_id, p_staff_id, p_fee, p_payment_method, 'new', v_is_verified)
   RETURNING id INTO v_payment_id;
 
-  -- Create audit logs
-  INSERT INTO member_logs (member_id, staff_id, action, details)
-  VALUES (v_member_id, p_staff_id, 'CREATE',
-          json_build_object('code', p_code, 'fee', p_fee, 'payment_id', v_payment_id));
+  -- Create audit & state log (Lưu thông tin gói tập vào đây)
+  INSERT INTO member_logs (
+    member_id, staff_id, action, 
+    package_type, start_date, end_date, fee, payment_method, is_payment_verified,
+    details
+  )
+  VALUES (
+    v_member_id, p_staff_id, 'CREATE',
+    p_package_type, v_start_date, v_end_date, p_fee, p_payment_method, v_is_verified,
+    json_build_object('code', p_code, 'fee', p_fee, 'payment_id', v_payment_id)
+  );
 
   INSERT INTO staff_logs (staff_id, action, target_item, details)
   VALUES (p_staff_id, 'Tạo hội viên', p_code,
@@ -416,8 +462,10 @@ CREATE OR REPLACE FUNCTION verify_payment_atomic(
 )
 RETURNS JSON AS $$
 DECLARE
-  v_updated INT;
+  v_updated_id UUID;
+  v_member_id UUID;
 BEGIN
+  -- 1. Update payment_logs
   UPDATE payment_logs
   SET
     is_verified = true,
@@ -427,16 +475,20 @@ BEGIN
     id = p_payment_id
     AND is_verified = false  -- Only if not already verified
     AND payment_method = 'CK'  -- Only for bank transfers
-  RETURNING id INTO v_updated;
+  RETURNING id, member_id INTO v_updated_id, v_member_id;
 
-  IF v_updated IS NULL THEN
+  IF v_updated_id IS NULL THEN
     RETURN json_build_object('success', false, 'error', 'Payment already verified or not found');
   END IF;
 
-  -- Log verification
+  -- 2. Create verification log in member_logs (To update current status view)
+  INSERT INTO member_logs (member_id, staff_id, action, is_payment_verified, note)
+  VALUES (v_member_id, p_admin_id, 'VERIFY_PAYMENT', true, 'Admin duyệt thanh toán chuyển khoản');
+
+  -- 3. Log verification in staff_logs
   INSERT INTO staff_logs (staff_id, action, target_item, details)
   VALUES (p_admin_id, 'Xác thực thanh toán', 'Payment #' || p_payment_id,
-          json_build_object('payment_id', p_payment_id));
+          json_build_object('payment_id', p_payment_id, 'member_id', v_member_id));
 
   RETURN json_build_object('success', true, 'payment_id', p_payment_id);
 EXCEPTION WHEN OTHERS THEN

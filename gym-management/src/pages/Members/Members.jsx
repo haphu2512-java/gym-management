@@ -5,6 +5,7 @@ import { memberService } from '../../services/memberService';
 import { staffLogService } from '../../services/staffLogService';
 import { shiftService } from '../../services/shiftService';
 import { memberLogService } from '../../services/memberLogService';
+import supabase from '../../config/supabase';
 import { useAuthStore } from '../../store/useAuthStore';
 
 function getStatus(endDate) {
@@ -37,7 +38,7 @@ const initialForm = {
 
 export default function Members() {
   const { user, profile } = useAuthStore();
-  const { members, loading, addMember, updateMember } = useMembers();
+  const { members, loading, addMember, updateMember, fetchMembers } = useMembers();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [error, setError] = useState('');
@@ -90,28 +91,40 @@ export default function Members() {
     });
   }, [members, searchTerm, filterStatus]);
 
-  const handleTogglePaymentVerification = async (member) => {
+  const handleLogVerification = async (log) => {
+    if (!window.confirm(`Xác nhận đã nhận đủ ${Number(log.fee || 0).toLocaleString()}đ chuyển khoản cho lần gia hạn này?`)) return;
+    
     try {
-      const newStatus = !member.is_payment_verified;
-      const updated = await updateMember(member.id, { is_payment_verified: newStatus });
+      await memberService.verifyLogPayment(log.id, user.id);
       
-      await memberLogService.logAction({
-        memberId: member.id,
-        staffId: user?.id,
-        action: 'VERIFY_PAYMENT',
-        details: { status: newStatus },
-        note: newStatus ? 'Duyệt thanh toán chuyển khoản' : 'Hủy duyệt thanh toán chuyển khoản'
-      });
+      // 1. Cập nhật ngay lập tức state History Logs để UI thay đổi nút -> dấu tích
+      setHistoryLogs(prevLogs => 
+        prevLogs.map(l => l.id === log.id ? { ...l, is_payment_verified: true } : l)
+      );
 
+      // 2. Làm mới danh sách hội viên tổng quát
+      await fetchMembers();
+      
+      // 3. Nếu đang xem đúng hội viên này, cập nhật lại editingMember để đồng bộ thông tin
+      if (editingMember && editingMember.id === log.member_id) {
+        const { data: freshMember } = await supabase
+          .from('member_current_status')
+          .select('*')
+          .eq('id', log.member_id)
+          .single();
+        if (freshMember) setEditingMember(freshMember);
+      }
+
+      // Ghi log hoạt động của Admin
       await staffLogService.logAction({
         staffId: user?.id,
-        action: newStatus ? 'Duyệt thanh toán' : 'Hủy duyệt thanh toán',
-        targetItem: updated.full_name,
-        details: { memberId: member.id, status: newStatus },
-        note: newStatus ? 'Admin duyệt thanh toán chuyển khoản' : 'Admin hủy duyệt thanh toán chuyển khoản',
+        action: 'Duyệt thanh toán CK',
+        targetItem: `Gia hạn ID: ${log.id}`,
+        details: { log_id: log.id, member_id: log.member_id },
+        note: 'Admin duyệt thanh toán từ bảng lịch sử chi tiết',
       });
     } catch (err) {
-      setError(err.message);
+      setError("Lỗi duyệt thanh toán: " + err.message);
     }
   };
 
@@ -122,7 +135,7 @@ export default function Members() {
     setShowModal(true);
   };
 
-  const openEditModal = (member) => {
+  const openEditModal = async (member) => {
     setEditingMember(member);
     setForm({
       member_code: member.member_code || '',
@@ -135,6 +148,17 @@ export default function Members() {
     });
     setError('');
     setShowModal(true);
+    
+    // Tự động tải lịch sử khi xem chi tiết
+    setHistoryLoading(true);
+    try {
+      const logs = await memberLogService.getLogsByMember(member.id);
+      setHistoryLogs(logs);
+    } catch (err) {
+      console.error("Lỗi tải lịch sử:", err);
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -224,7 +248,7 @@ export default function Members() {
         return;
       }
 
-      const updated = await memberService.renewMember(renewingMember.id, {
+      const result = await memberService.renewMember(renewingMember.id, {
         packageType,
         fee: Number(renewForm.fee || 0),
         paymentMethod: renewForm.payment_method,
@@ -232,21 +256,9 @@ export default function Members() {
         shiftId: activeShift.id,
       });
 
-      await memberLogService.logAction({
-        memberId: renewingMember.id,
-        staffId: user?.id,
-        action: 'RENEW',
-        details: { before: renewingMember, after: updated.member },
-        note: `Gia han them ${updated.member.package_type} thang`
-      });
-
-      await staffLogService.logAction({
-        staffId: user?.id,
-        action: 'Gia han hoi vien',
-        targetItem: renewingMember.full_name,
-        details: { before: renewingMember, after: updated.member },
-        note: `Gia han them ${updated.member.package_type} thang`,
-      });
+      // Quan trọng: Làm mới danh sách để cập nhật ngày hết hạn mới
+      await fetchMembers();
+      
       setShowRenewModal(false);
       setRenewingMember(null);
     } catch (err) {
@@ -288,9 +300,8 @@ export default function Members() {
         <table className="modern-table">
           <thead>
             <tr>
-              <th>Hội viên</th>
-              <th>Gói/Hạn</th>
-              <th>Phí</th>
+              <th>Mã hội viên</th>
+              <th>Ngày hết hạn</th>
               <th>Trạng thái</th>
               <th>Thao tác</th>
             </tr>
@@ -298,73 +309,37 @@ export default function Members() {
           <tbody>
             {!loading && filtered.length === 0 && (
               <tr>
-                <td colSpan={5} className="table-empty-cell">Không có dữ liệu</td>
+                <td colSpan={4} className="table-empty-cell">Không có dữ liệu</td>
               </tr>
             )}
             {filtered.map((m) => {
               const status = getStatus(m.end_date);
-              const { color } = getMemberStatus(m.end_date);
               return (
-                <tr key={m.id} className={`border-b ${color}`}>
+                <tr key={m.id}>
                   <td>
-                    <p className="cell-main">{m.full_name}</p>
-                    <p className="cell-sub">Mã: {m.member_code}</p>
+                    <p className="cell-main">{m.member_code}</p>
+                    <p className="cell-sub">{m.full_name}</p>
                   </td>
                   <td>
-                    <p className="cell-main">{m.package_type} tháng</p>
-                    <p className="cell-sub">Hết hạn: {m.end_date}</p>
+                    <p className="cell-main">{m.end_date || 'N/A'}</p>
+                    <p className="cell-sub">{m.package_type ? `${m.package_type} tháng` : 'Chưa có gói'} - {Number(m.fee || 0).toLocaleString()}đ</p>
                   </td>
                   <td>
-                    <p className="cell-main">{Number(m.fee || 0).toLocaleString('vi-VN')}đ</p>
-                    <span className={`pay-badge ${m.payment_method === 'TM' ? 'cash' : 'transfer'}`}>
-                      {m.payment_method}
+                    <span className={`status-badge ${status === 'Active' ? 'active' : 'expired'}`}>
+                      {status === 'Active' ? 'Đang tập' : 'Hết hạn'}
                     </span>
                     {m.payment_method === 'CK' && !m.is_payment_verified && (
                       <span className="pay-badge" style={{ background: '#fef08a', color: '#854d0e', marginLeft: '4px' }}>Chờ duyệt</span>
                     )}
                   </td>
                   <td>
-                    <span className={`status-badge ${status === 'Active' ? 'active' : 'expired'}`}>
-                      {status === 'Active' ? 'Đang tập' : 'Hết hạn'}
-                    </span>
-                  </td>
-                  <td>
                     <div className="table-actions">
                       <button type="button" className="link-btn" onClick={() => openEditModal(m)}>
                         Chi tiết
                       </button>
-                      <button type="button" className="link-btn" onClick={() => openHistoryModal(m)}>
-                        Lịch sử
-                      </button>
                       <button type="button" className="link-btn" onClick={() => openRenewModal(m)}>
                         <CreditCard size={14} /> Gia hạn
                       </button>
-                      {profile?.role === 'admin' && m.payment_method === 'CK' && (
-                        <label 
-                          style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '6px', 
-                            cursor: 'pointer', 
-                            color: m.is_payment_verified ? '#16a34a' : '#ef4444', 
-                            background: m.is_payment_verified ? '#f0fdf4' : '#fef2f2',
-                            padding: '4px 8px',
-                            borderRadius: '8px',
-                            border: '1px solid currentColor',
-                            fontSize: '13px',
-                            fontWeight: '700',
-                            transition: 'all 0.2s ease'
-                          }}
-                        >
-                          <input 
-                            type="checkbox" 
-                            checked={m.is_payment_verified} 
-                            onChange={() => handleTogglePaymentVerification(m)}
-                            style={{ cursor: 'pointer', width: '15px', height: '15px' }}
-                          />
-                          {m.is_payment_verified ? 'Đã duyệt' : 'Duyệt CK'}
-                        </label>
-                      )}
                     </div>
                   </td>
                 </tr>
@@ -376,65 +351,169 @@ export default function Members() {
 
       {showModal && (
         <div className="modal-backdrop" onClick={() => setShowModal(false)}>
-          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
-            <h3>{editingMember ? 'Chi tiết hội viên' : 'Thêm hội viên mới'}</h3>
-            <form className="modern-form" onSubmit={handleSubmit}>
-              <div className="form-grid-2">
-                <input
-                  value={form.member_code}
-                  onChange={(e) => setForm({ ...form, member_code: e.target.value })}
-                  placeholder="Mã hội viên"
-                  required
-                />
-                <input
-                  value={form.full_name}
-                  onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                  placeholder="Họ tên hội viên"
-                  required
-                />
+          <div className="modal-panel" style={{ width: 'min(900px, 96vw)', maxWidth: '900px' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0 }}>Chi tiết hội viên: {editingMember?.full_name || 'Mới'}</h3>
+              <button className="ghost-btn" onClick={() => setShowModal(false)}>Đóng</button>
+            </div>
+            
+            <div className="form-grid-2" style={{ gap: '24px', alignItems: 'start' }}>
+              {/* Cột 1: Thông tin hội viên */}
+              <div className="modern-card" style={{ padding: '20px', border: '1px solid #e2e8f0' }}>
+                <h4 style={{ marginTop: 0, marginBottom: '16px', fontSize: '16px' }}>Thông tin cơ bản</h4>
+                <form className="modern-form" onSubmit={handleSubmit}>
+                  <div className="form-grid-2">
+                    <div>
+                      <label className="cell-sub">Mã HV</label>
+                      <input
+                        value={form.member_code}
+                        onChange={(e) => setForm({ ...form, member_code: e.target.value })}
+                        placeholder="Mã hội viên"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="cell-sub">Họ tên</label>
+                      <input
+                        value={form.full_name}
+                        onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                        placeholder="Họ tên hội viên"
+                        required
+                      />
+                    </div>
+                  </div>
+                  
+                  {!editingMember && (
+                    <div className="form-grid-2">
+                      <div>
+                        <label className="cell-sub">Gói (tháng)</label>
+                        <input
+                          type="number"
+                          value={form.package_type}
+                          onChange={(e) => setForm({ ...form, package_type: e.target.value })}
+                          placeholder="Gói (tháng)"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="cell-sub">Học phí</label>
+                        <input
+                          type="number"
+                          value={form.fee}
+                          onChange={(e) => setForm({ ...form, fee: e.target.value })}
+                          placeholder="Học phí"
+                          required
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {!editingMember && (
+                    <div>
+                      <label className="cell-sub">Hình thức thanh toán</label>
+                      <select
+                        value={form.payment_method}
+                        onChange={(e) => setForm({ ...form, payment_method: e.target.value })}
+                      >
+                        <option value="TM">TM - Tiền mặt</option>
+                        <option value="CK">CK - Chuyển khoản</option>
+                      </select>
+                    </div>
+                  )}
+
+                  <label className="check-row" style={{ marginTop: '8px' }}>
+                    <input
+                      type="checkbox"
+                      checked={form.fingerprint_status}
+                      onChange={(e) => setForm({ ...form, fingerprint_status: e.target.checked })}
+                    />
+                    Đã đăng ký vân tay
+                  </label>
+                  
+                  <div style={{ marginTop: '8px' }}>
+                    <label className="cell-sub">Ghi chú</label>
+                    <textarea
+                      rows={3}
+                      value={form.note}
+                      onChange={(e) => setForm({ ...form, note: e.target.value })}
+                      placeholder="Ghi chú"
+                    />
+                  </div>
+
+                  <div className="modal-actions" style={{ marginTop: '16px' }}>
+                    <button type="submit" className="primary-btn" style={{ width: '100%' }}>
+                      {editingMember ? 'Cập nhật thông tin' : 'Tạo hội viên mới'}
+                    </button>
+                  </div>
+                </form>
               </div>
-              <div className="form-grid-2">
-                <input
-                  type="number"
-                  value={form.package_type}
-                  onChange={(e) => setForm({ ...form, package_type: e.target.value })}
-                  placeholder="Gói (tháng)"
-                  required
-                />
-                <input
-                  type="number"
-                  value={form.fee}
-                  onChange={(e) => setForm({ ...form, fee: e.target.value })}
-                  placeholder="Học phí"
-                  required
-                />
+
+              {/* Cột 2: Lịch sử gia hạn */}
+              <div className="modern-card" style={{ padding: '20px', border: '1px solid #e2e8f0', flex: 1 }}>
+                <h4 style={{ marginTop: 0, marginBottom: '16px', fontSize: '16px' }}>Lịch sử gia hạn & Hoạt động</h4>
+                
+                <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
+                  {editingMember ? (
+                    <div className="modern-table-wrap" style={{ border: 'none' }}>
+                      <table className="modern-table" style={{ minWidth: '100%' }}>
+                        <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+                          <tr>
+                            <th>Ngày</th>
+                            <th>Hành động</th>
+                            <th>Chi tiết gói</th>
+                            {profile?.role === 'admin' && <th>Thanh toán</th>}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {historyLoading ? (
+                            <tr><td colSpan={3} className="table-empty-cell">Đang tải...</td></tr>
+                          ) : historyLogs.length === 0 ? (
+                            <tr><td colSpan={3} className="table-empty-cell">Chưa có lịch sử</td></tr>
+                          ) : historyLogs.map(log => (
+                            <tr key={log.id} style={{ fontSize: '12px' }}>
+                              <td>{new Date(log.created_at).toLocaleDateString('vi-VN')}</td>
+                              <td>
+                                <strong style={{ color: '#0f172a' }}>
+                                  {log.action === 'CREATE' && '🆕 Đăng ký'}
+                                  {log.action === 'RENEW' && '⏳ Gia hạn'}
+                                  {log.action === 'UPDATE' && '📝 Sửa'}
+                                  {log.action === 'VERIFY_PAYMENT' && '✅ Duyệt'}
+                                </strong>
+                              </td>
+                              <td>
+                                {log.package_type && (
+                                  <div>{log.package_type} th - {Number(log.fee || 0).toLocaleString()}đ</div>
+                                )}
+                                <div className="cell-sub">{log.note}</div>
+                              </td>
+                              {profile?.role === 'admin' && (
+                                <td>
+                                  {log.payment_method === 'CK' && !log.is_payment_verified ? (
+                                    <button 
+                                      className="primary-btn" 
+                                      style={{ background: '#f59e0b', padding: '6px 10px', fontSize: '11px' }}
+                                      onClick={() => handleLogVerification(log)}
+                                    >
+                                      Duyệt CK
+                                    </button>
+                                  ) : log.payment_method === 'CK' ? (
+                                    <span style={{ color: '#16a34a', fontWeight: 'bold' }}>✓ Đã duyệt</span>
+                                  ) : log.payment_method === 'TM' ? (
+                                    <span style={{ color: '#64748b' }}>Tiền mặt</span>
+                                  ) : null}
+                                </td>
+                              )}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="modern-info">Lịch sử sẽ hiển thị sau khi hội viên được tạo.</div>
+                  )}
+                </div>
               </div>
-              <select
-                value={form.payment_method}
-                onChange={(e) => setForm({ ...form, payment_method: e.target.value })}
-              >
-                <option value="TM">TM - Tiền mặt</option>
-                <option value="CK">CK - Chuyển khoản</option>
-              </select>
-              <label className="check-row">
-                <input
-                  type="checkbox"
-                  checked={form.fingerprint_status}
-                  onChange={(e) => setForm({ ...form, fingerprint_status: e.target.checked })}
-                />
-                Đã đăng ký vân tay
-              </label>
-              <textarea
-                rows={3}
-                value={form.note}
-                onChange={(e) => setForm({ ...form, note: e.target.value })}
-                placeholder="Ghi chú"
-              />
-              <div className="modal-actions">
-                <button type="button" className="ghost-btn" onClick={() => setShowModal(false)}>Hủy</button>
-                <button type="submit" className="primary-btn">Lưu</button>
-              </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
@@ -445,88 +524,42 @@ export default function Members() {
             <h3>Gia hạn hội viên: {renewingMember?.full_name}</h3>
             <form className="modern-form" onSubmit={handleRenew}>
               <div className="form-grid-2">
-                <input
-                  type="number"
-                  value={renewForm.package_type}
-                  onChange={(e) => setRenewForm({ ...renewForm, package_type: e.target.value })}
-                  placeholder="Gói (tháng)"
-                  required
-                />
-                <input
-                  type="number"
-                  value={renewForm.fee}
-                  onChange={(e) => setRenewForm({ ...renewForm, fee: e.target.value })}
-                  placeholder="Học phí"
-                  required
-                />
+                <div>
+                  <label className="cell-sub">Gói (tháng)</label>
+                  <input
+                    type="number"
+                    value={renewForm.package_type}
+                    onChange={(e) => setRenewForm({ ...renewForm, package_type: e.target.value })}
+                    placeholder="Gói (tháng)"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="cell-sub">Học phí</label>
+                  <input
+                    type="number"
+                    value={renewForm.fee}
+                    onChange={(e) => setRenewForm({ ...renewForm, fee: e.target.value })}
+                    placeholder="Học phí"
+                    required
+                  />
+                </div>
               </div>
-              <select
-                value={renewForm.payment_method}
-                onChange={(e) => setRenewForm({ ...renewForm, payment_method: e.target.value })}
-              >
-                <option value="TM">TM - Tiền mặt</option>
-                <option value="CK">CK - Chuyển khoản</option>
-              </select>
-              <div className="modal-actions">
+              <div>
+                <label className="cell-sub">Hình thức thanh toán</label>
+                <select
+                  value={renewForm.payment_method}
+                  onChange={(e) => setRenewForm({ ...renewForm, payment_method: e.target.value })}
+                >
+                  <option value="TM">TM - Tiền mặt</option>
+                  <option value="CK">CK - Chuyển khoản</option>
+                </select>
+              </div>
+              <div className="modal-actions" style={{ marginTop: '16px' }}>
                 <button type="button" className="ghost-btn" onClick={() => setShowRenewModal(false)}>Hủy</button>
-                <button type="submit" className="primary-btn">Xác nhận</button>
+                <button type="submit" className="primary-btn">Xác nhận gia hạn</button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {showHistoryModal && (
-        <div className="modal-backdrop" onClick={() => setShowHistoryModal(false)}>
-          <div className="modal-panel" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ margin: 0 }}>Lịch sử hội viên: {renewingMember?.full_name}</h3>
-              <button className="ghost-btn" onClick={() => setShowHistoryModal(false)}>Đóng</button>
-            </div>
-            
-            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-              {historyLoading && <div className="modern-info">Đang tải lịch sử...</div>}
-              {!historyLoading && historyLogs.length === 0 && <p className="muted-text">Chưa có lịch sử ghi nhận.</p>}
-              
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {historyLogs.map(log => (
-                  <div key={log.id} style={{ padding: '12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                      <strong style={{ color: '#0f172a' }}>
-                        {log.action === 'CREATE' && '🆕 Đăng ký mới'}
-                        {log.action === 'UPDATE' && '📝 Cập nhật thông tin'}
-                        {log.action === 'RENEW' && '⏳ Gia hạn thẻ'}
-                        {log.action === 'VERIFY_PAYMENT' && '✅ Duyệt thanh toán'}
-                      </strong>
-                      <span className="muted-text">{new Date(log.created_at).toLocaleString('vi-VN')}</span>
-                    </div>
-                    <p style={{ margin: '4px 0', color: '#475569' }}>{log.note}</p>
-                    <div className="muted-text" style={{ fontSize: '11px', marginTop: '4px' }}>
-                      Thực hiện bởi: {log.profiles?.full_name || 'Hệ thống'}
-                    </div>
-                    
-                    {/* Hiển thị chi tiết thay đổi nếu là UPDATE hoặc RENEW */}
-                    {(log.action === 'UPDATE' || log.action === 'RENEW') && log.details?.before && log.details?.after && (
-                      <div style={{ marginTop: '8px', padding: '8px', background: '#f8fafc', borderRadius: '4px', fontSize: '12px' }}>
-                        {log.details.before.package_type !== log.details.after.package_type && (
-                          <div>Gói: {log.details.before.package_type} → {log.details.after.package_type} tháng</div>
-                        )}
-                        {log.details.before.end_date !== log.details.after.end_date && (
-                          <div>Hạn dùng: {log.details.before.end_date} → {log.details.after.end_date}</div>
-                        )}
-                        {log.details.before.fee !== log.details.after.fee && (
-                          <div>Phí: {Number(log.details.before.fee).toLocaleString()}đ → {Number(log.details.after.fee).toLocaleString()}đ</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="modal-actions" style={{ marginTop: '20px' }}>
-              <button className="primary-btn" onClick={() => setShowHistoryModal(false)}>Hoàn tất</button>
-            </div>
           </div>
         </div>
       )}

@@ -2,6 +2,7 @@ import supabase from '../config/supabase';
 import { addMonths, format } from 'date-fns';
 
 const TABLE_NAME = 'members';
+const VIEW_NAME = 'member_current_status';
 
 function toDateOnly(date) {
   return date.toISOString().slice(0, 10);
@@ -30,9 +31,8 @@ export async function validateMemberDates(startDate, packageType) {
 export const memberService = {
   async getAllMembers() {
     const { data, error } = await supabase
-      .from(TABLE_NAME)
+      .from(VIEW_NAME)
       .select('*')
-      .is('deleted_at', null)
       .order('created_at', { ascending: false });
     if (error) throw new Error(error.message);
     return data || [];
@@ -40,9 +40,8 @@ export const memberService = {
 
   async getRecentMembers(limit = 5) {
     const { data, error } = await supabase
-      .from(TABLE_NAME)
+      .from(VIEW_NAME)
       .select('*')
-      .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .limit(limit);
     if (error) throw new Error(error.message);
@@ -67,7 +66,7 @@ export const memberService = {
     if (!data?.success || !data?.member_id) throw new Error(data?.error || 'Tao hoi vien that bai');
 
     const { data: member, error: memberError } = await supabase
-      .from(TABLE_NAME)
+      .from(VIEW_NAME)
       .select('*')
       .eq('id', data.member_id)
       .single();
@@ -77,7 +76,44 @@ export const memberService = {
   },
 
   async updateMember(id, updates) {
-    const { data, error } = await supabase.from(TABLE_NAME).update(updates).eq('id', id).select().single();
+    // Separate member fields and log fields
+    const memberFields = ['full_name', 'member_code', 'fingerprint_status', 'note', 'deleted_at'];
+    const logFields = ['package_type', 'start_date', 'end_date', 'fee', 'payment_method', 'is_payment_verified'];
+
+    const memberUpdates = {};
+    const logUpdates = {};
+
+    Object.keys(updates).forEach(key => {
+      if (memberFields.includes(key)) memberUpdates[key] = updates[key];
+      if (logFields.includes(key)) logUpdates[key] = updates[key];
+    });
+
+    // Update members table if needed
+    if (Object.keys(memberUpdates).length > 0) {
+      const { error } = await supabase.from(TABLE_NAME).update(memberUpdates).eq('id', id);
+      if (error) throw new Error(error.message);
+    }
+
+    // If any log fields changed, create an UPDATE log entry
+    if (Object.keys(logUpdates).length > 0) {
+      // Get current values to fill the gaps in the log
+      const { data: current } = await supabase.from(VIEW_NAME).select('*').eq('id', id).single();
+
+      await supabase.from('member_logs').insert([{
+        member_id: id,
+        action: 'UPDATE',
+        package_type: logUpdates.package_type ?? current.package_type,
+        start_date: logUpdates.start_date ?? current.start_date,
+        end_date: logUpdates.end_date ?? current.end_date,
+        fee: logUpdates.fee ?? current.fee,
+        payment_method: logUpdates.payment_method ?? current.payment_method,
+        is_payment_verified: logUpdates.is_payment_verified ?? current.is_payment_verified,
+        details: { updates: logUpdates },
+        note: 'Cập nhật trạng thái hội viên'
+      }]);
+    }
+
+    const { data, error } = await supabase.from(VIEW_NAME).select().eq('id', id).single();
     if (error) throw new Error(error.message);
     return data;
   },
@@ -90,7 +126,7 @@ export const memberService = {
     const shiftId = renewalData.shiftId || null;
 
     const { data: member, error: memberError } = await supabase
-      .from(TABLE_NAME)
+      .from(VIEW_NAME)
       .select('*')
       .eq('id', memberId)
       .single();
@@ -105,22 +141,7 @@ export const memberService = {
 
     await validateMemberDates(renewalStart, packageType);
 
-    const { data: updatedMember, error: updateError } = await supabase
-      .from(TABLE_NAME)
-      .update({
-        end_date: newEndDate,
-        package_type: packageType,
-        fee,
-        payment_method: paymentMethod,
-        is_payment_verified: paymentMethod === 'TM',
-        note: `Gia han ${packageType} thang ngay ${toDateOnly(now)}`,
-      })
-      .eq('id', memberId)
-      .select()
-      .single();
-
-    if (updateError) throw updateError;
-
+    // 1. Create payment log
     const { data: payment, error: paymentError } = await supabase
       .from('payment_logs')
       .insert([
@@ -141,16 +162,22 @@ export const memberService = {
 
     if (paymentError) throw paymentError;
 
+    // 2. Create renewal log (This now holds the state)
     await supabase.from('member_logs').insert([
       {
         member_id: memberId,
         staff_id: staffId,
         action: 'RENEW',
+        package_type: packageType,
+        start_date: toDateOnly(renewalStart),
+        end_date: toDateOnly(newEndDate),
+        fee,
+        payment_method: paymentMethod,
+        is_payment_verified: paymentMethod === 'TM',
         details: {
-          package_type: packageType,
-          fee,
           payment_id: payment.id,
         },
+        note: `Gia han ${packageType} thang ngay ${toDateOnly(now)}`,
       },
     ]);
 
@@ -167,7 +194,52 @@ export const memberService = {
       },
     ]);
 
+    // 3. Fetch the updated state from view
+    const { data: updatedMember } = await supabase
+      .from(VIEW_NAME)
+      .select('*')
+      .eq('id', memberId)
+      .single();
+
     return { member: updatedMember, payment };
+  },
+
+  async verifyLogPayment(logId, staffId) {
+    // 1. Lấy thông tin log để tìm payment_id liên quan
+    const { data: log, error: logError } = await supabase
+      .from('member_logs')
+      .select('*')
+      .eq('id', logId)
+      .single();
+    
+    if (logError) throw new Error('Không tìm thấy bản ghi log: ' + logError.message);
+
+    // 2. Cập nhật bảng member_logs
+    const { error: updateLogError } = await supabase
+      .from('member_logs')
+      .update({ 
+        is_payment_verified: true,
+        note: (log.note || '') + ' (Admin đã duyệt)'
+      })
+      .eq('id', logId);
+    
+    if (updateLogError) throw new Error('Cập nhật log thất bại: ' + updateLogError.message);
+
+    // 3. Cập nhật bảng payment_logs nếu có payment_id
+    const paymentId = log.details?.payment_id;
+    if (paymentId) {
+      const { error: payError } = await supabase
+        .from('payment_logs')
+        .update({
+          is_verified: true,
+          verified_by: staffId,
+          verified_at: new Date().toISOString()
+        })
+        .eq('id', paymentId);
+      if (payError) console.error('Cập nhật payment_log thất bại:', payError);
+    }
+
+    return true;
   },
 
   async deleteMember(id) {
