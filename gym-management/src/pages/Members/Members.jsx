@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { CreditCard, Plus, Search } from 'lucide-react';
+import { CreditCard, Plus, Search, Eye, Trash2 } from 'lucide-react';
 import { useMembers } from '../../hooks/useMembers';
 import { memberService } from '../../services/memberService';
 import { staffLogService } from '../../services/staffLogService';
@@ -88,37 +88,37 @@ export default function Members() {
       const keyword = searchTerm.toLowerCase();
       const matchSearch = (m.full_name || '').toLowerCase().includes(keyword)
         || (m.member_code || '').toLowerCase().includes(keyword);
-        
+
       let matchDate = true;
       if (filterDate) {
         const expDate = m.end_date ? m.end_date.split('T')[0] : '';
         const regDate = m.start_date ? m.start_date.split('T')[0] : '';
         matchDate = (expDate === filterDate) || (regDate === filterDate);
       }
-      
+
       let matchStatus = true;
       if (filterStatus === 'pending_ck') {
         matchStatus = m.payment_method === 'CK' && !m.is_payment_verified;
       }
-      
+
       return matchSearch && matchDate && matchStatus;
     });
   }, [members, searchTerm, filterStatus, filterDate]);
 
   const handleLogVerification = async (log) => {
     if (!window.confirm(`Xác nhận đã nhận đủ ${Number(log.fee || 0).toLocaleString()}đ chuyển khoản cho lần gia hạn này?`)) return;
-    
+
     try {
       await memberService.verifyLogPayment(log.id, user.id);
-      
+
       // 1. Cập nhật ngay lập tức state History Logs để UI thay đổi nút -> dấu tích
-      setHistoryLogs(prevLogs => 
+      setHistoryLogs(prevLogs =>
         prevLogs.map(l => l.id === log.id ? { ...l, is_payment_verified: true } : l)
       );
 
       // 2. Làm mới danh sách hội viên tổng quát
       await fetchMembers();
-      
+
       // 3. Nếu đang xem đúng hội viên này, cập nhật lại editingMember để đồng bộ thông tin
       if (editingMember && editingMember.id === log.member_id) {
         const { data: freshMember } = await supabase
@@ -146,7 +146,7 @@ export default function Members() {
     if (!deletingMember) return;
     try {
       await memberService.deleteMember(deletingMember.id);
-      
+
       await staffLogService.logAction({
         staffId: user?.id,
         action: 'Xoa hoi vien',
@@ -183,7 +183,7 @@ export default function Members() {
     });
     setError('');
     setShowModal(true);
-    
+
     // Tự động tải lịch sử khi xem chi tiết
     setHistoryLoading(true);
     try {
@@ -223,15 +223,15 @@ export default function Members() {
     setError('');
 
     if (!activeShift?.id) {
-       setError("Vui lòng mở ca trước khi thêm hội viên mới.");
-       return;
+      setError("Vui lòng mở ca trước khi thêm hội viên mới.");
+      return;
     }
 
     try {
       const startDate = form.start_date || getLocalISODate();
       const startObj = new Date(startDate);
       const endDate = getLocalISODate(addMonths(startObj, Number(form.package_type || 1)));
-      
+
       const payload = {
         member_code: form.member_code,
         full_name: form.full_name,
@@ -256,7 +256,7 @@ export default function Members() {
           note: form.note,
         };
         const updated = await updateMember(editingMember.id, updatePayload);
-        
+
         await memberLogService.logAction({
           memberId: editingMember.id,
           staffId: user?.id,
@@ -291,11 +291,11 @@ export default function Members() {
   const openRenewModal = (member) => {
     setRenewingMember(member);
     const cat = member.membership_category || 'normal';
-    setRenewForm({ 
-      membership_category: cat, 
-      package_type: '1', 
-      fee: calculateFee(cat, '1') || '', 
-      payment_method: 'TM' 
+    setRenewForm({
+      membership_category: cat,
+      package_type: '1',
+      fee: calculateFee(cat, '1') || '',
+      payment_method: 'TM'
     });
     setError('');
     setShowRenewModal(true);
@@ -307,8 +307,8 @@ export default function Members() {
     setError('');
 
     if (!activeShift?.id) {
-       setError("Vui lòng mở ca trước khi gia hạn hội viên.");
-       return;
+      setError("Vui lòng mở ca trước khi gia hạn hội viên.");
+      return;
     }
 
     try {
@@ -329,7 +329,7 @@ export default function Members() {
 
       // Quan trọng: Làm mới danh sách để cập nhật ngày hết hạn mới
       await fetchMembers();
-      
+
       setShowRenewModal(false);
       setRenewingMember(null);
     } catch (err) {
@@ -349,7 +349,7 @@ export default function Members() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        
+
         <input
           type="date"
           value={filterDate}
@@ -359,8 +359,8 @@ export default function Members() {
         />
 
         {profile?.role === 'admin' && (
-          <select 
-            value={filterStatus} 
+          <select
+            value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
             style={{ padding: '8px', borderRadius: '6px', border: '1px solid #ddd' }}
           >
@@ -382,13 +382,14 @@ export default function Members() {
               <th>Mã hội viên</th>
               <th>Ngày hết hạn</th>
               <th>Trạng thái</th>
+              <th>Ghi chú</th>
               <th>Thao tác</th>
             </tr>
           </thead>
           <tbody>
             {!loading && filtered.length === 0 && (
               <tr>
-                <td colSpan={4} className="table-empty-cell">Không có dữ liệu</td>
+                <td colSpan={5} className="table-empty-cell">Không có dữ liệu</td>
               </tr>
             )}
             {filtered.map((m) => {
@@ -414,22 +415,49 @@ export default function Members() {
                       <span className="pay-badge" style={{ background: '#fef08a', color: '#854d0e', marginLeft: '4px' }}>Chờ duyệt</span>
                     )}
                   </td>
+                  <td style={{ maxWidth: '150px' }}>
+                    <div
+                      style={{
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        fontSize: '12px',
+                        color: '#64748b'
+                      }}
+                      title={m.note}
+                    >
+                      {m.note || '-'}
+                    </div>
+                  </td>
                   <td>
-                    <div className="table-actions">
-                      <button type="button" className="link-btn" onClick={() => openEditModal(m)}>
-                        Chi tiết
+                    <div className="table-actions" style={{ gap: '8px' }}>
+                      <button
+                        type="button"
+                        className="ghost-btn-sm"
+                        onClick={() => openEditModal(m)}
+                        title="Xem chi tiết & Sửa"
+                        style={{ padding: '6px', color: '#2563eb' }}
+                      >
+                        <Eye size={18} />
                       </button>
-                      <button type="button" className="link-btn" onClick={() => openRenewModal(m)}>
-                        <CreditCard size={14} /> Gia hạn
+                      <button
+                        type="button"
+                        className="ghost-btn-sm"
+                        onClick={() => openRenewModal(m)}
+                        title="Gia hạn thành viên"
+                        style={{ padding: '6px', color: '#059669' }}
+                      >
+                        <CreditCard size={18} />
                       </button>
                       {profile?.role === 'admin' && (
-                        <button 
-                          type="button" 
-                          className="link-btn" 
-                          style={{ color: '#dc2626' }}
+                        <button
+                          type="button"
+                          className="ghost-btn-sm"
+                          style={{ color: '#dc2626', padding: '6px' }}
                           onClick={() => setDeletingMember(m)}
+                          title="Xóa hội viên"
                         >
-                          Xóa người dùng
+                          <Trash2 size={18} />
                         </button>
                       )}
                     </div>
@@ -448,7 +476,7 @@ export default function Members() {
               <h3 style={{ margin: 0 }}>Chi tiết hội viên: {editingMember?.full_name || 'Mới'}</h3>
               <button className="ghost-btn" onClick={() => setShowModal(false)}>Đóng</button>
             </div>
-            
+
             <div className="form-grid-2" style={{ gap: '24px', alignItems: 'start' }}>
               {/* Cột 1: Thông tin hội viên */}
               <div className="modern-card" style={{ padding: '20px', border: '1px solid #e2e8f0' }}>
@@ -474,7 +502,7 @@ export default function Members() {
                       />
                     </div>
                   </div>
-                  
+
                   {!editingMember && (
                     <>
                       <div style={{ marginTop: '12px' }}>
@@ -535,28 +563,41 @@ export default function Members() {
                     </div>
                   )}
 
-                  {editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true') ? (
-                    <div style={{ marginTop: '8px' }}>
-                      <label className="check-row" style={{ color: '#64748b', cursor: 'not-allowed' }}>
-                        <input
-                          type="checkbox"
-                          checked={form.fingerprint_status}
-                          disabled
-                        />
-                        Đã đăng ký vân tay (Đã thiết lập)
-                      </label>
-                    </div>
-                  ) : (
-                    <label className="check-row" style={{ marginTop: '8px' }}>
-                      <input
-                        type="checkbox"
-                        checked={form.fingerprint_status}
-                        onChange={(e) => setForm({ ...form, fingerprint_status: e.target.checked })}
-                      />
-                      Đã đăng ký vân tay
+                  <div style={{ 
+                    marginTop: '12px', 
+                    padding: '10px 14px', 
+                    background: '#f8fafc', 
+                    borderRadius: '10px', 
+                    border: '1px solid #e2e8f0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}>
+                    <input
+                      type="checkbox"
+                      id="fingerprint_status"
+                      checked={form.fingerprint_status}
+                      onChange={(e) => setForm({ ...form, fingerprint_status: e.target.checked })}
+                      disabled={editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true')}
+                      style={{ width: '20px', height: '20px', cursor: (editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true')) ? 'not-allowed' : 'pointer', accentColor: '#2563eb' }}
+                    />
+                    <label 
+                      htmlFor="fingerprint_status" 
+                      style={{ 
+                        fontSize: '14px', 
+                        fontWeight: '600', 
+                        color: (editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true')) ? '#94a3b8' : '#334155', 
+                        cursor: (editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true')) ? 'not-allowed' : 'pointer',
+                        userSelect: 'none',
+                        margin: 0
+                      }}
+                    >
+                      {editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true') 
+                        ? 'Đã đăng ký vân tay (Đã thiết lập)' 
+                        : 'Đã đăng ký vân tay'}
                     </label>
-                  )}
-                  
+                  </div>
+
                   <div style={{ marginTop: '8px' }}>
                     <label className="cell-sub">Ghi chú</label>
                     <textarea
@@ -578,7 +619,7 @@ export default function Members() {
               {/* Cột 2: Lịch sử gia hạn */}
               <div className="modern-card" style={{ padding: '20px', border: '1px solid #e2e8f0', flex: 1 }}>
                 <h4 style={{ marginTop: 0, marginBottom: '16px', fontSize: '16px' }}>Lịch sử gia hạn & Hoạt động</h4>
-                
+
                 <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
                   {editingMember ? (
                     <div className="modern-table-wrap" style={{ border: 'none' }}>
@@ -620,8 +661,8 @@ export default function Members() {
                               {profile?.role === 'admin' && (
                                 <td>
                                   {log.payment_method === 'CK' && !log.is_payment_verified ? (
-                                    <button 
-                                      className="primary-btn" 
+                                    <button
+                                      className="primary-btn"
                                       style={{ background: '#f59e0b', padding: '6px 10px', fontSize: '11px' }}
                                       onClick={() => handleLogVerification(log)}
                                     >

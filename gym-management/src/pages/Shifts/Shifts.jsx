@@ -286,14 +286,36 @@ export default function Shifts() {
             </div>
 
             {!activeShift && profile?.role === 'admin' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                gap: '12px', 
+                marginBottom: '20px',
+                padding: '12px 20px',
+                background: '#eff6ff',
+                borderRadius: '12px',
+                border: '1px solid #bfdbfe',
+                width: 'fit-content',
+                margin: '0 auto 20px auto'
+              }}>
                 <input
                   type="checkbox"
                   id="skipTimeCheck"
                   checked={skipTimeCheck}
                   onChange={(e) => setSkipTimeCheck(e.target.checked)}
+                  style={{ width: '22px', height: '22px', cursor: 'pointer', accentColor: '#2563eb' }}
                 />
-                <label htmlFor="skipTimeCheck" style={{ fontSize: '13px', color: '#64748b', cursor: 'pointer' }}>
+                <label 
+                  htmlFor="skipTimeCheck" 
+                  style={{ 
+                    fontSize: '14px', 
+                    fontWeight: '700', 
+                    color: '#1e40af', 
+                    cursor: 'pointer',
+                    userSelect: 'none'
+                  }}
+                >
                   Bỏ qua giới hạn giờ (Admin override)
                 </label>
               </div>
