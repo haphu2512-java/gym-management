@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Clock } from 'lucide-react';
 import { shiftService } from '../../services/shiftService';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -25,6 +25,10 @@ export default function Shifts() {
     note: '',
   });
 
+  const [selectedShiftSummary, setSelectedShiftSummary] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+
   const loadShifts = async () => {
     setLoading(true);
     setError('');
@@ -35,6 +39,20 @@ export default function Shifts() {
       setError(e.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openShiftDetail = async (shift) => {
+    setSelectedShiftSummary(null);
+    setShowDetailModal(true);
+    setSummaryLoading(true);
+    try {
+      const summary = await shiftService.getShiftSummary(shift.id);
+      setSelectedShiftSummary(summary);
+    } catch (err) {
+      setError("Lỗi tải chi tiết ca: " + err.message);
+    } finally {
+      setSummaryLoading(false);
     }
   };
 
@@ -273,9 +291,9 @@ export default function Shifts() {
               <th>Ca</th>
               <th>Bắt đầu</th>
               <th>Kết thúc</th>
-              <th>Tiền đầu ca</th>
-              <th>Tiền kết ca</th>
+              <th>Tiền đầu/cuối</th>
               <th>Trạng thái</th>
+              <th>Hành động</th>
             </tr>
           </thead>
           <tbody>
@@ -288,19 +306,141 @@ export default function Shifts() {
               <tr key={shift.id}>
                 <td className="cell-main">{shift.shift_name}</td>
                 <td>{formatDateTime(shift.start_time)}</td>
-                <td>{formatDateTime(shift.end_time)}</td>
-                <td>{Number(shift.starting_cash || 0).toLocaleString('vi-VN')}đ</td>
-                <td>{Number(shift.ending_cash || 0).toLocaleString('vi-VN')}đ</td>
+                <td>{formatDateTime(shift.end_time) || '-'}</td>
+                <td>
+                  <p className="cell-main">{Number(shift.starting_cash || 0).toLocaleString('vi-VN')}đ</p>
+                  <p className="cell-sub">{shift.status === 'closed' ? `${Number(shift.ending_cash || 0).toLocaleString('vi-VN')}đ` : '---'}</p>
+                </td>
                 <td>
                   <span className={`status-badge ${shift.status === 'open' ? 'active' : 'expired'}`}>
                     {shift.status === 'open' ? 'Đang mở' : 'Đã chốt'}
                   </span>
+                </td>
+                <td>
+                  <button className="link-btn" onClick={() => openShiftDetail(shift)}>Chi tiết</button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {showDetailModal && (
+        <div className="modal-backdrop" onClick={() => setShowDetailModal(false)}>
+          <div className="modal-panel" style={{ width: 'min(800px, 96vw)' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0 }}>Chi tiết: {selectedShiftSummary?.shift?.shift_name} ({formatDateTime(selectedShiftSummary?.shift?.start_time)})</h3>
+              <button className="ghost-btn" onClick={() => setShowDetailModal(false)}>Đóng</button>
+            </div>
+
+            {summaryLoading ? (
+              <div className="modern-info">Đang tải dữ liệu ca...</div>
+            ) : selectedShiftSummary ? (
+              <div className="modern-stack" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                <div className="form-grid-2">
+                  <div className="modern-card" style={{ padding: '12px', background: '#f8fafc' }}>
+                    <p className="cell-sub">Nhân viên mở ca</p>
+                    <p className="cell-main">{selectedShiftSummary.shift?.profiles?.full_name || 'N/A'}</p>
+                  </div>
+                  <div className="modern-card" style={{ padding: '12px', background: '#f8fafc' }}>
+                    <p className="cell-sub">Doanh thu dự kiến (TM)</p>
+                    <p className="cell-main">
+                      {Number(
+                        (selectedShiftSummary.shift?.starting_cash || 0) +
+                        selectedShiftSummary.payments.filter(p => p.payment_method === 'TM').reduce((s, p) => s + p.amount, 0) +
+                        selectedShiftSummary.sales.filter(s => s.payment_method === 'TM').reduce((s, p) => s + p.total_price, 0) -
+                        selectedShiftSummary.expenses.reduce((s, e) => s + e.amount, 0)
+                      ).toLocaleString()}đ
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '16px' }}>
+                  <h4 style={{ marginBottom: '8px', borderBottom: '1px solid #eee', paddingBottom: '4px' }}>Hội viên mới & Gia hạn ({selectedShiftSummary.payments.length})</h4>
+                  <table className="modern-table" style={{ fontSize: '13px' }}>
+                    <thead>
+                      <tr>
+                        <th>Hội viên</th>
+                        <th>Số tiền</th>
+                        <th>HTTT</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedShiftSummary.payments.length === 0 && (
+                        <tr><td colSpan={3} className="table-empty-cell">Không có phát sinh</td></tr>
+                      )}
+                      {selectedShiftSummary.payments.map(p => (
+                        <tr key={p.id}>
+                          <td>{p.members?.member_code} - {p.members?.full_name}</td>
+                          <td>{Number(p.amount).toLocaleString()}đ</td>
+                          <td>{p.payment_method}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style={{ marginTop: '16px' }}>
+                  <h4 style={{ marginBottom: '8px', borderBottom: '1px solid #eee', paddingBottom: '4px' }}>Bán nước ({selectedShiftSummary.sales.length})</h4>
+                  <table className="modern-table" style={{ fontSize: '13px' }}>
+                    <thead>
+                      <tr>
+                        <th>Sản phẩm</th>
+                        <th>SL</th>
+                        <th>Tổng</th>
+                        <th>HTTT</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedShiftSummary.sales.length === 0 && (
+                        <tr><td colSpan={4} className="table-empty-cell">Không có phát sinh</td></tr>
+                      )}
+                      {selectedShiftSummary.sales.map(s => (
+                        <tr key={s.id}>
+                          <td>{s.products?.name}</td>
+                          <td>{s.quantity}</td>
+                          <td>{Number(s.total_price).toLocaleString()}đ</td>
+                          <td>{s.payment_method}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style={{ marginTop: '16px' }}>
+                  <h4 style={{ marginBottom: '8px', borderBottom: '1px solid #eee', paddingBottom: '4px' }}>Khoản chi ({selectedShiftSummary.expenses.length})</h4>
+                  <table className="modern-table" style={{ fontSize: '13px' }}>
+                    <thead>
+                      <tr>
+                        <th>Lý do</th>
+                        <th>Số tiền</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedShiftSummary.expenses.length === 0 && (
+                        <tr><td colSpan={2} className="table-empty-cell">Không có khoản chi</td></tr>
+                      )}
+                      {selectedShiftSummary.expenses.map(e => (
+                        <tr key={e.id}>
+                          <td>{e.reason}</td>
+                          <td>{Number(e.amount).toLocaleString()}đ</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {selectedShiftSummary.shift?.note && (
+                  <div style={{ marginTop: '16px', padding: '12px', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fef3c7' }}>
+                    <p className="cell-sub">Ghi chú ca:</p>
+                    <p style={{ margin: 0, fontSize: '14px' }}>{selectedShiftSummary.shift.note}</p>
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { shiftService } from '../../services/shiftService';
 import { memberLogService } from '../../services/memberLogService';
 import supabase from '../../config/supabase';
 import { useAuthStore } from '../../store/useAuthStore';
-import { formatDate, getLocalISODate } from '../../utils/formatters';
+import { formatDate, getLocalISODate, addMonths } from '../../utils/formatters';
 
 function getStatus(endDate) {
   const today = new Date();

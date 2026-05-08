@@ -123,4 +123,51 @@ export const shiftService = {
 
     return data;
   },
+
+  async getShiftSummary(shiftId) {
+    // 1. Shift Basic Info
+    const { data: shift, error: shiftError } = await supabase
+      .from(SHIFT_TABLE)
+      .select(`
+        *,
+        profiles:opened_by (full_name)
+      `)
+      .eq('id', shiftId)
+      .single();
+    if (shiftError) throw new Error(shiftError.message);
+
+    // 2. Member Payments (Registration/Renewal)
+    const { data: payments, error: paymentError } = await supabase
+      .from('payment_logs')
+      .select(`
+        *,
+        members (member_code, full_name)
+      `)
+      .eq('shift_id', shiftId);
+    if (paymentError) throw new Error(paymentError.message);
+
+    // 3. Drink Sales
+    const { data: sales, error: salesError } = await supabase
+      .from('sales_logs')
+      .select(`
+        *,
+        products (name)
+      `)
+      .eq('shift_id', shiftId);
+    if (salesError) throw new Error(salesError.message);
+
+    // 4. Expenses
+    const { data: expenses, error: expenseError } = await supabase
+      .from('shift_expenses')
+      .select('*')
+      .eq('shift_id', shiftId);
+    if (expenseError) throw new Error(expenseError.message);
+
+    return {
+      shift,
+      payments: payments || [],
+      sales: sales || [],
+      expenses: expenses || []
+    };
+  },
 };

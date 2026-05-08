@@ -15,7 +15,7 @@ export default function Inventory() {
   const [showModal, setShowModal] = useState(false);
   const [viewMode, setViewMode] = useState('sales'); // 'sales' or 'admin'
   const [editingProduct, setEditingProduct] = useState(null);
-  const [form, setForm] = useState({ name: '', price: '', stock_quantity: '', note: '' });
+  const [form, setForm] = useState({ name: '', price: '', stock_quantity: '', restock_quantity: '0', note: '' });
 
   // Quantities for sales
   const [sellQuantities, setSellQuantities] = useState({});
@@ -75,7 +75,7 @@ export default function Inventory() {
 
   const handleOpenCreate = () => {
     setEditingProduct(null);
-    setForm({ name: '', price: '', stock_quantity: '', note: '' });
+    setForm({ name: '', price: '', stock_quantity: '', restock_quantity: '0', note: '' });
     setShowModal(true);
   };
 
@@ -85,6 +85,7 @@ export default function Inventory() {
       name: product.name,
       price: String(product.price),
       stock_quantity: String(product.stock_quantity),
+      restock_quantity: '0',
       note: product.note || ''
     });
     setShowModal(true);
@@ -97,7 +98,7 @@ export default function Inventory() {
       const payload = {
         name: form.name,
         price: Number(form.price || 0),
-        stock_quantity: Number(form.stock_quantity || 0),
+        stock_quantity: Number(form.stock_quantity || 0) + Number(form.restock_quantity || 0),
         note: form.note,
       };
 
@@ -123,7 +124,7 @@ export default function Inventory() {
 
       setShowModal(false);
       setEditingProduct(null);
-      setForm({ name: '', price: '', stock_quantity: '', note: '' });
+      setForm({ name: '', price: '', stock_quantity: '', restock_quantity: '0', note: '' });
       await loadProducts();
       showSuccess('Cập nhật kho thành công!');
     } catch (err) {
@@ -371,37 +372,69 @@ export default function Inventory() {
           <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
             <h3>{editingProduct ? 'Cập nhật / Nhập hàng' : 'Thêm sản phẩm nước'}</h3>
             <form className="modern-form" onSubmit={handleAddOrUpdate}>
-              <input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="Tên sản phẩm"
-                required
-              />
-              <div className="form-grid-2">
+              <div style={{ marginBottom: '12px' }}>
+                <label className="cell-sub" style={{ display: 'block', marginBottom: '4px' }}>Tên sản phẩm</label>
                 <input
-                  type="number"
-                  value={form.price}
-                  onChange={(e) => setForm({ ...form, price: e.target.value })}
-                  placeholder="Giá bán"
-                  required
-                />
-                <input
-                  type="number"
-                  value={form.stock_quantity}
-                  onChange={(e) => setForm({ ...form, stock_quantity: e.target.value })}
-                  placeholder="Số lượng"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="Tên sản phẩm (ví dụ: Nước suối)"
                   required
                 />
               </div>
-              <textarea
-                rows={3}
-                value={form.note}
-                onChange={(e) => setForm({ ...form, note: e.target.value })}
-                placeholder="Ghi chú"
-              />
-              <div className="modal-actions">
+
+              <div className="form-grid-2">
+                <div>
+                  <label className="cell-sub" style={{ display: 'block', marginBottom: '4px' }}>Giá bán (VNĐ)</label>
+                  <input
+                    type="number"
+                    value={form.price}
+                    onChange={(e) => setForm({ ...form, price: e.target.value })}
+                    placeholder="Giá bán"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="cell-sub" style={{ display: 'block', marginBottom: '4px' }}>Tồn kho hiện tại</label>
+                  <input
+                    type="number"
+                    value={form.stock_quantity}
+                    onChange={(e) => setForm({ ...form, stock_quantity: e.target.value })}
+                    placeholder="Số lượng"
+                    required
+                    disabled={editingProduct !== null}
+                  />
+                </div>
+              </div>
+
+              {editingProduct && (
+                <div style={{ marginTop: '12px', padding: '12px', background: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                  <label className="cell-sub" style={{ display: 'block', marginBottom: '4px', color: '#166534', fontWeight: 'bold' }}>Nhập thêm hàng (+)</label>
+                  <input
+                    type="number"
+                    value={form.restock_quantity}
+                    onChange={(e) => setForm({ ...form, restock_quantity: e.target.value })}
+                    placeholder="Số lượng nhập thêm"
+                    style={{ borderColor: '#16a34a' }}
+                  />
+                  <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#15803d' }}>
+                    Tổng kho sau khi lưu: <strong>{Number(form.stock_quantity) + Number(form.restock_quantity || 0)}</strong>
+                  </p>
+                </div>
+              )}
+
+              <div style={{ marginTop: '12px' }}>
+                <label className="cell-sub" style={{ display: 'block', marginBottom: '4px' }}>Ghi chú</label>
+                <textarea
+                  rows={3}
+                  value={form.note}
+                  onChange={(e) => setForm({ ...form, note: e.target.value })}
+                  placeholder="Mô tả sản phẩm hoặc ghi chú nhập hàng..."
+                />
+              </div>
+
+              <div className="modal-actions" style={{ marginTop: '20px' }}>
                 <button type="button" className="ghost-btn" onClick={() => setShowModal(false)}>Hủy</button>
-                <button type="submit" className="primary-btn">Lưu</button>
+                <button type="submit" className="primary-btn">Lưu thay đổi</button>
               </div>
             </form>
           </div>

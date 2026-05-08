@@ -204,19 +204,26 @@ export const memberService = {
     if (logError) console.error('Lỗi lưu log hội viên:', logError.message);
 
     // staff_logs can be non-blocking as it doesn't affect the member view
-    supabase.from('staff_logs').insert([
-      {
-        staff_id: staffId,
-        action: 'Gia han hoi vien',
-        target_item: `${member.member_code} - ${member.full_name}`,
-        details: {
-          member_id: memberId,
-          fee,
-          payment_id: payment.id,
-        },
-        created_at: new Date().toISOString(),
-      },
-    ]).catch(err => console.error('Lỗi lưu staff log:', err.message));
+    // We use a self-invoking async function to handle it without blocking the main flow
+    (async () => {
+      try {
+        await supabase.from('staff_logs').insert([
+          {
+            staff_id: staffId,
+            action: 'Gia han hoi vien',
+            target_item: `${member.member_code} - ${member.full_name}`,
+            details: {
+              member_id: memberId,
+              fee,
+              payment_id: payment.id,
+            },
+            created_at: new Date().toISOString(),
+          },
+        ]);
+      } catch (err) {
+        console.error('Lỗi lưu staff log:', err.message);
+      }
+    })();
 
     // 3. Fetch the updated state from view
     const { data: updatedMember, error: fetchError } = await supabase
