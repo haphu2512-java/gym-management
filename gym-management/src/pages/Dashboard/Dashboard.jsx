@@ -24,10 +24,13 @@ export default function Dashboard() {
     const load = async () => {
       setLoading(true);
       try {
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        
         const [data, recent, totalMemberRev] = await Promise.all([
           memberService.getAllMembers(),
           memberService.getRecentMembers(5),
-          paymentService.getTotalMemberRevenue()
+          paymentService.getTotalMemberRevenue({ startDate: startOfMonth })
         ]);
         setMembers(data);
         setRecentMembers(recent);
@@ -94,11 +97,11 @@ export default function Dashboard() {
         <div className="modern-card stat-card-modern">
           <div className="stat-icon-wrap green"><TrendingUp size={22} /></div>
           <div>
-            <p className="stat-label-modern">Doanh thu hội viên</p>
+            <p className="stat-label-modern">Doanh thu hội viên (Tháng này)</p>
             <p className="stat-value-modern" style={{ fontSize: '20px' }}>
               {stats.memberRevenue.toLocaleString('vi-VN')}đ
             </p>
-            <p className="cell-sub">(Đã xác nhận thanh toán)</p>
+            <p className="cell-sub">(Đã xác nhận)</p>
           </div>
         </div>
 

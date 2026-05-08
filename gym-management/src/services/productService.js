@@ -31,14 +31,15 @@ export const productService = {
     return data;
   },
 
-  async sellOneBottle(product, shiftId, userId) {
+  async sellOneBottle(product, shiftId, userId, paymentMethod = 'TM') {
     // Use atomic transaction function
     const { data, error } = await supabase.rpc('sell_bottle_transaction', {
       p_product_id: product.id,
       p_shift_id: shiftId,
       p_staff_id: userId,
       p_quantity: 1,
-      p_total_price: Number(product.price || 0)
+      p_total_price: Number(product.price || 0),
+      p_payment_method: paymentMethod
     });
 
     if (error) throw new Error('Bán hàng thất bại: ' + error.message);

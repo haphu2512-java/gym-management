@@ -115,7 +115,9 @@ export default function Inventory() {
   };
 
   // Bán 1 chai — cập nhật doanh thu ngay sau khi bán
-  const handleSell = async (product) => {
+  const [sellingProduct, setSellingProduct] = useState(null);
+
+  const handleSell = async (product, method = 'TM') => {
     setError('');
     const shiftId = activeShift?.id || null;
 
@@ -125,7 +127,7 @@ export default function Inventory() {
     }
 
     try {
-      const result = await productService.sellOneBottle(product, shiftId, user?.id);
+      await productService.sellOneBottle(product, shiftId, user?.id, method);
 
       // Update local state
       setProducts((prev) => prev.map((item) =>
@@ -138,7 +140,8 @@ export default function Inventory() {
         setDrinkRevenue(rev);
       }
 
-      showSuccess(`Đã bán ${product.name} thành công!`);
+      showSuccess(`Đã bán ${product.name} (${method}) thành công!`);
+      setSellingProduct(null);
     } catch (err) {
       showError(`Bán hàng thất bại: ${err.message}`);
     }
@@ -233,10 +236,10 @@ export default function Inventory() {
                     <button
                       type="button"
                       className="dark-btn"
-                      onClick={() => handleSell(item)}
+                      onClick={() => setSellingProduct(item)}
                       disabled={Number(item.stock_quantity || 0) <= 0}
                     >
-                      <Plus size={14} style={{ marginRight: '4px' }} /> Bán 1
+                      <Plus size={14} style={{ marginRight: '4px' }} /> Bán hàng
                     </button>
                     {profile?.role === 'admin' && (
                       <>
@@ -304,6 +307,45 @@ export default function Inventory() {
                 <button type="submit" className="primary-btn">Lưu</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal xác nhận bán hàng & Chọn phương thức */}
+      {sellingProduct && (
+        <div className="modal-backdrop" onClick={() => setSellingProduct(null)}>
+          <div className="modal-panel" style={{ maxWidth: '400px' }} onClick={(e) => e.stopPropagation()}>
+            <h3>Bán hàng: {sellingProduct.name}</h3>
+            <p className="muted-text">Giá bán: <strong>{Number(sellingProduct.price || 0).toLocaleString('vi-VN')}đ</strong></p>
+            
+            <p style={{ marginTop: '16px', fontWeight: '600' }}>Chọn phương thức thanh toán:</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '8px' }}>
+              <button 
+                type="button" 
+                className="primary-btn" 
+                style={{ background: '#0f172a' }}
+                onClick={() => handleSell(sellingProduct, 'TM')}
+              >
+                Tiền mặt (TM)
+              </button>
+              <button 
+                type="button" 
+                className="primary-btn" 
+                style={{ background: '#2563eb' }}
+                onClick={() => handleSell(sellingProduct, 'CK')}
+              >
+                Chuyển khoản (CK)
+              </button>
+            </div>
+            
+            <button 
+              type="button" 
+              className="ghost-btn" 
+              style={{ width: '100%', marginTop: '12px' }}
+              onClick={() => setSellingProduct(null)}
+            >
+              Hủy
+            </button>
           </div>
         </div>
       )}

@@ -16,6 +16,13 @@ function formatDate() {
   return new Date().toLocaleDateString('vi-VN');
 }
 
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Chào buổi sáng!';
+  if (hour < 18) return 'Chào buổi chiều!';
+  return 'Chào buổi tối!';
+}
+
 export default function Header({ onMenuToggle }) {
   const location = useLocation();
   const title = titleMap[location.pathname] || 'Gym Management';
@@ -47,7 +54,7 @@ export default function Header({ onMenuToggle }) {
       <div className="desktop-title-row">
         <div>
           <h2>{title}</h2>
-          <p>Chào buổi sáng! Hôm nay là ngày {formatDate()}</p>
+          <p>{getGreeting()} Hôm nay là ngày {formatDate()}</p>
         </div>
         <div className="system-status" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

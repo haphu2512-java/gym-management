@@ -49,11 +49,20 @@ export const paymentService = {
     return data;
   },
 
-  async getTotalMemberRevenue() {
-    const { data, error } = await supabase
+  async getTotalMemberRevenue(filters = {}) {
+    let query = supabase
       .from(TABLE_NAME)
       .select('amount')
       .eq('is_verified', true);
+
+    if (filters.startDate) {
+      query = query.gte('created_at', filters.startDate);
+    }
+    if (filters.endDate) {
+      query = query.lte('created_at', filters.endDate);
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
     return data.reduce((sum, p) => sum + Number(p.amount), 0);
   },

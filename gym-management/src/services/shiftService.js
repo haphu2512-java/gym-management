@@ -49,6 +49,17 @@ export const shiftService = {
   },
 
   async openShift({ shiftName, startingCash = 0, note = '', staffId = null }) {
+    // Check if there is already an open shift
+    const { data: openShifts, error: checkError } = await supabase
+      .from(SHIFT_TABLE)
+      .select('id, shift_name')
+      .eq('status', 'open');
+    
+    if (checkError) throw new Error(checkError.message);
+    if (openShifts && openShifts.length > 0) {
+      throw new Error(`Đã có ca "${openShifts[0].shift_name}" đang mở. Vui lòng chốt ca cũ trước khi mở ca mới.`);
+    }
+
     const shiftTimeMap = {
       'Ca 1': { start: '05:00:00', end: '09:00:00' },
       'Ca 2': { start: '09:00:00', end: '13:00:00' },
@@ -66,7 +77,7 @@ export const shiftService = {
       start_time: new Date().toISOString(),
       starting_cash: Number(startingCash || 0),
       status: 'open',
-      opened_by: staffId, // Added this
+      opened_by: staffId,
       note,
     };
 

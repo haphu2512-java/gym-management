@@ -14,26 +14,28 @@ function getStatus(endDate) {
   return target >= new Date(today.toDateString()) ? 'Active' : 'Expired';
 }
 
-function getMemberStatus(endDate) {
-  const today = new Date();
-  const end = new Date(endDate);
-  const daysLeft = Math.ceil((end - today) / (1000 * 60 * 60 * 24));
 
-  if (daysLeft < 0) return { status: 'expired', color: 'bg-red-100 text-red-800' };
-  if (daysLeft <= 7) return { status: 'warning', color: 'bg-yellow-100 text-yellow-800' };
-  return { status: 'active', color: 'bg-green-100 text-green-800' };
+
+const PRICING_TIERS = {
+  normal: { 1: 350000, 3: 795000, 6: 1440000 },
+  couple: { 1: 320000, 3: 720000, 6: 1320000 },
+  team: { 1: 300000, 3: 660000, 6: 1200000 }
+};
+
+function calculateFee(category, packageType) {
+  return PRICING_TIERS[category]?.[packageType] || '';
 }
-
-import { addMonths } from '../../utils/formatters';
 
 const initialForm = {
   member_code: '',
   full_name: '',
+  membership_category: 'normal',
   package_type: '1',
-  fee: '',
+  fee: '350000',
   payment_method: 'TM',
   fingerprint_status: false,
   note: '',
+  start_date: new Date().toISOString().slice(0, 10),
 };
 
 export default function Members() {
@@ -48,7 +50,7 @@ export default function Members() {
 
   const [showRenewModal, setShowRenewModal] = useState(false);
   const [renewingMember, setRenewingMember] = useState(null);
-  const [renewForm, setRenewForm] = useState({ package_type: '1', fee: '', payment_method: 'TM' });
+  const [renewForm, setRenewForm] = useState({ membership_category: 'normal', package_type: '1', fee: '350000', payment_method: 'TM' });
 
   const [activeShift, setActiveShift] = useState(null);
 
@@ -140,6 +142,7 @@ export default function Members() {
     setForm({
       member_code: member.member_code || '',
       full_name: member.full_name || '',
+      membership_category: member.membership_category || 'normal',
       package_type: String(member.package_type || 1),
       fee: String(member.fee || 0),
       payment_method: member.payment_method || 'TM',
@@ -161,6 +164,28 @@ export default function Members() {
     }
   };
 
+  const handleFormChange = (field, value) => {
+    setForm(prev => {
+      const next = { ...prev, [field]: value };
+      if (field === 'package_type' || field === 'membership_category') {
+        const fee = calculateFee(next.membership_category, next.package_type);
+        if (fee !== '') next.fee = String(fee);
+      }
+      return next;
+    });
+  };
+
+  const handleRenewFormChange = (field, value) => {
+    setRenewForm(prev => {
+      const next = { ...prev, [field]: value };
+      if (field === 'package_type' || field === 'membership_category') {
+        const fee = calculateFee(next.membership_category, next.package_type);
+        if (fee !== '') next.fee = String(fee);
+      }
+      return next;
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -171,12 +196,14 @@ export default function Members() {
     }
 
     try {
-      const now = new Date();
-      const startDate = now.toISOString().slice(0, 10);
-      const endDate = addMonths(now, Number(form.package_type || 1)).toISOString().slice(0, 10);
+      const startDate = form.start_date || new Date().toISOString().slice(0, 10);
+      const startObj = new Date(startDate);
+      const endDate = addMonths(startObj, Number(form.package_type || 1)).toISOString().slice(0, 10);
+      
       const payload = {
         member_code: form.member_code,
         full_name: form.full_name,
+        membership_category: form.membership_category || 'normal',
         package_type: Number(form.package_type || 1),
         start_date: editingMember?.start_date || startDate,
         end_date: editingMember?.end_date || endDate,
@@ -226,7 +253,13 @@ export default function Members() {
 
   const openRenewModal = (member) => {
     setRenewingMember(member);
-    setRenewForm({ package_type: '1', fee: '', payment_method: 'TM' });
+    const cat = member.membership_category || 'normal';
+    setRenewForm({ 
+      membership_category: cat, 
+      package_type: '1', 
+      fee: calculateFee(cat, '1') || '', 
+      payment_method: 'TM' 
+    });
     setError('');
     setShowRenewModal(true);
   };
@@ -250,6 +283,7 @@ export default function Members() {
 
       const result = await memberService.renewMember(renewingMember.id, {
         packageType,
+        membershipCategory: renewForm.membership_category,
         fee: Number(renewForm.fee || 0),
         paymentMethod: renewForm.payment_method,
         staffId: user?.id,
@@ -322,7 +356,10 @@ export default function Members() {
                   </td>
                   <td>
                     <p className="cell-main">{m.end_date || 'N/A'}</p>
-                    <p className="cell-sub">{m.package_type ? `${m.package_type} tháng` : 'Chưa có gói'} - {Number(m.fee || 0).toLocaleString()}đ</p>
+                    <p className="cell-sub">
+                      {m.membership_category ? `(${m.membership_category.toUpperCase()}) ` : ''}
+                      {m.package_type ? `${m.package_type} tháng` : 'Chưa có gói'} - {Number(m.fee || 0).toLocaleString()}đ
+                    </p>
                   </td>
                   <td>
                     <span className={`status-badge ${status === 'Active' ? 'active' : 'expired'}`}>
@@ -384,28 +421,50 @@ export default function Members() {
                   </div>
                   
                   {!editingMember && (
-                    <div className="form-grid-2">
-                      <div>
-                        <label className="cell-sub">Gói (tháng)</label>
+                    <>
+                      <div style={{ marginTop: '12px' }}>
+                        <label className="cell-sub">Ngày bắt đầu tập</label>
                         <input
-                          type="number"
-                          value={form.package_type}
-                          onChange={(e) => setForm({ ...form, package_type: e.target.value })}
-                          placeholder="Gói (tháng)"
+                          type="date"
+                          value={form.start_date}
+                          onChange={(e) => setForm({ ...form, start_date: e.target.value })}
                           required
                         />
                       </div>
-                      <div>
-                        <label className="cell-sub">Học phí</label>
-                        <input
-                          type="number"
-                          value={form.fee}
-                          onChange={(e) => setForm({ ...form, fee: e.target.value })}
-                          placeholder="Học phí"
-                          required
-                        />
+                      <div style={{ marginTop: '12px' }}>
+                        <label className="cell-sub">Loại thẻ</label>
+                        <select
+                          value={form.membership_category}
+                          onChange={(e) => handleFormChange('membership_category', e.target.value)}
+                        >
+                          <option value="normal">Thường</option>
+                          <option value="couple">Couple</option>
+                          <option value="team">Team</option>
+                        </select>
                       </div>
-                    </div>
+                      <div className="form-grid-2" style={{ marginTop: '12px' }}>
+                        <div>
+                          <label className="cell-sub">Gói (tháng)</label>
+                          <input
+                            type="number"
+                            value={form.package_type}
+                            onChange={(e) => handleFormChange('package_type', e.target.value)}
+                            placeholder="Gói (tháng)"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="cell-sub">Học phí</label>
+                          <input
+                            type="number"
+                            value={form.fee}
+                            onChange={(e) => handleFormChange('fee', e.target.value)}
+                            placeholder="Học phí"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </>
                   )}
 
                   {!editingMember && (
@@ -523,13 +582,24 @@ export default function Members() {
           <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
             <h3>Gia hạn hội viên: {renewingMember?.full_name}</h3>
             <form className="modern-form" onSubmit={handleRenew}>
-              <div className="form-grid-2">
+              <div>
+                <label className="cell-sub">Loại thẻ</label>
+                <select
+                  value={renewForm.membership_category}
+                  onChange={(e) => handleRenewFormChange('membership_category', e.target.value)}
+                >
+                  <option value="normal">Thường</option>
+                  <option value="couple">Couple</option>
+                  <option value="team">Team</option>
+                </select>
+              </div>
+              <div className="form-grid-2" style={{ marginTop: '12px' }}>
                 <div>
                   <label className="cell-sub">Gói (tháng)</label>
                   <input
                     type="number"
                     value={renewForm.package_type}
-                    onChange={(e) => setRenewForm({ ...renewForm, package_type: e.target.value })}
+                    onChange={(e) => handleRenewFormChange('package_type', e.target.value)}
                     placeholder="Gói (tháng)"
                     required
                   />
@@ -539,13 +609,13 @@ export default function Members() {
                   <input
                     type="number"
                     value={renewForm.fee}
-                    onChange={(e) => setRenewForm({ ...renewForm, fee: e.target.value })}
+                    onChange={(e) => handleRenewFormChange('fee', e.target.value)}
                     placeholder="Học phí"
                     required
                   />
                 </div>
               </div>
-              <div>
+              <div style={{ marginTop: '12px' }}>
                 <label className="cell-sub">Hình thức thanh toán</label>
                 <select
                   value={renewForm.payment_method}

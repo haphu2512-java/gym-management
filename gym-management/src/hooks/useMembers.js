@@ -25,7 +25,7 @@ export function useMembers() {
   const addMember = async (member) => {
     try {
       const newMember = await memberService.createMember(member);
-      setMembers((prev) => [newMember, ...prev]);
+      await fetchMembers(); // Refresh from view to ensure all calculated fields are present
       return newMember;
     } catch (err) {
       setError(err.message);
@@ -36,7 +36,7 @@ export function useMembers() {
   const updateMember = async (id, updates) => {
     try {
       const updated = await memberService.updateMember(id, updates);
-      setMembers((prev) => prev.map((m) => (m.id === id ? updated : m)));
+      await fetchMembers(); // Refresh from view
       return updated;
     } catch (err) {
       setError(err.message);
@@ -47,7 +47,7 @@ export function useMembers() {
   const deleteMember = async (id) => {
     try {
       await memberService.deleteMember(id);
-      setMembers((prev) => prev.filter((m) => m.id !== id));
+      await fetchMembers(); // Refresh from view
     } catch (err) {
       setError(err.message);
       throw err;

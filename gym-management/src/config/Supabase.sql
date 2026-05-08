@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS member_logs (
   
   -- Thông tin gói tập tại thời điểm log
   package_type INT,
+  membership_category TEXT DEFAULT 'normal' CHECK (membership_category IN ('normal', 'couple', 'team')),
   start_date DATE,
   end_date DATE,
   fee NUMERIC,
@@ -109,6 +110,7 @@ WITH LatestPackage AS (
     SELECT DISTINCT ON (member_id)
       member_id,
       package_type,
+      membership_category,
       start_date,
       end_date,
       fee,
@@ -137,6 +139,7 @@ SELECT
   m.created_at,
   m.deleted_at,
   lp.package_type,
+  lp.membership_category,
   lp.start_date,
   lp.end_date,
   lp.fee,
@@ -288,6 +291,11 @@ CREATE POLICY "payment_logs_select" ON payment_logs FOR SELECT TO authenticated 
   (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
   OR auth.uid() = staff_id
   OR auth.uid() = verified_by
+  OR EXISTS (
+    SELECT 1 FROM shifts s
+    WHERE s.id = shift_id
+    AND s.opened_by = auth.uid()
+  )
 );
 CREATE POLICY "payment_logs_insert" ON payment_logs FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY "payment_logs_update" ON payment_logs FOR UPDATE TO authenticated USING (
@@ -384,7 +392,8 @@ CREATE OR REPLACE FUNCTION sell_bottle_transaction(
   p_shift_id UUID,
   p_staff_id UUID,
   p_quantity INT,
-  p_total_price NUMERIC
+  p_total_price NUMERIC,
+  p_payment_method TEXT DEFAULT 'TM'
 )
 RETURNS JSON AS $$
 DECLARE
@@ -400,8 +409,8 @@ BEGIN
   -- Atomic: Decrement + Log in transaction
   UPDATE products SET stock_quantity = stock_quantity - p_quantity WHERE id = p_product_id;
 
-  INSERT INTO sales_logs (product_id, shift_id, sold_by, quantity, total_price)
-  VALUES (p_product_id, p_shift_id, p_staff_id, p_quantity, p_total_price)
+  INSERT INTO sales_logs (product_id, shift_id, sold_by, quantity, total_price, payment_method)
+  VALUES (p_product_id, p_shift_id, p_staff_id, p_quantity, p_total_price, p_payment_method)
   RETURNING id INTO v_sales_log_id;
 
   INSERT INTO staff_logs (staff_id, action, target_item, details)
@@ -419,18 +428,21 @@ CREATE OR REPLACE FUNCTION create_member_transaction(
   p_code TEXT,
   p_name TEXT,
   p_package_type INT,
+  p_membership_category TEXT,
   p_fee NUMERIC,
   p_payment_method TEXT,
   p_shift_id UUID,
-  p_staff_id UUID
+  p_staff_id UUID,
+  p_start_date DATE DEFAULT NOW()
 )
 RETURNS JSON AS $$
 DECLARE
   v_member_id UUID;
   v_payment_id UUID;
-  v_start_date DATE := NOW()::DATE;
-  v_end_date DATE := (NOW() + (p_package_type || ' months')::INTERVAL)::DATE;
+  v_start_date DATE := p_start_date;
+  v_end_date DATE := (p_start_date + (p_package_type || ' months')::INTERVAL)::DATE;
   v_is_verified BOOLEAN := (p_payment_method = 'TM');
+  v_result JSON;
 BEGIN
   -- Create member (Chỉ thông tin cơ bản)
   INSERT INTO members (member_code, full_name)
@@ -445,12 +457,12 @@ BEGIN
   -- Create audit & state log (Lưu thông tin gói tập vào đây)
   INSERT INTO member_logs (
     member_id, staff_id, action, 
-    package_type, start_date, end_date, fee, payment_method, is_payment_verified,
+    package_type, membership_category, start_date, end_date, fee, payment_method, is_payment_verified,
     details
   )
   VALUES (
     v_member_id, p_staff_id, 'CREATE',
-    p_package_type, v_start_date, v_end_date, p_fee, p_payment_method, v_is_verified,
+    p_package_type, p_membership_category, v_start_date, v_end_date, p_fee, p_payment_method, v_is_verified,
     json_build_object('code', p_code, 'fee', p_fee, 'payment_id', v_payment_id)
   );
 
@@ -458,7 +470,12 @@ BEGIN
   VALUES (p_staff_id, 'Tạo hội viên', p_code,
           json_build_object('member_id', v_member_id, 'fee', p_fee));
 
-  RETURN json_build_object('success', true, 'member_id', v_member_id, 'payment_id', v_payment_id);
+  -- Trả về toàn bộ thông tin từ view để đồng bộ state local ngay lập tức
+  SELECT row_to_json(r) FROM (
+    SELECT * FROM member_current_status WHERE id = v_member_id
+  ) r INTO v_result;
+
+  RETURN v_result;
 EXCEPTION WHEN OTHERS THEN
   RETURN json_build_object('success', false, 'error', SQLERRM);
 END;
@@ -535,6 +552,13 @@ CREATE INDEX IF NOT EXISTS idx_profiles_deleted ON profiles(deleted_at) WHERE de
 ALTER TABLE profiles
   ALTER COLUMN staff_type SET DEFAULT 'CT',
   ALTER COLUMN staff_type SET NOT NULL;
+-- Update existing member_logs table if membership_category is missing
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='member_logs' AND column_name='membership_category') THEN
+    ALTER TABLE member_logs ADD COLUMN membership_category TEXT DEFAULT 'normal' CHECK (membership_category IN ('normal', 'couple', 'team'));
+  END IF;
+END $$;
 
 -- Update existing NULLs
 UPDATE profiles SET staff_type = 'CT' WHERE staff_type IS NULL;

@@ -56,29 +56,37 @@ export const memberService = {
       p_code: memberData.member_code,
       p_name: memberData.full_name,
       p_package_type: packageType,
+      p_membership_category: memberData.membership_category || 'normal',
       p_fee: Number(memberData.fee || 0),
       p_payment_method: memberData.payment_method,
       p_shift_id: memberData.shift_id,
       p_staff_id: memberData.staff_id,
+      p_start_date: memberData.start_date || new Date().toISOString().slice(0, 10),
     });
 
-    if (error) throw new Error('Tao hoi vien that bai: ' + error.message);
-    if (!data?.success || !data?.member_id) throw new Error(data?.error || 'Tao hoi vien that bai');
-
-    const { data: member, error: memberError } = await supabase
-      .from(VIEW_NAME)
-      .select('*')
-      .eq('id', data.member_id)
-      .single();
-
-    if (memberError) throw new Error('Tao thanh cong nhung tai du lieu that bai: ' + memberError.message);
-    return member;
+    if (error) {
+      if (error.message.includes('unique constraint') || error.message.includes('already exists')) {
+        throw new Error('Mã hội viên đã tồn tại trên hệ thống. Vui lòng kiểm tra lại.');
+      }
+      throw new Error('Tạo hội viên thất bại: ' + error.message);
+    }
+    
+    if (data?.success === false) {
+      const errorMsg = data?.error || '';
+      if (errorMsg.includes('unique constraint') || errorMsg.includes('already exists') || errorMsg.includes('duplicate key')) {
+         throw new Error('Mã hội viên đã tồn tại trên hệ thống. Vui lòng kiểm tra lại.');
+      }
+      throw new Error(data?.error || 'Tạo hội viên thất bại');
+    }
+    
+    // RPC now returns the full member object from view
+    return data;
   },
 
   async updateMember(id, updates) {
     // Separate member fields and log fields
     const memberFields = ['full_name', 'member_code', 'fingerprint_status', 'note', 'deleted_at'];
-    const logFields = ['package_type', 'start_date', 'end_date', 'fee', 'payment_method', 'is_payment_verified'];
+    const logFields = ['package_type', 'membership_category', 'start_date', 'end_date', 'fee', 'payment_method', 'is_payment_verified'];
 
     const memberUpdates = {};
     const logUpdates = {};
@@ -99,10 +107,11 @@ export const memberService = {
       // Get current values to fill the gaps in the log
       const { data: current } = await supabase.from(VIEW_NAME).select('*').eq('id', id).single();
 
-      await supabase.from('member_logs').insert([{
+      const { error: logError } = await supabase.from('member_logs').insert([{
         member_id: id,
         action: 'UPDATE',
         package_type: logUpdates.package_type ?? current.package_type,
+        membership_category: logUpdates.membership_category ?? current.membership_category,
         start_date: logUpdates.start_date ?? current.start_date,
         end_date: logUpdates.end_date ?? current.end_date,
         fee: logUpdates.fee ?? current.fee,
@@ -111,6 +120,8 @@ export const memberService = {
         details: { updates: logUpdates },
         note: 'Cập nhật trạng thái hội viên'
       }]);
+      
+      if (logError) throw new Error('Lỗi lưu log cập nhật hội viên: ' + logError.message);
     }
 
     const { data, error } = await supabase.from(VIEW_NAME).select().eq('id', id).single();
@@ -120,6 +131,7 @@ export const memberService = {
 
   async renewMember(memberId, renewalData) {
     const packageType = Number(renewalData.packageType || 1);
+    const membershipCategory = renewalData.membershipCategory || 'normal';
     const fee = Number(renewalData.fee || 0);
     const paymentMethod = renewalData.paymentMethod || 'TM';
     const staffId = renewalData.staffId || null;
@@ -141,7 +153,7 @@ export const memberService = {
 
     await validateMemberDates(renewalStart, packageType);
 
-    // 1. Create payment log
+    // 1. Create payment log (Must wait for this)
     const { data: payment, error: paymentError } = await supabase
       .from('payment_logs')
       .insert([
@@ -162,13 +174,14 @@ export const memberService = {
 
     if (paymentError) throw paymentError;
 
-    // 2. Create renewal log (This now holds the state)
-    await supabase.from('member_logs').insert([
+    // 2. Create renewal logs (Must wait for member_logs because view depends on it)
+    const { error: logError } = await supabase.from('member_logs').insert([
       {
         member_id: memberId,
         staff_id: staffId,
         action: 'RENEW',
         package_type: packageType,
+        membership_category: membershipCategory,
         start_date: toDateOnly(renewalStart),
         end_date: toDateOnly(newEndDate),
         fee,
@@ -180,8 +193,11 @@ export const memberService = {
         note: `Gia han ${packageType} thang ngay ${toDateOnly(now)}`,
       },
     ]);
+    
+    if (logError) console.error('Lỗi lưu log hội viên:', logError.message);
 
-    await supabase.from('staff_logs').insert([
+    // staff_logs can be non-blocking as it doesn't affect the member view
+    supabase.from('staff_logs').insert([
       {
         staff_id: staffId,
         action: 'Gia han hoi vien',
@@ -192,14 +208,16 @@ export const memberService = {
           payment_id: payment.id,
         },
       },
-    ]);
+    ]).catch(err => console.error('Lỗi lưu staff log:', err.message));
 
     // 3. Fetch the updated state from view
-    const { data: updatedMember } = await supabase
+    const { data: updatedMember, error: fetchError } = await supabase
       .from(VIEW_NAME)
       .select('*')
       .eq('id', memberId)
       .single();
+
+    if (fetchError) throw new Error('Cập nhật thành công nhưng không thể lấy dữ liệu mới: ' + fetchError.message);
 
     return { member: updatedMember, payment };
   },
@@ -239,14 +257,16 @@ export const memberService = {
       if (payError) console.error('Cập nhật payment_log thất bại:', payError);
     }
 
-    // 4. Thêm log VERIFY_PAYMENT cho đồng bộ với luồng atomic
-    await supabase.from('member_logs').insert([{
+    // 4. Thêm log VERIFY_PAYMENT (Non-blocking)
+    supabase.from('member_logs').insert([{
       member_id: log.member_id,
       staff_id: staffId,
       action: 'VERIFY_PAYMENT',
       is_payment_verified: true,
       note: 'Admin duyệt thanh toán chuyển khoản'
-    }]);
+    }]).then(({ error }) => {
+      if (error) console.error('Lỗi lưu log xác thực:', error.message);
+    });
 
     return true;
   },
