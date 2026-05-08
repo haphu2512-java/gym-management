@@ -83,6 +83,19 @@ export const memberService = {
       throw new Error(data?.error || 'Tạo hội viên thất bại');
     }
 
+    // Since RPC doesn't handle fingerprint_status and note, we update them directly if needed
+    const hasFingerprint = Boolean(memberData.fingerprint_status);
+    const hasNote = memberData.note && memberData.note.trim().length > 0;
+
+    if (data?.id && (hasFingerprint || hasNote)) {
+      await supabase.from('members').update({ 
+        fingerprint_status: hasFingerprint,
+        note: memberData.note 
+      }).eq('id', data.id);
+      data.fingerprint_status = hasFingerprint;
+      data.note = memberData.note;
+    }
+
     // RPC now returns the full member object from view
     return data;
   },

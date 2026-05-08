@@ -147,7 +147,7 @@ export default function Members() {
       package_type: String(member.package_type || 1),
       fee: String(member.fee || 0),
       payment_method: member.payment_method || 'TM',
-      fingerprint_status: Boolean(member.fingerprint_status),
+      fingerprint_status: member.fingerprint_status === true || member.fingerprint_status === 'true',
       note: member.note || '',
     });
     setError('');
@@ -157,7 +157,7 @@ export default function Members() {
     setHistoryLoading(true);
     try {
       const logs = await memberLogService.getLogsByMember(member.id);
-      setHistoryLogs(logs);
+      setHistoryLogs(logs.filter(log => log.action === 'CREATE' || log.action === 'RENEW'));
     } catch (err) {
       console.error("Lỗi tải lịch sử:", err);
     } finally {
@@ -217,13 +217,14 @@ export default function Members() {
         staff_id: user?.id,
       };
 
-      if (payload.package_type < 1 || payload.package_type > 36) {
-        setError('Goi tap tu 1 den 36 thang.');
-        return;
-      }
-
       if (editingMember?.id) {
-        const updated = await updateMember(editingMember.id, payload);
+        const updatePayload = {
+          member_code: form.member_code,
+          full_name: form.full_name,
+          fingerprint_status: form.fingerprint_status,
+          note: form.note,
+        };
+        const updated = await updateMember(editingMember.id, updatePayload);
         
         await memberLogService.logAction({
           memberId: editingMember.id,
@@ -241,6 +242,10 @@ export default function Members() {
           note: 'Cập nhật thông tin hội viên',
         });
       } else {
+        if (payload.package_type < 1 || payload.package_type > 36) {
+          setError('Goi tap tu 1 den 36 thang.');
+          return;
+        }
         await addMember(payload);
       }
 
@@ -481,14 +486,27 @@ export default function Members() {
                     </div>
                   )}
 
-                  <label className="check-row" style={{ marginTop: '8px' }}>
-                    <input
-                      type="checkbox"
-                      checked={form.fingerprint_status}
-                      onChange={(e) => setForm({ ...form, fingerprint_status: e.target.checked })}
-                    />
-                    Đã đăng ký vân tay
-                  </label>
+                  {editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true') ? (
+                    <div style={{ marginTop: '8px' }}>
+                      <label className="check-row" style={{ color: '#64748b', cursor: 'not-allowed' }}>
+                        <input
+                          type="checkbox"
+                          checked={form.fingerprint_status}
+                          disabled
+                        />
+                        Đã đăng ký vân tay (Đã thiết lập)
+                      </label>
+                    </div>
+                  ) : (
+                    <label className="check-row" style={{ marginTop: '8px' }}>
+                      <input
+                        type="checkbox"
+                        checked={form.fingerprint_status}
+                        onChange={(e) => setForm({ ...form, fingerprint_status: e.target.checked })}
+                      />
+                      Đã đăng ký vân tay
+                    </label>
+                  )}
                   
                   <div style={{ marginTop: '8px' }}>
                     <label className="cell-sub">Ghi chú</label>
