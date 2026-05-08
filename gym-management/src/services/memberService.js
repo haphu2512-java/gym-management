@@ -239,6 +239,15 @@ export const memberService = {
       if (payError) console.error('Cập nhật payment_log thất bại:', payError);
     }
 
+    // 4. Thêm log VERIFY_PAYMENT cho đồng bộ với luồng atomic
+    await supabase.from('member_logs').insert([{
+      member_id: log.member_id,
+      staff_id: staffId,
+      action: 'VERIFY_PAYMENT',
+      is_payment_verified: true,
+      note: 'Admin duyệt thanh toán chuyển khoản'
+    }]);
+
     return true;
   },
 

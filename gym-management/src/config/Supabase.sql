@@ -104,9 +104,8 @@ CREATE TABLE IF NOT EXISTS member_logs (
 
 -- View để lấy trạng thái hiện tại của hội viên (Ưu tiên lấy từ Log Gia hạn/Tạo mới)
 CREATE OR REPLACE VIEW member_current_status AS
-WITH LatestMembership AS (
-    -- Chỉ lấy thông tin gói tập từ bản ghi CREATE hoặc RENEW mới nhất
-    -- (Hoặc UPDATE nếu bản ghi đó có chứa thông tin gói tập)
+WITH LatestPackage AS (
+    -- Lấy thông tin gói tập mới nhất
     SELECT DISTINCT ON (member_id)
       member_id,
       package_type,
@@ -114,10 +113,19 @@ WITH LatestMembership AS (
       end_date,
       fee,
       payment_method,
-      is_payment_verified
+      created_at
     FROM member_logs
-    WHERE action IN ('CREATE', 'RENEW', 'UPDATE')
-      AND package_type IS NOT NULL -- Đảm bảo bản ghi log này có chứa thông tin gói tập
+    WHERE package_type IS NOT NULL
+    ORDER BY member_id, created_at DESC
+),
+LatestStatus AS (
+    -- Lấy trạng thái thanh toán mới nhất (có thể từ log VERIFY_PAYMENT)
+    SELECT DISTINCT ON (member_id)
+      member_id,
+      is_payment_verified,
+      created_at
+    FROM member_logs
+    WHERE is_payment_verified IS NOT NULL
     ORDER BY member_id, created_at DESC
 )
 SELECT 
@@ -128,14 +136,15 @@ SELECT
   m.note,
   m.created_at,
   m.deleted_at,
-  lm.package_type,
-  lm.start_date,
-  lm.end_date,
-  lm.fee,
-  lm.payment_method,
-  COALESCE(lm.is_payment_verified, FALSE) as is_payment_verified
+  lp.package_type,
+  lp.start_date,
+  lp.end_date,
+  lp.fee,
+  lp.payment_method,
+  COALESCE(ls.is_payment_verified, FALSE) as is_payment_verified
 FROM members m
-LEFT JOIN LatestMembership lm ON m.id = lm.member_id
+LEFT JOIN LatestPackage lp ON m.id = lp.member_id
+LEFT JOIN LatestStatus ls ON m.id = ls.member_id
 WHERE m.deleted_at IS NULL;
 
 -- 9. Cấu hình lương theo ca
@@ -481,11 +490,17 @@ BEGIN
     RETURN json_build_object('success', false, 'error', 'Payment already verified or not found');
   END IF;
 
-  -- 2. Create verification log in member_logs (To update current status view)
+  -- 2. Update the original log entry (CREATE/RENEW) for consistency
+  UPDATE member_logs
+  SET is_payment_verified = true
+  WHERE member_id = v_member_id
+    AND (details->>'payment_id' = p_payment_id::text);
+
+  -- 3. Create verification log in member_logs (For audit trail and to update current status view)
   INSERT INTO member_logs (member_id, staff_id, action, is_payment_verified, note)
   VALUES (v_member_id, p_admin_id, 'VERIFY_PAYMENT', true, 'Admin duyệt thanh toán chuyển khoản');
 
-  -- 3. Log verification in staff_logs
+  -- 4. Log verification in staff_logs
   INSERT INTO staff_logs (staff_id, action, target_item, details)
   VALUES (p_admin_id, 'Xác thực thanh toán', 'Payment #' || p_payment_id,
           json_build_object('payment_id', p_payment_id, 'member_id', v_member_id));
