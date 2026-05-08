@@ -144,7 +144,8 @@ SELECT
   lp.end_date,
   lp.fee,
   lp.payment_method,
-  COALESCE(ls.is_payment_verified, FALSE) as is_payment_verified
+  COALESCE(ls.is_payment_verified, FALSE) as is_payment_verified,
+  lp.created_at as last_active_at
 FROM members m
 LEFT JOIN LatestPackage lp ON m.id = lp.member_id
 LEFT JOIN LatestStatus ls ON m.id = ls.member_id
@@ -156,6 +157,7 @@ CREATE TABLE IF NOT EXISTS salary_configs (
   shift_name TEXT NOT NULL, -- Ca 1, Ca 2...
   staff_type TEXT NOT NULL CHECK (staff_type IN ('CT', 'TV')),
   rate_per_shift NUMERIC NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()),
   UNIQUE(shift_name, staff_type)
 );
 
@@ -166,7 +168,7 @@ CREATE TABLE IF NOT EXISTS weekly_schedules (
   staff_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
   day_of_week INT CHECK (day_of_week BETWEEN 0 AND 6), -- 0: Chủ nhật, 1: Thứ 2...
   shift_name TEXT NOT NULL, -- Ca 1, Ca 2...
-  UNIQUE(week_start, staff_id, day_of_week, shift_name)
+  UNIQUE(week_start, day_of_week, shift_name)
 );
 
 -- 10. Bang ghi nhan chi trong ca
@@ -560,5 +562,14 @@ BEGIN
   END IF;
 END $$;
 
--- Update existing NULLs
-UPDATE profiles SET staff_type = 'CT' WHERE staff_type IS NULL;
+ALTER TABLE IF EXISTS salary_configs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW());
+ALTER TABLE IF EXISTS salary_configs ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP; -- For consistency if needed later
+
+-- Fix UNIQUE constraint on weekly_schedules
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='weekly_schedules_week_start_staff_id_day_of_week_shift_name_key') THEN
+        ALTER TABLE weekly_schedules DROP CONSTRAINT weekly_schedules_week_start_staff_id_day_of_week_shift_name_key;
+        ALTER TABLE weekly_schedules ADD CONSTRAINT weekly_schedules_week_start_day_of_week_shift_name_key UNIQUE(week_start, day_of_week, shift_name);
+    END IF;
+END $$;

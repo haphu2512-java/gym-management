@@ -42,7 +42,7 @@ export const memberService = {
     const { data, error } = await supabase
       .from(VIEW_NAME)
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('last_active_at', { ascending: false, nullsFirst: false })
       .limit(limit);
     if (error) throw new Error(error.message);
     return data || [];

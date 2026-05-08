@@ -54,11 +54,21 @@ export const staffService = {
     upsertWeeklySchedule: async (schedule) => {
         const { data, error } = await supabase
             .from('weekly_schedules')
-            .upsert(schedule, { onConflict: 'staff_id, week_start, shift_name, day_of_week' })
+            .upsert(schedule, { onConflict: 'week_start, shift_name, day_of_week' })
             .select()
             .single();
         if (error) throw error;
         return data;
+    },
+
+    deleteWeeklyScheduleEntry: async ({ weekStart, shiftName, dayOfWeek }) => {
+        const { error } = await supabase
+            .from('weekly_schedules')
+            .delete()
+            .eq('week_start', weekStart)
+            .eq('shift_name', shiftName)
+            .eq('day_of_week', dayOfWeek);
+        if (error) throw error;
     },
 
     deleteWeeklySchedule: async (weekStart) => {
@@ -67,5 +77,35 @@ export const staffService = {
             .delete()
             .eq('week_start', weekStart);
         if (error) throw error;
+    },
+
+    getSalaryAdjustments: async (staffId, date) => {
+        const { data, error } = await supabase
+            .from('salary_adjustments')
+            .select('*')
+            .eq('staff_id', staffId)
+            .eq('adjustment_date', date)
+            .maybeSingle();
+        if (error) throw error;
+        return data;
+    },
+
+    getAllSalaryAdjustments: async (date) => {
+        const { data, error } = await supabase
+            .from('salary_adjustments')
+            .select('*')
+            .eq('adjustment_date', date);
+        if (error) throw error;
+        return data || [];
+    },
+
+    upsertSalaryAdjustment: async (adjustment) => {
+        const { data, error } = await supabase
+            .from('salary_adjustments')
+            .upsert(adjustment, { onConflict: 'staff_id, adjustment_date' })
+            .select()
+            .single();
+        if (error) throw error;
+        return data;
     }
 };

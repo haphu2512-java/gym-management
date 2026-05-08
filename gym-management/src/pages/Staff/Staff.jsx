@@ -21,17 +21,18 @@ export default function Staff() {
   const [weekStart, setWeekStart] = useState(getMonday(new Date()));
   const [schedule, setSchedule] = useState({});
   const [salaryConfigs, setSalaryConfigs] = useState([]);
-  const [adjustments, setAdjustments] = useState(() => JSON.parse(localStorage.getItem('gym_adjustments')) || {});
+  const [adjustments, setAdjustments] = useState({});
 
   // Fetch initial data
   const loadData = useCallback(async () => {
     if (profile?.role !== 'admin') return;
     setLoading(true);
     try {
-      const [staffData, configData, scheduleData] = await Promise.all([
+      const [staffData, configData, scheduleData, adjustmentData] = await Promise.all([
         staffService.getStaffs(),
         staffService.getSalaryConfigs(),
-        staffService.getWeeklySchedules(weekStart)
+        staffService.getWeeklySchedules(weekStart),
+        staffService.getAllSalaryAdjustments(weekStart)
       ]);
       
       setStaffs(staffData);
@@ -42,6 +43,20 @@ export default function Staff() {
         schedMap[`${s.shift_name}-${DAYS[s.day_of_week]}`] = s.staff_id;
       });
       setSchedule(schedMap);
+
+      const adjMap = {};
+      adjustmentData.forEach(a => {
+        adjMap[a.staff_id] = {
+          commission: a.commission,
+          others: a.others, // mapping logic: 'others' in UI is likely 'reason' or a general field
+          // Actually checking DB schema: commission, shortage, penalty, reason
+          // Let's use 'others' for UI compatibility but mapping to DB correctly
+          shortage: a.shortage,
+          penalty: a.penalty,
+          reason: a.reason
+        };
+      });
+      setAdjustments(adjMap);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -53,12 +68,6 @@ export default function Staff() {
     loadData();
   }, [loadData]);
 
-  // Adjustments still in localStorage for now as they are very dynamic, 
-  // but we can move them later if needed.
-  useEffect(() => {
-    localStorage.setItem('gym_adjustments', JSON.stringify(adjustments));
-  }, [adjustments]);
-
   // Handlers
   const updateSchedule = async (shift, day, staffId) => {
     try {
@@ -68,17 +77,15 @@ export default function Staff() {
           staff_id: staffId,
           week_start: weekStart,
           shift_name: shift,
-          day_of_week: dayIndex,
-          is_assigned: true
+          day_of_week: dayIndex
         });
       } else {
-        // Handling removal might need a specific delete or logic in upsert
-        // For simplicity, we can just upsert with is_assigned: false
-        const currentStaffId = schedule[`${shift}-${day}`];
-        if (currentStaffId) {
-           // We would ideally delete this record or set is_assigned to false
-           // Let's just upsert with is_assigned false if the schema supports it
-        }
+        // Correctly handle removal by deleting the record from DB
+        await staffService.deleteWeeklyScheduleEntry({
+          weekStart,
+          shiftName: shift,
+          dayOfWeek: dayIndex
+        });
       }
       setSchedule(prev => ({ ...prev, [`${shift}-${day}`]: staffId }));
     } catch (e) {
@@ -104,11 +111,31 @@ export default function Staff() {
     }
   };
 
-  const updateAdj = (staffId, field, val) => {
-    setAdjustments(prev => ({
-      ...prev,
-      [staffId]: { ...(prev[staffId] || {}), [field]: Number(val) || 0 }
-    }));
+  const updateAdj = async (staffId, field, val) => {
+    const numericVal = Number(val) || 0;
+    const currentAdj = adjustments[staffId] || {};
+    const updatedAdj = { ...currentAdj, [field]: numericVal };
+    
+    try {
+      // Optimistic UI update
+      setAdjustments(prev => ({
+        ...prev,
+        [staffId]: updatedAdj
+      }));
+
+      await staffService.upsertSalaryAdjustment({
+        staff_id: staffId,
+        adjustment_date: weekStart,
+        commission: field === 'commission' ? numericVal : (currentAdj.commission || 0),
+        shortage: field === 'shortage' ? numericVal : (currentAdj.shortage || 0),
+        penalty: field === 'penalty' ? numericVal : (currentAdj.penalty || 0),
+        reason: field === 'others' ? String(val) : (currentAdj.reason || ''),
+        created_by: profile.id
+      });
+    } catch (e) {
+      console.error("Lỗi cập nhật phụ cấp:", e.message);
+      // Revert on error if needed
+    }
   };
 
   // Calculations
@@ -130,18 +157,12 @@ export default function Staff() {
       
       SHIFTS.forEach(shift => {
         const count = counts[s.id][shift];
-        // Find rate in salaryConfigs
-        // Note: salaryConfigs uses 'Sang', 'Chieu', 'Toi' but SHIFTS uses 'Ca 1'...'Ca 5'
-        // In the database initialization we used 'Sang', 'Chieu', 'Toi'.
-        // Let's map Ca 1/2 to Sang, Ca 3/4 to Chieu, Ca 5 to Toi for calculation if needed,
-        // or just match by name if we assume Ca 1/2/3... names are in DB.
-        // Actually, let's just use the shift name as is.
         const config = salaryConfigs.find(c => c.shift_name === shift && c.staff_type === type);
         baseSalary += count * (config?.rate_per_shift || 0);
       });
 
-      const adj = adjustments[s.id] || { commission: 0, others: 0, shortage: 0, penalty: 0 };
-      const finalSalary = baseSalary + (adj.commission || 0) + (adj.others || 0) - (adj.shortage || 0) - (adj.penalty || 0);
+      const adj = adjustments[s.id] || { commission: 0, shortage: 0, penalty: 0, others: 0 };
+      const finalSalary = baseSalary + (adj.commission || 0) + (Number(adj.others) || 0) - (adj.shortage || 0) - (adj.penalty || 0);
 
       return {
         ...s,
