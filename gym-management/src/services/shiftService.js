@@ -1,12 +1,13 @@
 import supabase from '../config/supabase';
 import { staffLogService } from './staffLogService';
+import { getLocalISODate } from '../utils/formatters';
 
 const SHIFT_TABLE = 'shifts';
 
 const DEFAULT_SHIFTS = ['Ca 1', 'Ca 2', 'Ca 3', 'Ca 4', 'Ca 5'];
 
 function formatDateKey(date = new Date()) {
-  return date.toISOString().slice(0, 10);
+  return getLocalISODate(date);
 }
 
 export const shiftService = {
@@ -54,7 +55,7 @@ export const shiftService = {
       .from(SHIFT_TABLE)
       .select('id, shift_name')
       .eq('status', 'open');
-    
+
     if (checkError) throw new Error(checkError.message);
     if (openShifts && openShifts.length > 0) {
       throw new Error(`Đã có ca "${openShifts[0].shift_name}" đang mở. Vui lòng chốt ca cũ trước khi mở ca mới.`);
@@ -90,6 +91,7 @@ export const shiftService = {
       targetItem: shiftName,
       details: { startingCash },
       note: note || 'Mở ca mới',
+      created_at: new Date().toISOString()
     });
 
     return data;
@@ -116,6 +118,7 @@ export const shiftService = {
       targetItem: shiftName || data.shift_name,
       details: { endingCash },
       note: note || 'Chốt ca kết thúc',
+      created_at: new Date().toISOString()
     });
 
     return data;

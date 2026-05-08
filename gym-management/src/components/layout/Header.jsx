@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useState, useEffect } from 'react';
 import { shiftService } from '../../services/shiftService';
+import { formatDate } from '../../utils/formatters';
 
 const titleMap = {
   '/dashboard': 'Tổng quan hệ thống',
@@ -11,10 +12,6 @@ const titleMap = {
   '/shifts': 'Quản lý ca trực',
   '/staff': 'Nhân viên & tính lương',
 };
-
-function formatDate() {
-  return new Date().toLocaleDateString('vi-VN');
-}
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -54,7 +51,7 @@ export default function Header({ onMenuToggle }) {
       <div className="desktop-title-row">
         <div>
           <h2>{title}</h2>
-          <p>{getGreeting()} Hôm nay là ngày {formatDate()}</p>
+          <p>{getGreeting()} Hôm nay là ngày {formatDate(new Date())}</p>
         </div>
         <div className="system-status" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

@@ -22,6 +22,7 @@ export const expenseService = {
           amount: Number(amount || 0),
           reason,
           created_by: staffId,
+          created_at: new Date().toISOString(),
         },
       ])
       .select()

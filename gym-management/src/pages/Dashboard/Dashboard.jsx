@@ -4,12 +4,13 @@ import { memberService } from '../../services/memberService';
 import { productService } from '../../services/productService';
 import { shiftService } from '../../services/shiftService';
 import { paymentService } from '../../services/paymentService';
+import { formatDate } from '../../utils/formatters';
 
 function getMemberStatus(endDate) {
   if (!endDate) return 'Expired';
   const today = new Date();
-  const target = new Date(endDate);
-  return target >= new Date(today.toDateString()) ? 'Active' : 'Expired';
+  const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+  return endDate >= todayStr ? 'Active' : 'Expired';
 }
 
 export default function Dashboard() {
@@ -25,7 +26,8 @@ export default function Dashboard() {
       setLoading(true);
       try {
         const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        const startOfMonthObj = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+        const startOfMonth = startOfMonthObj.toISOString();
         
         const [data, recent, totalMemberRev] = await Promise.all([
           memberService.getAllMembers(),
@@ -139,6 +141,9 @@ export default function Dashboard() {
                       borderRadius: '999px', padding: '2px 7px', fontSize: '11px', fontWeight: '800'
                     }}>Chờ duyệt</span>
                   )}
+                </p>
+                <p className="member-meta" style={{ fontSize: '11px', color: '#64748b' }}>
+                  Hết hạn: {formatDate(m.end_date)}
                 </p>
               </div>
               <p className="member-fee">+{Number(m.fee || 0).toLocaleString('vi-VN')}đ</p>

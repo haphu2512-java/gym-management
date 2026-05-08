@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Minus, Trash2, ShoppingCart, Settings } from 'lucide-react';
 import { productService } from '../../services/productService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { staffLogService } from '../../services/staffLogService';
@@ -13,8 +13,12 @@ export default function Inventory() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [viewMode, setViewMode] = useState('sales'); // 'sales' or 'admin'
   const [editingProduct, setEditingProduct] = useState(null);
   const [form, setForm] = useState({ name: '', price: '', stock_quantity: '', note: '' });
+
+  // Quantities for sales
+  const [sellQuantities, setSellQuantities] = useState({});
 
   // Doanh thu nước của ca hiện tại
   const [drinkRevenue, setDrinkRevenue] = useState(0);
@@ -46,6 +50,10 @@ export default function Inventory() {
     try {
       const data = await productService.getAllProducts();
       setProducts(data);
+      // Initialize quantities to 1
+      const qtys = {};
+      data.forEach(p => qtys[p.id] = 1);
+      setSellQuantities(qtys);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -56,6 +64,14 @@ export default function Inventory() {
   useEffect(() => {
     loadProducts();
   }, [loadProducts]);
+
+  const handleQtyChange = (id, delta, stock) => {
+    setSellQuantities(prev => {
+      const current = prev[id] || 1;
+      const next = Math.max(1, Math.min(stock, current + delta));
+      return { ...prev, [id]: next };
+    });
+  };
 
   const handleOpenCreate = () => {
     setEditingProduct(null);
@@ -109,17 +125,19 @@ export default function Inventory() {
       setEditingProduct(null);
       setForm({ name: '', price: '', stock_quantity: '', note: '' });
       await loadProducts();
+      showSuccess('Cập nhật kho thành công!');
     } catch (err) {
       setError(err.message);
     }
   };
 
-  // Bán 1 chai — cập nhật doanh thu ngay sau khi bán
-  const [sellingProduct, setSellingProduct] = useState(null);
+  // Bán hàng
+  const [sellingItem, setSellingItem] = useState(null);
 
   const handleSell = async (product, method = 'TM') => {
     setError('');
     const shiftId = activeShift?.id || null;
+    const qty = sellQuantities[product.id] || 1;
 
     if (!shiftId) {
       showError('Vui lòng mở ca làm việc trước khi thực hiện bán hàng.');
@@ -127,12 +145,15 @@ export default function Inventory() {
     }
 
     try {
-      await productService.sellOneBottle(product, shiftId, user?.id, method);
+      await productService.sellProduct(product, qty, shiftId, user?.id, method);
 
       // Update local state
       setProducts((prev) => prev.map((item) =>
-        (item.id === product.id ? { ...item, stock_quantity: item.stock_quantity - 1 } : item)
+        (item.id === product.id ? { ...item, stock_quantity: item.stock_quantity - qty } : item)
       ));
+
+      // Reset quantity to 1
+      setSellQuantities(prev => ({ ...prev, [product.id]: 1 }));
 
       // Cập nhật doanh thu nước real-time
       if (shiftId) {
@@ -140,8 +161,8 @@ export default function Inventory() {
         setDrinkRevenue(rev);
       }
 
-      showSuccess(`Đã bán ${product.name} (${method}) thành công!`);
-      setSellingProduct(null);
+      showSuccess(`Đã bán ${qty} ${product.name} (${method}) thành công!`);
+      setSellingItem(null);
     } catch (err) {
       showError(`Bán hàng thất bại: ${err.message}`);
     }
@@ -171,23 +192,45 @@ export default function Inventory() {
 
   return (
     <div className="modern-stack">
-      <div className="modern-toolbar">
+      <div className="modern-toolbar" style={{ flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h3 className="modern-title">Kho nước &amp; bán hàng</h3>
-          <p className="muted-text">Quản lý tồn kho theo thời gian thực.</p>
+          <p className="muted-text">Bấm chọn số lượng và nhấn Bán hàng.</p>
         </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginLeft: 'auto' }}>
           {/* Doanh thu nước ca hiện tại */}
           <div style={{
-            background: '#ecfdf5',
-            border: '1px solid #a7f3d0',
+            background: '#f0f9ff',
+            border: '1px solid #bae6fd',
             borderRadius: '12px',
             padding: '8px 14px',
             fontSize: '13px',
             fontWeight: '800',
-            color: '#047857',
+            color: '#0369a1',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
           }}>
-            DT Nước ({activeShift?.shift_name || 'Chưa mở ca'}): {drinkRevenue.toLocaleString('vi-VN')}đ
+            <ShoppingCart size={16} />
+            DT Nước: {drinkRevenue.toLocaleString('vi-VN')}đ
+          </div>
+
+          <div className="tab-group" style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '8px' }}>
+            <button 
+              className={`tab-btn ${viewMode === 'sales' ? 'active' : ''}`}
+              onClick={() => setViewMode('sales')}
+              style={{ padding: '6px 12px', border: 'none', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', background: viewMode === 'sales' ? '#fff' : 'transparent', fontWeight: viewMode === 'sales' ? '600' : 'normal', boxShadow: viewMode === 'sales' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+            >
+              Bán hàng
+            </button>
+            <button 
+              className={`tab-btn ${viewMode === 'admin' ? 'active' : ''}`}
+              onClick={() => setViewMode('admin')}
+              style={{ padding: '6px 12px', border: 'none', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', background: viewMode === 'admin' ? '#fff' : 'transparent', fontWeight: viewMode === 'admin' ? '600' : 'normal', boxShadow: viewMode === 'admin' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+            >
+              Quản lý kho
+            </button>
           </div>
 
           {profile?.role === 'admin' && (
@@ -201,72 +244,126 @@ export default function Inventory() {
       {error && <div className="modern-error">{error}</div>}
       {loading && <div className="modern-info">Đang tải kho...</div>}
 
-      <div className="modern-table-wrap">
-        <table className="modern-table">
-          <thead>
-            <tr>
-              <th>Sản phẩm</th>
-              <th>Giá bán</th>
-              <th>Tồn kho</th>
-              <th>Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {!loading && products.length === 0 && (
-              <tr>
-                <td colSpan={4} className="table-empty-cell">Không có dữ liệu</td>
-              </tr>
-            )}
-            {products.map((item) => (
-              <tr key={item.id}>
-                <td>
-                  <p className="cell-main">{item.name}</p>
-                  {item.note && <p className="cell-sub">{item.note}</p>}
-                </td>
-                <td>
-                  <p className="cell-main">{Number(item.price || 0).toLocaleString('vi-VN')}đ</p>
-                </td>
-                <td>
-                  <span className={`stock-badge ${Number(item.stock_quantity || 0) < 10 ? 'low' : 'ok'}`}>
-                    {item.stock_quantity}
-                  </span>
-                </td>
-                <td>
-                  <div className="table-actions">
-                    <button
-                      type="button"
-                      className="dark-btn"
-                      onClick={() => setSellingProduct(item)}
-                      disabled={Number(item.stock_quantity || 0) <= 0}
-                    >
-                      <Plus size={14} style={{ marginRight: '4px' }} /> Bán hàng
-                    </button>
-                    {profile?.role === 'admin' && (
-                      <>
-                        <button
-                          type="button"
-                          className="ghost-btn"
-                          onClick={() => handleOpenEdit(item)}
-                        >
-                          Nhập / Sửa
-                        </button>
-                        <button
-                          type="button"
-                          className="ghost-btn"
-                          style={{ color: '#dc2626', background: '#fef2f2' }}
-                          onClick={() => setDeletingProduct(item)}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </>
-                    )}
+      {/* POS Grid View */}
+      {viewMode === 'sales' ? (
+        <div className="pos-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px', marginTop: '8px' }}>
+          {products.map((item) => {
+            const qty = sellQuantities[item.id] || 1;
+            const isOutOfStock = Number(item.stock_quantity || 0) <= 0;
+            const isLowStock = Number(item.stock_quantity || 0) < 10;
+
+            return (
+              <div key={item.id} className="pos-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', transition: 'all 0.2s', opacity: isOutOfStock ? 0.7 : 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                  <div style={{ width: '40px', height: '40px', background: '#f8fafc', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 'bold', color: '#64748b' }}>
+                    {item.name.charAt(0).toUpperCase()}
                   </div>
-                </td>
+                  <span style={{ 
+                    fontSize: '11px', 
+                    padding: '2px 8px', 
+                    borderRadius: '99px', 
+                    fontWeight: 'bold',
+                    background: isOutOfStock ? '#fee2e2' : (isLowStock ? '#fef9c3' : '#f0fdf4'),
+                    color: isOutOfStock ? '#dc2626' : (isLowStock ? '#854d0e' : '#16a34a')
+                  }}>
+                    Kho: {item.stock_quantity}
+                  </span>
+                </div>
+
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '15px', color: '#0f172a' }}>{item.name}</h4>
+                  <p style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#2563eb' }}>
+                    {Number(item.price || 0).toLocaleString('vi-VN')}đ
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '4px', borderRadius: '10px', marginTop: 'auto' }}>
+                  <button 
+                    onClick={() => handleQtyChange(item.id, -1, item.stock_quantity)}
+                    style={{ width: '32px', height: '32px', border: 'none', background: '#fff', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+                    disabled={isOutOfStock}
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <span style={{ fontWeight: 'bold', fontSize: '14px' }}>{qty}</span>
+                  <button 
+                    onClick={() => handleQtyChange(item.id, 1, item.stock_quantity)}
+                    style={{ width: '32px', height: '32px', border: 'none', background: '#fff', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+                    disabled={isOutOfStock || qty >= item.stock_quantity}
+                  >
+                    <Plus size={14} />
+                  </button>
+                </div>
+
+                <button 
+                  className="primary-btn" 
+                  style={{ width: '100%', borderRadius: '10px', padding: '10px' }}
+                  onClick={() => setSellingItem(item)}
+                  disabled={isOutOfStock}
+                >
+                  Bán hàng
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* Admin Table View */
+        <div className="modern-table-wrap">
+          <table className="modern-table">
+            <thead>
+              <tr>
+                <th>Sản phẩm</th>
+                <th>Giá bán</th>
+                <th>Tồn kho</th>
+                <th>Thao tác</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {!loading && products.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="table-empty-cell">Không có dữ liệu</td>
+                </tr>
+              )}
+              {products.map((item) => (
+                <tr key={item.id}>
+                  <td>
+                    <p className="cell-main">{item.name}</p>
+                    {item.note && <p className="cell-sub">{item.note}</p>}
+                  </td>
+                  <td>
+                    <p className="cell-main">{Number(item.price || 0).toLocaleString('vi-VN')}đ</p>
+                  </td>
+                  <td>
+                    <span className={`stock-badge ${Number(item.stock_quantity || 0) < 10 ? 'low' : 'ok'}`}>
+                      {item.stock_quantity}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="table-actions">
+                      <button
+                        type="button"
+                        className="ghost-btn"
+                        onClick={() => handleOpenEdit(item)}
+                      >
+                        <Settings size={14} style={{ marginRight: '4px' }} /> Nhập / Sửa
+                      </button>
+                      <button
+                        type="button"
+                        className="ghost-btn"
+                        style={{ color: '#dc2626', background: '#fef2f2' }}
+                        onClick={() => setDeletingProduct(item)}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Modal thêm/sửa sản phẩm */}
       {showModal && (
@@ -312,29 +409,38 @@ export default function Inventory() {
       )}
 
       {/* Modal xác nhận bán hàng & Chọn phương thức */}
-      {sellingProduct && (
-        <div className="modal-backdrop" onClick={() => setSellingProduct(null)}>
+      {sellingItem && (
+        <div className="modal-backdrop" onClick={() => setSellingItem(null)}>
           <div className="modal-panel" style={{ maxWidth: '400px' }} onClick={(e) => e.stopPropagation()}>
-            <h3>Bán hàng: {sellingProduct.name}</h3>
-            <p className="muted-text">Giá bán: <strong>{Number(sellingProduct.price || 0).toLocaleString('vi-VN')}đ</strong></p>
+            <h3 style={{ marginBottom: '8px' }}>Xác nhận bán hàng</h3>
+            <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', marginBottom: '16px' }}>
+              <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>Sản phẩm:</p>
+              <p style={{ margin: '4px 0', fontSize: '18px', fontWeight: 'bold' }}>{sellingItem.name}</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed #cbd5e1' }}>
+                <span>Số lượng: <strong>x{sellQuantities[sellingItem.id]}</strong></span>
+                <span style={{ color: '#2563eb', fontWeight: '800' }}>
+                  Tổng: {(Number(sellingItem.price || 0) * (sellQuantities[sellingItem.id] || 1)).toLocaleString('vi-VN')}đ
+                </span>
+              </div>
+            </div>
             
-            <p style={{ marginTop: '16px', fontWeight: '600' }}>Chọn phương thức thanh toán:</p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '8px' }}>
+            <p style={{ fontWeight: '600', marginBottom: '8px' }}>Phương thức thanh toán:</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <button 
                 type="button" 
                 className="primary-btn" 
-                style={{ background: '#0f172a' }}
-                onClick={() => handleSell(sellingProduct, 'TM')}
+                style={{ background: '#0f172a', height: '48px' }}
+                onClick={() => handleSell(sellingItem, 'TM')}
               >
-                Tiền mặt (TM)
+                Tiền mặt
               </button>
               <button 
                 type="button" 
                 className="primary-btn" 
-                style={{ background: '#2563eb' }}
-                onClick={() => handleSell(sellingProduct, 'CK')}
+                style={{ background: '#2563eb', height: '48px' }}
+                onClick={() => handleSell(sellingItem, 'CK')}
               >
-                Chuyển khoản (CK)
+                Chuyển khoản
               </button>
             </div>
             
@@ -342,9 +448,9 @@ export default function Inventory() {
               type="button" 
               className="ghost-btn" 
               style={{ width: '100%', marginTop: '12px' }}
-              onClick={() => setSellingProduct(null)}
+              onClick={() => setSellingItem(null)}
             >
-              Hủy
+              Quay lại
             </button>
           </div>
         </div>
@@ -357,7 +463,7 @@ export default function Inventory() {
             <h3 style={{ color: '#dc2626' }}>Xác nhận xóa sản phẩm</h3>
             <p>
               Bạn có chắc muốn xóa sản phẩm <strong>{deletingProduct.name}</strong> khỏi kho?
-              Hành động này sẽ xóa toàn bộ dữ liệu liên quan và không thể hoàn tác.
+              Hành động này sẽ xóa toàn bộ dữ liệu liên quan.
             </p>
             <div className="modal-actions">
               <button type="button" className="ghost-btn" onClick={() => setDeletingProduct(null)}>Hủy</button>

@@ -101,37 +101,37 @@ BEGIN
   -- 7) Member Logs (Membership state)
   INSERT INTO member_logs (
     member_id, staff_id, action, 
-    package_type, start_date, end_date, fee, payment_method, is_payment_verified,
-    note
+    package_type, membership_category, start_date, end_date, fee, payment_method, is_payment_verified,
+    note, created_at
   ) VALUES
-    (v_member_1, uuid_tramanh, 'CREATE', 1, CURRENT_DATE - 10, CURRENT_DATE + 20, 500000, 'TM', true, 'Dang ky moi HV001'),
-    (v_member_2, uuid_phu, 'RENEW', 3, CURRENT_DATE - 40, CURRENT_DATE - 5, 1200000, 'CK', false, 'Gia han HV002'),
-    (v_member_3, uuid_phu, 'CREATE', 1, CURRENT_DATE - 2, CURRENT_DATE + 28, 500000, 'CK', true, 'Dang ky moi HV003');
+    (v_member_1, uuid_tramanh, 'CREATE', 1, 'normal', CURRENT_DATE - 10, CURRENT_DATE + 20, 500000, 'TM', true, 'Dang ky moi HV001', NOW() - INTERVAL '10 days'),
+    (v_member_2, uuid_phu, 'RENEW', 3, 'couple', CURRENT_DATE - 40, CURRENT_DATE - 5, 1200000, 'CK', false, 'Gia han HV002', NOW() - INTERVAL '40 days'),
+    (v_member_3, uuid_phu, 'CREATE', 1, 'team', CURRENT_DATE - 2, CURRENT_DATE + 28, 500000, 'CK', true, 'Dang ky moi HV003', NOW() - INTERVAL '2 days');
 
   -- 8) Payment logs
   INSERT INTO payment_logs (
     member_id, shift_id, staff_id, amount, payment_method,
-    payment_type, is_verified, verified_by, verified_at, note
+    payment_type, is_verified, verified_by, verified_at, note, created_at
   ) VALUES
-    (v_member_1, v_shift_1, uuid_tramanh, 500000, 'TM', 'new', true, uuid_tramanh, NOW() - INTERVAL '9 hours', 'Dang ky moi HV001'),
-    (v_member_2, v_shift_2, uuid_phu, 1200000, 'CK', 'renew', false, NULL, NULL, 'Gia han HV002 cho duyet CK'),
-    (v_member_3, v_shift_2, uuid_phu, 500000, 'CK', 'new', true, uuid_nhu, NOW() - INTERVAL '30 minutes', 'CK da xac minh');
+    (v_member_1, v_shift_1, uuid_tramanh, 500000, 'TM', 'new', true, uuid_tramanh, NOW() - INTERVAL '9 hours', 'Dang ky moi HV001', NOW() - INTERVAL '10 days'),
+    (v_member_2, v_shift_2, uuid_phu, 1200000, 'CK', 'renew', false, NULL, NULL, 'Gia han HV002 cho duyet CK', NOW() - INTERVAL '40 days'),
+    (v_member_3, v_shift_2, uuid_phu, 500000, 'CK', 'new', true, uuid_nhu, NOW() - INTERVAL '30 minutes', 'CK da xac minh', NOW() - INTERVAL '2 days');
 
   -- 9) Sales logs
-  INSERT INTO sales_logs (product_id, shift_id, sold_by, quantity, total_price, payment_method) VALUES
-    (v_product_1, v_shift_2, uuid_phu, 2, 20000, 'TM'),
-    (v_product_2, v_shift_2, uuid_phu, 1, 15000, 'TM');
+  INSERT INTO sales_logs (product_id, shift_id, sold_by, quantity, total_price, payment_method, sold_at) VALUES
+    (v_product_1, v_shift_2, uuid_phu, 2, 20000, 'TM', NOW() - INTERVAL '1 hour'),
+    (v_product_2, v_shift_2, uuid_phu, 1, 15000, 'TM', NOW() - INTERVAL '30 minutes');
 
   -- 10) Shift expenses (tab Chi)
-  INSERT INTO shift_expenses (shift_id, amount, reason, created_by) VALUES
-    (v_shift_2, 30000, 'Mua dung cu ve sinh', uuid_phu),
-    (v_shift_2, 15000, 'In hoa don', uuid_phu);
+  INSERT INTO shift_expenses (shift_id, amount, reason, created_by, created_at) VALUES
+    (v_shift_2, 30000, 'Mua dung cu ve sinh', uuid_phu, NOW() - INTERVAL '45 minutes'),
+    (v_shift_2, 15000, 'In hoa don', uuid_phu, NOW() - INTERVAL '15 minutes');
 
   -- 11) Staff logs
-  INSERT INTO staff_logs (staff_id, action, target_item, details, note) VALUES
-    (uuid_tramanh, 'Mo ca truc', 'Ca 1', jsonb_build_object('starting_cash', 500000), 'Mo ca sang'),
-    (uuid_tramanh, 'Chot ca truc', 'Ca 1', jsonb_build_object('ending_cash', 870000), 'Ket ca sang'),
-    (uuid_phu, 'Them khoan chi', 'Ca 2', jsonb_build_object('amount', 30000), 'Mua dung cu ve sinh');
+  INSERT INTO staff_logs (staff_id, action, target_item, details, note, created_at) VALUES
+    (uuid_tramanh, 'Mo ca truc', 'Ca 1', jsonb_build_object('starting_cash', 500000), 'Mo ca sang', NOW() - INTERVAL '10 hours'),
+    (uuid_tramanh, 'Chot ca truc', 'Ca 1', jsonb_build_object('ending_cash', 870000), 'Ket ca sang', NOW() - INTERVAL '6 hours'),
+    (uuid_phu, 'Them khoan chi', 'Ca 2', jsonb_build_object('amount', 30000), 'Mua dung cu ve sinh', NOW() - INTERVAL '45 minutes');
 
   -- 12) Weekly schedules
   IF uuid_tramanh IS NOT NULL AND EXISTS (SELECT 1 FROM profiles WHERE id = uuid_tramanh) THEN

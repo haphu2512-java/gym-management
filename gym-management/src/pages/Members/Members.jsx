@@ -7,6 +7,7 @@ import { shiftService } from '../../services/shiftService';
 import { memberLogService } from '../../services/memberLogService';
 import supabase from '../../config/supabase';
 import { useAuthStore } from '../../store/useAuthStore';
+import { formatDate, getLocalISODate } from '../../utils/formatters';
 
 function getStatus(endDate) {
   const today = new Date();
@@ -196,9 +197,9 @@ export default function Members() {
     }
 
     try {
-      const startDate = form.start_date || new Date().toISOString().slice(0, 10);
+      const startDate = form.start_date || getLocalISODate();
       const startObj = new Date(startDate);
-      const endDate = addMonths(startObj, Number(form.package_type || 1)).toISOString().slice(0, 10);
+      const endDate = getLocalISODate(addMonths(startObj, Number(form.package_type || 1)));
       
       const payload = {
         member_code: form.member_code,
@@ -355,7 +356,7 @@ export default function Members() {
                     <p className="cell-sub">{m.full_name}</p>
                   </td>
                   <td>
-                    <p className="cell-main">{m.end_date || 'N/A'}</p>
+                    <p className="cell-main">{formatDate(m.end_date) || 'N/A'}</p>
                     <p className="cell-sub">
                       {m.membership_category ? `(${m.membership_category.toUpperCase()}) ` : ''}
                       {m.package_type ? `${m.package_type} tháng` : 'Chưa có gói'} - {Number(m.fee || 0).toLocaleString()}đ
@@ -530,7 +531,7 @@ export default function Members() {
                             <tr><td colSpan={3} className="table-empty-cell">Chưa có lịch sử</td></tr>
                           ) : historyLogs.map(log => (
                             <tr key={log.id} style={{ fontSize: '12px' }}>
-                              <td>{new Date(log.created_at).toLocaleDateString('vi-VN')}</td>
+                              <td>{formatDate(log.created_at)}</td>
                               <td>
                                 <strong style={{ color: '#0f172a' }}>
                                   {log.action === 'CREATE' && '🆕 Đăng ký'}

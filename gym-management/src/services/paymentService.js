@@ -28,7 +28,8 @@ export const paymentService = {
         payment_method: method,
         payment_type: type,
         note,
-        is_verified: method === 'TM' // Cash is auto-verified, CK needs manual verification
+        is_verified: method === 'TM', // Cash is auto-verified, CK needs manual verification
+        created_at: new Date().toISOString()
       }])
       .select()
       .single();
@@ -40,7 +41,8 @@ export const paymentService = {
     // Use atomic verification function
     const { data, error } = await supabase.rpc('verify_payment_atomic', {
       p_payment_id: paymentId,
-      p_admin_id: adminId
+      p_admin_id: adminId,
+      p_verified_at: new Date().toISOString()
     });
 
     if (error) throw new Error('Xác thực thanh toán thất bại: ' + error.message);

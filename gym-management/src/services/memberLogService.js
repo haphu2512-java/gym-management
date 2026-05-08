@@ -3,7 +3,7 @@ import supabase from '../config/supabase';
 const TABLE_NAME = 'member_logs';
 
 export const memberLogService = {
-  async logAction({ memberId, staffId, action, details = {}, note = '' }) {
+  async logAction({ memberId, staffId, action, details = {}, note = '', created_at = null }) {
     try {
       const { data, error } = await supabase
         .from(TABLE_NAME)
@@ -12,7 +12,8 @@ export const memberLogService = {
           staff_id: staffId,
           action,
           details,
-          note
+          note,
+          created_at: created_at || new Date().toISOString()
         }]);
       
       if (error) throw error;

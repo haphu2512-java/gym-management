@@ -6,11 +6,7 @@ import { paymentService } from '../../services/paymentService';
 import { productService } from '../../services/productService';
 import { expenseService } from '../../services/expenseService';
 import { staffLogService } from '../../services/staffLogService';
-
-function formatDateTime(value) {
-  if (!value) return '-';
-  return new Date(value).toLocaleString('vi-VN');
-}
+import { formatDateTime } from '../../utils/formatters';
 
 export default function Shifts() {
   const { user } = useAuthStore();
@@ -52,18 +48,23 @@ export default function Shifts() {
   );
 
   // Tính toán tiền bàn giao khi có ca đang mở
-  const calculateHandoverCash = async (shiftId) => {
+  const calculateHandoverCash = async (shift) => {
     try {
-      // Lấy tất cả TM payments cho ca này
-      const payments = await paymentService.getPaymentsByShift(shiftId, 'TM', true);
-      const totalPayments = payments.reduce((sum, p) => sum + Number(p.amount), 0);
+      if (!shift) return 0;
+      
+      // Lấy tất cả TM payments cho ca này (Hội viên)
+      const payments = await paymentService.getPaymentsByShift(shift.id, 'TM', true);
+      const totalMemberCash = payments.reduce((sum, p) => sum + Number(p.amount), 0);
 
-      // Lấy tất cả sales cho ca này
-      const totalSales = await productService.getDrinkRevenueForShift(shiftId);
-      const shiftExpense = await expenseService.getTotalByShift(shiftId);
+      // Lấy doanh thu nước bằng Tiền mặt (TM) cho ca này
+      const totalDrinkCash = await productService.getDrinkRevenueForShift(shift.id, 'TM');
+      
+      // Lấy tổng chi
+      const shiftExpense = await expenseService.getTotalByShift(shift.id);
       setTotalExpense(shiftExpense);
 
-      return totalPayments + totalSales - shiftExpense;
+      // Công thức: Tiền kết ca = Tiền đầu ca + TM hội viên + TM nước - Chi
+      return (Number(shift.starting_cash) || 0) + totalMemberCash + totalDrinkCash - shiftExpense;
     } catch (error) {
       console.error('Error calculating handover cash:', error);
       return 0;
@@ -73,7 +74,7 @@ export default function Shifts() {
   // Cập nhật suggested cash khi activeShift thay đổi
   useEffect(() => {
     if (activeShift) {
-      calculateHandoverCash(activeShift.id).then(setSuggestedEndingCash);
+      calculateHandoverCash(activeShift).then(setSuggestedEndingCash);
       expenseService.getByShift(activeShift.id).then(setExpenses).catch(() => setExpenses([]));
     } else {
       setSuggestedEndingCash(0);

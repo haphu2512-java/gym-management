@@ -3,7 +3,7 @@ import supabase from '../config/supabase';
 const TABLE_NAME = 'staff_logs';
 
 export const staffLogService = {
-  async logAction({ staffId, action, targetItem = '', details = null, note = '' }) {
+  async logAction({ staffId, action, targetItem = '', details = null, note = '', created_at = null }) {
     if (!staffId) return;
     const payload = {
       staff_id: staffId,
@@ -11,7 +11,7 @@ export const staffLogService = {
       target_item: targetItem,
       details,
       note,
-      created_at: new Date().toISOString(),
+      created_at: created_at || new Date().toISOString(),
     };
 
     const { error } = await supabase.from(TABLE_NAME).insert([payload]);

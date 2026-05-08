@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { staffService } from '../../services/staffService';
 import { useAuthStore } from '../../store/useAuthStore';
+import { formatDate } from '../../utils/formatters';
 
 const DAYS = ['Mon', 'Tues', 'Wed', 'Thur', 'Fri', 'Sat', 'Sun'];
 const SHIFTS = ['Ca 1', 'Ca 2', 'Ca 3', 'Ca 4', 'Ca 5'];
@@ -8,8 +9,13 @@ const SHIFTS = ['Ca 1', 'Ca 2', 'Ca 3', 'Ca 4', 'Ca 5'];
 function getMonday(d) {
   d = new Date(d);
   var day = d.getDay(),
-      diff = d.getDate() - day + (day == 0 ? -6:1); // adjust when day is sunday
-  return new Date(d.setDate(diff)).toISOString().split('T')[0];
+      diff = d.getDate() - day + (day === 0 ? -6 : 1); 
+  const monday = new Date(d.setDate(diff));
+  
+  const year = monday.getFullYear();
+  const month = String(monday.getMonth() + 1).padStart(2, '0');
+  const date = String(monday.getDate()).padStart(2, '0');
+  return `${year}-${month}-${date}`;
 }
 
 export default function Staff() {

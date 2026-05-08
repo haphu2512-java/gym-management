@@ -1,10 +1,6 @@
 import { useEffect, useState } from 'react';
 import { staffLogService } from '../../services/staffLogService';
-
-function formatDateTime(value) {
-  if (!value) return '-';
-  return new Date(value).toLocaleString('vi-VN');
-}
+import { formatDateTime } from '../../utils/formatters';
 
 export default function Logs() {
   const [logs, setLogs] = useState([]);

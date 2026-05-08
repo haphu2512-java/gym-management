@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS staff_logs (
   target_item TEXT,
   details JSONB,
   note TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
 -- 6. Bảng lưu giao dịch bán hàng nước
@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS sales_logs (
   quantity INT DEFAULT 1,
   total_price NUMERIC NOT NULL,
   payment_method TEXT DEFAULT 'TM' CHECK (payment_method IN ('TM', 'CK')),
-  sold_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+  sold_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
 -- 7. Bảng ghi nhận thanh toán hội viên (Mới/Gia hạn)
@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS payment_logs (
   verified_by UUID REFERENCES profiles(id),
   verified_at TIMESTAMP WITH TIME ZONE,
   note TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
 -- 8. Bảng nhật ký thay đổi hội viên (Member Logs - Lưu lịch sử gia hạn/đăng ký)
@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS member_logs (
 
   details JSONB,        -- { "old": ..., "new": ... }
   note TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
 -- View để lấy trạng thái hiện tại của hội viên (Ưu tiên lấy từ Log Gia hạn/Tạo mới)
@@ -178,7 +178,7 @@ CREATE TABLE IF NOT EXISTS shift_expenses (
   amount NUMERIC NOT NULL CHECK (amount > 0),
   reason TEXT,
   created_by UUID REFERENCES profiles(id),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
 -- ===========================================
@@ -395,7 +395,8 @@ CREATE OR REPLACE FUNCTION sell_bottle_transaction(
   p_staff_id UUID,
   p_quantity INT,
   p_total_price NUMERIC,
-  p_payment_method TEXT DEFAULT 'TM'
+  p_payment_method TEXT DEFAULT 'TM',
+  p_sold_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 )
 RETURNS JSON AS $$
 DECLARE
@@ -411,13 +412,14 @@ BEGIN
   -- Atomic: Decrement + Log in transaction
   UPDATE products SET stock_quantity = stock_quantity - p_quantity WHERE id = p_product_id;
 
-  INSERT INTO sales_logs (product_id, shift_id, sold_by, quantity, total_price, payment_method)
-  VALUES (p_product_id, p_shift_id, p_staff_id, p_quantity, p_total_price, p_payment_method)
+  INSERT INTO sales_logs (product_id, shift_id, sold_by, quantity, total_price, payment_method, sold_at)
+  VALUES (p_product_id, p_shift_id, p_staff_id, p_quantity, p_total_price, p_payment_method, p_sold_at)
   RETURNING id INTO v_sales_log_id;
 
-  INSERT INTO staff_logs (staff_id, action, target_item, details)
+  INSERT INTO staff_logs (staff_id, action, target_item, details, created_at)
   VALUES (p_staff_id, 'Bán hàng', (SELECT name FROM products WHERE id = p_product_id),
-          json_build_object('sale_id', v_sales_log_id));
+          json_build_object('sale_id', v_sales_log_id),
+          p_sold_at);
 
   RETURN json_build_object('success', true, 'sale_id', v_sales_log_id);
 EXCEPTION WHEN OTHERS THEN
@@ -435,7 +437,8 @@ CREATE OR REPLACE FUNCTION create_member_transaction(
   p_payment_method TEXT,
   p_shift_id UUID,
   p_staff_id UUID,
-  p_start_date DATE DEFAULT NOW()
+  p_start_date DATE DEFAULT NOW(),
+  p_created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 )
 RETURNS JSON AS $$
 DECLARE
@@ -447,30 +450,32 @@ DECLARE
   v_result JSON;
 BEGIN
   -- Create member (Chỉ thông tin cơ bản)
-  INSERT INTO members (member_code, full_name)
-  VALUES (p_code, p_name)
+  INSERT INTO members (member_code, full_name, created_at)
+  VALUES (p_code, p_name, p_created_at)
   RETURNING id INTO v_member_id;
 
   -- Create payment log
-  INSERT INTO payment_logs (member_id, shift_id, staff_id, amount, payment_method, payment_type, is_verified)
-  VALUES (v_member_id, p_shift_id, p_staff_id, p_fee, p_payment_method, 'new', v_is_verified)
+  INSERT INTO payment_logs (member_id, shift_id, staff_id, amount, payment_method, payment_type, is_verified, created_at)
+  VALUES (v_member_id, p_shift_id, p_staff_id, p_fee, p_payment_method, 'new', v_is_verified, p_created_at)
   RETURNING id INTO v_payment_id;
 
   -- Create audit & state log (Lưu thông tin gói tập vào đây)
   INSERT INTO member_logs (
     member_id, staff_id, action, 
     package_type, membership_category, start_date, end_date, fee, payment_method, is_payment_verified,
-    details
+    details, created_at
   )
   VALUES (
     v_member_id, p_staff_id, 'CREATE',
     p_package_type, p_membership_category, v_start_date, v_end_date, p_fee, p_payment_method, v_is_verified,
-    json_build_object('code', p_code, 'fee', p_fee, 'payment_id', v_payment_id)
+    json_build_object('code', p_code, 'fee', p_fee, 'payment_id', v_payment_id),
+    p_created_at
   );
 
-  INSERT INTO staff_logs (staff_id, action, target_item, details)
+  INSERT INTO staff_logs (staff_id, action, target_item, details, created_at)
   VALUES (p_staff_id, 'Tạo hội viên', p_code,
-          json_build_object('member_id', v_member_id, 'fee', p_fee));
+          json_build_object('member_id', v_member_id, 'fee', p_fee),
+          p_created_at);
 
   -- Trả về toàn bộ thông tin từ view để đồng bộ state local ngay lập tức
   SELECT row_to_json(r) FROM (
@@ -486,7 +491,8 @@ $$ LANGUAGE plpgsql;
 -- Atomic payment verification
 CREATE OR REPLACE FUNCTION verify_payment_atomic(
   p_payment_id UUID,
-  p_admin_id UUID
+  p_admin_id UUID,
+  p_verified_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 )
 RETURNS JSON AS $$
 DECLARE
@@ -498,7 +504,7 @@ BEGIN
   SET
     is_verified = true,
     verified_by = p_admin_id,
-    verified_at = NOW()
+    verified_at = p_verified_at
   WHERE
     id = p_payment_id
     AND is_verified = false  -- Only if not already verified
@@ -516,13 +522,14 @@ BEGIN
     AND (details->>'payment_id' = p_payment_id::text);
 
   -- 3. Create verification log in member_logs (For audit trail and to update current status view)
-  INSERT INTO member_logs (member_id, staff_id, action, is_payment_verified, note)
-  VALUES (v_member_id, p_admin_id, 'VERIFY_PAYMENT', true, 'Admin duyệt thanh toán chuyển khoản');
+  INSERT INTO member_logs (member_id, staff_id, action, is_payment_verified, note, created_at)
+  VALUES (v_member_id, p_admin_id, 'VERIFY_PAYMENT', true, 'Admin duyệt thanh toán chuyển khoản', p_verified_at);
 
   -- 4. Log verification in staff_logs
-  INSERT INTO staff_logs (staff_id, action, target_item, details)
+  INSERT INTO staff_logs (staff_id, action, target_item, details, created_at)
   VALUES (p_admin_id, 'Xác thực thanh toán', 'Payment #' || p_payment_id,
-          json_build_object('payment_id', p_payment_id, 'member_id', v_member_id));
+          json_build_object('payment_id', p_payment_id, 'member_id', v_member_id),
+          p_verified_at);
 
   RETURN json_build_object('success', true, 'payment_id', p_payment_id);
 EXCEPTION WHEN OTHERS THEN
