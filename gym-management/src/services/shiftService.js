@@ -6,12 +6,47 @@ const SHIFT_TABLE = 'shifts';
 
 const DEFAULT_SHIFTS = ['Ca 1', 'Ca 2', 'Ca 3', 'Ca 4', 'Ca 5'];
 
+// Ca 1: 5-8h, Ca 2: 9-11h, Ca 3: 13-16h, Ca 4: 16-19h, Ca 5: 19-22h
+const SHIFT_TIME_MAP = {
+  'Ca 1': { start: '05:00', end: '09:00', label: '5:00 - 9:00 sáng' },
+  'Ca 2': { start: '09:00', end: '12:00', label: '9:00 - 12:00 trưa' },
+  'Ca 3': { start: '13:00', end: '16:00', label: '13:00 - 16:00 chiều' },
+  'Ca 4': { start: '16:00', end: '19:00', label: '16:00 - 19:00 chiều' },
+  'Ca 5': { start: '19:00', end: '22:00', label: '19:00 - 22:00 tối' },
+};
+
+function validateShiftTime(shiftName, allowOverride = false) {
+  if (allowOverride) return; // Admin có thể bỏ qua nếu cần
+
+  const now = new Date();
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+  const currentTotal = currentHour * 60 + currentMinute;
+
+  const schedule = SHIFT_TIME_MAP[shiftName];
+  if (!schedule) return; // Nếu không tìm thấy thì bỏ qua
+
+  const [startH, startM] = schedule.start.split(':').map(Number);
+  const [endH, endM] = schedule.end.split(':').map(Number);
+  const startTotal = startH * 60 + startM;
+  const endTotal = endH * 60 + endM;
+
+  // Cho phép mở sớm 30 phút trước giờ bắt đầu ca
+  const tolerance = 30;
+  if (currentTotal < startTotal - tolerance || currentTotal > endTotal) {
+    throw new Error(
+      `Không thể mở ${shiftName} lúc này. ${shiftName} chỉ được mở trong khung giờ ${schedule.label}. Giờ hiện tại: ${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}.`
+    );
+  }
+}
+
 function formatDateKey(date = new Date()) {
   return getLocalISODate(date);
 }
 
 export const shiftService = {
   shiftOptions: DEFAULT_SHIFTS,
+  shiftTimeMap: SHIFT_TIME_MAP,
 
   async getLatestShifts(limit = 20) {
     const { data, error } = await supabase
@@ -49,7 +84,10 @@ export const shiftService = {
     return { valid: Boolean(active), shift: active || null };
   },
 
-  async openShift({ shiftName, startingCash = 0, note = '', staffId = null }) {
+  async openShift({ shiftName, startingCash = 0, note = '', staffId = null, skipTimeCheck = false }) {
+    // Validate thời gian mở ca
+    validateShiftTime(shiftName, skipTimeCheck);
+
     // Check if there is already an open shift
     const { data: openShifts, error: checkError } = await supabase
       .from(SHIFT_TABLE)
@@ -61,20 +99,12 @@ export const shiftService = {
       throw new Error(`Đã có ca "${openShifts[0].shift_name}" đang mở. Vui lòng chốt ca cũ trước khi mở ca mới.`);
     }
 
-    const shiftTimeMap = {
-      'Ca 1': { start: '05:00:00', end: '09:00:00' },
-      'Ca 2': { start: '09:00:00', end: '13:00:00' },
-      'Ca 3': { start: '13:00:00', end: '17:00:00' },
-      'Ca 4': { start: '17:00:00', end: '21:00:00' },
-      'Ca 5': { start: '21:00:00', end: '23:00:00' },
-    };
-
-    const times = shiftTimeMap[shiftName] || { start: '00:00:00', end: '00:00:00' };
+    const times = SHIFT_TIME_MAP[shiftName] || { start: '00:00', end: '00:00' };
 
     const payload = {
       shift_name: shiftName,
-      default_start: times.start,
-      default_end: times.end,
+      default_start: times.start + ':00',
+      default_end: times.end + ':00',
       start_time: new Date().toISOString(),
       starting_cash: Number(startingCash || 0),
       status: 'open',

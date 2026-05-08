@@ -11,13 +11,23 @@ import { formatDateTime } from '../../utils/formatters';
 export default function Shifts() {
   const { user, profile } = useAuthStore();
   const [shifts, setShifts] = useState([]);
+  const [skipTimeCheck, setSkipTimeCheck] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('shift');
   const [suggestedEndingCash, setSuggestedEndingCash] = useState(0);
   const [expenses, setExpenses] = useState([]);
   const [totalExpense, setTotalExpense] = useState(0);
-  const [expenseForm, setExpenseForm] = useState({ amount: '', reason: '' });
+  const [expenseForm, setExpenseForm] = useState(() => {
+    const saved = localStorage.getItem('gym_expense_form');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) { }
+    }
+    return { amount: '', reason: '' };
+  });
+
   const [form, setForm] = useState(() => {
     const saved = localStorage.getItem('gym_shift_form');
     if (saved) {
@@ -36,6 +46,10 @@ export default function Shifts() {
   useEffect(() => {
     localStorage.setItem('gym_shift_form', JSON.stringify(form));
   }, [form]);
+
+  useEffect(() => {
+    localStorage.setItem('gym_expense_form', JSON.stringify(expenseForm));
+  }, [expenseForm]);
 
   const [selectedShiftSummary, setSelectedShiftSummary] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -189,6 +203,7 @@ export default function Shifts() {
           startingCash: Number(form.starting_cash),
           note: form.note,
           staffId: user?.id,
+          skipTimeCheck: profile?.role === 'admin' && skipTimeCheck,
         });
       }
 
@@ -214,11 +229,19 @@ export default function Shifts() {
         {activeTab === 'shift' && (
           <form className="modern-form" onSubmit={handleSubmit}>
             <label className="field-label">Chọn ca làm</label>
-            <select value={form.shift_name} onChange={(e) => setForm({ ...form, shift_name: e.target.value })}>
+            <select value={form.shift_name} onChange={(e) => setForm({ ...form, shift_name: e.target.value })} disabled={!!activeShift}>
               {shiftService.shiftOptions.map((item) => (
                 <option key={item} value={item}>{item}</option>
               ))}
             </select>
+            {!activeShift && (() => {
+              const schedule = shiftService.shiftTimeMap?.[form.shift_name];
+              return schedule ? (
+                <small className="field-hint">
+                  ⏰ Khung giờ: <strong>{schedule.label}</strong>
+                </small>
+              ) : null;
+            })()}
 
             <div style={{ marginBottom: '16px' }}>
               {!activeShift ? (
@@ -262,7 +285,19 @@ export default function Shifts() {
               )}
             </div>
 
-
+            {!activeShift && profile?.role === 'admin' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                <input
+                  type="checkbox"
+                  id="skipTimeCheck"
+                  checked={skipTimeCheck}
+                  onChange={(e) => setSkipTimeCheck(e.target.checked)}
+                />
+                <label htmlFor="skipTimeCheck" style={{ fontSize: '13px', color: '#64748b', cursor: 'pointer' }}>
+                  Bỏ qua giới hạn giờ (Admin override)
+                </label>
+              </div>
+            )}
 
             <button type="submit" className="primary-btn large">
               {activeShift ? 'Chốt Ca Trực' : 'Mở Ca Trực'}

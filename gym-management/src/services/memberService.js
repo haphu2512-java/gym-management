@@ -207,7 +207,17 @@ export const memberService = {
   },
 
   async deleteMember(id) {
-    const { error } = await supabase.from(TABLE_NAME).update({ deleted_at: new Date() }).eq('id', id);
-    if (error) throw new Error(error.message);
+    const { data: member } = await supabase.from(TABLE_NAME).select('member_code').eq('id', id).single();
+    if (member) {
+      const newCode = `${member.member_code}_del_${Date.now()}`;
+      const { error } = await supabase
+        .from(TABLE_NAME)
+        .update({
+          deleted_at: new Date().toISOString(),
+          member_code: newCode
+        })
+        .eq('id', id);
+      if (error) throw new Error(error.message);
+    }
   },
 };

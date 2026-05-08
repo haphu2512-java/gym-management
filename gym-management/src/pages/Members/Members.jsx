@@ -58,6 +58,7 @@ export default function Members() {
 
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historyLogs, setHistoryLogs] = useState([]);
+  const [deletingMember, setDeletingMember] = useState(null);
   const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => {
@@ -138,6 +139,26 @@ export default function Members() {
       });
     } catch (err) {
       setError("Lỗi duyệt thanh toán: " + err.message);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingMember) return;
+    try {
+      await memberService.deleteMember(deletingMember.id);
+      
+      await staffLogService.logAction({
+        staffId: user?.id,
+        action: 'Xoa hoi vien',
+        targetItem: deletingMember.full_name,
+        details: { member_id: deletingMember.id, member_code: deletingMember.member_code },
+        note: 'Admin thuc hien xoa hoi vien (soft delete)',
+      });
+
+      await fetchMembers();
+      setDeletingMember(null);
+    } catch (err) {
+      setError("Lỗi xóa hội viên: " + err.message);
     }
   };
 
@@ -401,6 +422,16 @@ export default function Members() {
                       <button type="button" className="link-btn" onClick={() => openRenewModal(m)}>
                         <CreditCard size={14} /> Gia hạn
                       </button>
+                      {profile?.role === 'admin' && (
+                        <button 
+                          type="button" 
+                          className="link-btn" 
+                          style={{ color: '#dc2626' }}
+                          onClick={() => setDeletingMember(m)}
+                        >
+                          Xóa người dùng
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -671,6 +702,30 @@ export default function Members() {
                 <button type="submit" className="primary-btn">Xác nhận gia hạn</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal xác nhận xóa hội viên */}
+      {deletingMember && (
+        <div className="modal-backdrop" onClick={() => setDeletingMember(null)}>
+          <div className="modal-panel" style={{ maxWidth: '380px' }} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ color: '#dc2626' }}>Xác nhận xóa hội viên</h3>
+            <p>
+              Bạn có chắc muốn xóa hội viên <strong>{deletingMember.full_name}</strong> ({deletingMember.member_code})?
+              Hành động này sẽ ẩn hội viên khỏi danh sách quản lý.
+            </p>
+            <div className="modal-actions">
+              <button type="button" className="ghost-btn" onClick={() => setDeletingMember(null)}>Hủy</button>
+              <button
+                type="button"
+                className="primary-btn"
+                style={{ background: '#dc2626' }}
+                onClick={handleConfirmDelete}
+              >
+                Xác nhận xóa
+              </button>
+            </div>
           </div>
         </div>
       )}
