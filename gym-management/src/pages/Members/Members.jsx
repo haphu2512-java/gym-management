@@ -44,6 +44,7 @@ export default function Members() {
   const { members, loading, addMember, updateMember, fetchMembers } = useMembers();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterDate, setFilterDate] = useState('');
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
@@ -87,12 +88,21 @@ export default function Members() {
       const matchSearch = (m.full_name || '').toLowerCase().includes(keyword)
         || (m.member_code || '').toLowerCase().includes(keyword);
         
-      if (filterStatus === 'pending_ck') {
-        return matchSearch && m.payment_method === 'CK' && !m.is_payment_verified;
+      let matchDate = true;
+      if (filterDate) {
+        const expDate = m.end_date ? m.end_date.split('T')[0] : '';
+        const regDate = m.start_date ? m.start_date.split('T')[0] : '';
+        matchDate = (expDate === filterDate) || (regDate === filterDate);
       }
-      return matchSearch;
+      
+      let matchStatus = true;
+      if (filterStatus === 'pending_ck') {
+        matchStatus = m.payment_method === 'CK' && !m.is_payment_verified;
+      }
+      
+      return matchSearch && matchDate && matchStatus;
     });
-  }, [members, searchTerm, filterStatus]);
+  }, [members, searchTerm, filterStatus, filterDate]);
 
   const handleLogVerification = async (log) => {
     if (!window.confirm(`Xác nhận đã nhận đủ ${Number(log.fee || 0).toLocaleString()}đ chuyển khoản cho lần gia hạn này?`)) return;
@@ -319,6 +329,14 @@ export default function Members() {
           />
         </div>
         
+        <input
+          type="date"
+          value={filterDate}
+          onChange={(e) => setFilterDate(e.target.value)}
+          style={{ padding: '8px', borderRadius: '6px', border: '1px solid #ddd', minWidth: '130px' }}
+          title="Lọc theo ngày đăng ký hoặc hết hạn"
+        />
+
         {profile?.role === 'admin' && (
           <select 
             value={filterStatus} 
@@ -539,14 +557,15 @@ export default function Members() {
                             <th>Ngày</th>
                             <th>Hành động</th>
                             <th>Chi tiết gói</th>
+                            {profile?.role === 'admin' && <th>Nhân viên</th>}
                             {profile?.role === 'admin' && <th>Thanh toán</th>}
                           </tr>
                         </thead>
                         <tbody>
                           {historyLoading ? (
-                            <tr><td colSpan={3} className="table-empty-cell">Đang tải...</td></tr>
+                            <tr><td colSpan={profile?.role === 'admin' ? 5 : 3} className="table-empty-cell">Đang tải...</td></tr>
                           ) : historyLogs.length === 0 ? (
-                            <tr><td colSpan={3} className="table-empty-cell">Chưa có lịch sử</td></tr>
+                            <tr><td colSpan={profile?.role === 'admin' ? 5 : 3} className="table-empty-cell">Chưa có lịch sử</td></tr>
                           ) : historyLogs.map(log => (
                             <tr key={log.id} style={{ fontSize: '12px' }}>
                               <td>{formatDate(log.created_at)}</td>
@@ -564,6 +583,9 @@ export default function Members() {
                                 )}
                                 <div className="cell-sub">{log.note}</div>
                               </td>
+                              {profile?.role === 'admin' && (
+                                <td>{log.profiles?.full_name || 'Hệ thống'}</td>
+                              )}
                               {profile?.role === 'admin' && (
                                 <td>
                                   {log.payment_method === 'CK' && !log.is_payment_verified ? (

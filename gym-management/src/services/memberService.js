@@ -64,6 +64,8 @@ export const memberService = {
       p_payment_method: memberData.payment_method,
       p_shift_id: memberData.shift_id,
       p_staff_id: memberData.staff_id,
+      p_fingerprint_status: Boolean(memberData.fingerprint_status),
+      p_note: memberData.note || '',
       p_start_date: memberData.start_date || getLocalISODate(),
       p_created_at: new Date().toISOString(),
     });
@@ -83,20 +85,6 @@ export const memberService = {
       throw new Error(data?.error || 'Tạo hội viên thất bại');
     }
 
-    // Since RPC doesn't handle fingerprint_status and note, we update them directly if needed
-    const hasFingerprint = Boolean(memberData.fingerprint_status);
-    const hasNote = memberData.note && memberData.note.trim().length > 0;
-
-    if (data?.id && (hasFingerprint || hasNote)) {
-      await supabase.from('members').update({ 
-        fingerprint_status: hasFingerprint,
-        note: memberData.note 
-      }).eq('id', data.id);
-      data.fingerprint_status = hasFingerprint;
-      data.note = memberData.note;
-    }
-
-    // RPC now returns the full member object from view
     return data;
   },
 
@@ -167,91 +155,30 @@ export const memberService = {
     const now = new Date();
     const currentEnd = member.end_date ? new Date(member.end_date) : null;
     const renewalStart = currentEnd && currentEnd > now ? currentEnd : now;
-    const newEndDate = addMonths(renewalStart, packageType);
 
     await validateMemberDates(renewalStart, packageType);
 
-    // 1. Create payment log (Must wait for this)
-    const { data: payment, error: paymentError } = await supabase
-      .from('payment_logs')
-      .insert([
-        {
-          member_id: memberId,
-          shift_id: shiftId,
-          staff_id: staffId,
-          amount: fee,
-          payment_method: paymentMethod,
-          payment_type: 'renew',
-          is_verified: paymentMethod === 'TM',
-          verified_by: paymentMethod === 'TM' ? staffId : null,
-          verified_at: paymentMethod === 'TM' ? new Date().toISOString() : null,
-          created_at: new Date().toISOString()
-        },
-      ])
-      .select()
-      .single();
+    const { data: result, error: rpcError } = await supabase.rpc('renew_member_transaction', {
+      p_member_id: memberId,
+      p_package_type: packageType,
+      p_membership_category: membershipCategory,
+      p_fee: fee,
+      p_payment_method: paymentMethod,
+      p_shift_id: shiftId,
+      p_staff_id: staffId,
+      p_start_date: toDateOnly(renewalStart),
+      p_created_at: new Date().toISOString()
+    });
 
-    if (paymentError) throw paymentError;
+    if (rpcError) throw new Error('Gia hạn thất bại: ' + rpcError.message);
+    if (result?.success === false) {
+      throw new Error(result.error || 'Gia hạn thất bại');
+    }
 
-    // 2. Create renewal logs (Must wait for member_logs because view depends on it)
-    const { error: logError } = await supabase.from('member_logs').insert([
-      {
-        member_id: memberId,
-        staff_id: staffId,
-        action: 'RENEW',
-        package_type: packageType,
-        membership_category: membershipCategory,
-        start_date: toDateOnly(renewalStart),
-        end_date: toDateOnly(newEndDate),
-        fee,
-        payment_method: paymentMethod,
-        is_payment_verified: paymentMethod === 'TM',
-        details: {
-          payment_id: payment.id,
-        },
-        note: `Gia han ${packageType} thang ngay ${toDateOnly(now)}`,
-        created_at: new Date().toISOString(),
-      },
-    ]);
-
-    if (logError) console.error('Lỗi lưu log hội viên:', logError.message);
-
-    // staff_logs can be non-blocking as it doesn't affect the member view
-    // We use a self-invoking async function to handle it without blocking the main flow
-    (async () => {
-      try {
-        await supabase.from('staff_logs').insert([
-          {
-            staff_id: staffId,
-            action: 'Gia han hoi vien',
-            target_item: `${member.member_code} - ${member.full_name}`,
-            details: {
-              member_id: memberId,
-              fee,
-              payment_id: payment.id,
-            },
-            created_at: new Date().toISOString(),
-          },
-        ]);
-      } catch (err) {
-        console.error('Lỗi lưu staff log:', err.message);
-      }
-    })();
-
-    // 3. Fetch the updated state from view
-    const { data: updatedMember, error: fetchError } = await supabase
-      .from(VIEW_NAME)
-      .select('*')
-      .eq('id', memberId)
-      .single();
-
-    if (fetchError) throw new Error('Cập nhật thành công nhưng không thể lấy dữ liệu mới: ' + fetchError.message);
-
-    return { member: updatedMember, payment };
+    return { member: result.member || result, payment: { id: result.payment_id } };
   },
 
   async verifyLogPayment(logId, staffId) {
-    // 1. Lấy thông tin log để tìm payment_id liên quan
     const { data: log, error: logError } = await supabase
       .from('member_logs')
       .select('*')
@@ -260,42 +187,21 @@ export const memberService = {
 
     if (logError) throw new Error('Không tìm thấy bản ghi log: ' + logError.message);
 
-    // 2. Cập nhật bảng member_logs
-    const { error: updateLogError } = await supabase
-      .from('member_logs')
-      .update({
-        is_payment_verified: true,
-        note: (log.note || '') + ' (Admin đã duyệt)'
-      })
-      .eq('id', logId);
-
-    if (updateLogError) throw new Error('Cập nhật log thất bại: ' + updateLogError.message);
-
-    // 3. Cập nhật bảng payment_logs nếu có payment_id
     const paymentId = log.details?.payment_id;
-    if (paymentId) {
-      const { error: payError } = await supabase
-        .from('payment_logs')
-        .update({
-          is_verified: true,
-          verified_by: staffId,
-          verified_at: new Date().toISOString()
-        })
-        .eq('id', paymentId);
-      if (payError) console.error('Cập nhật payment_log thất bại:', payError);
+    if (!paymentId) {
+      throw new Error('Không tìm thấy payment liên quan để xác thực.');
     }
 
-    // 4. Thêm log VERIFY_PAYMENT (Blocking to ensure consistency)
-    const { error: finalLogError } = await supabase.from('member_logs').insert([{
-      member_id: log.member_id,
-      staff_id: staffId,
-      action: 'VERIFY_PAYMENT',
-      is_payment_verified: true,
-      note: 'Admin duyệt thanh toán chuyển khoản',
-      created_at: new Date().toISOString()
-    }]);
-    
-    if (finalLogError) console.error('Lỗi lưu log xác thực:', finalLogError.message);
+    const { data, error } = await supabase.rpc('verify_payment_atomic', {
+      p_payment_id: paymentId,
+      p_admin_id: staffId,
+      p_verified_at: new Date().toISOString()
+    });
+
+    if (error) throw new Error('Xác thực thanh toán thất bại: ' + error.message);
+    if (data?.success === false) {
+      throw new Error(data.error || 'Xác thực thanh toán thất bại');
+    }
 
     return true;
   },

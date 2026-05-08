@@ -98,6 +98,16 @@ export const shiftService = {
   },
 
   async closeShift({ shiftId, endingCash = 0, note = '', staffId = null, shiftName = '' }) {
+    if (staffId) {
+      const { data: shiftInfo } = await supabase.from(SHIFT_TABLE).select('opened_by').eq('id', shiftId).single();
+      if (shiftInfo && shiftInfo.opened_by !== staffId) {
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', staffId).single();
+        if (!profile || profile.role !== 'admin') {
+          throw new Error('Bạn không có quyền chốt ca này. Chỉ người mở ca hoặc Quản lý mới có quyền chốt ca.');
+        }
+      }
+    }
+
     const { data, error } = await supabase
       .from(SHIFT_TABLE)
       .update({

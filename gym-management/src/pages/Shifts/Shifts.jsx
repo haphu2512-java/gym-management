@@ -9,7 +9,7 @@ import { staffLogService } from '../../services/staffLogService';
 import { formatDateTime } from '../../utils/formatters';
 
 export default function Shifts() {
-  const { user } = useAuthStore();
+  const { user, profile } = useAuthStore();
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -18,12 +18,24 @@ export default function Shifts() {
   const [expenses, setExpenses] = useState([]);
   const [totalExpense, setTotalExpense] = useState(0);
   const [expenseForm, setExpenseForm] = useState({ amount: '', reason: '' });
-  const [form, setForm] = useState({
-    shift_name: shiftService.shiftOptions[0],
-    starting_cash: '',
-    ending_cash: '',
-    note: '',
+  const [form, setForm] = useState(() => {
+    const saved = localStorage.getItem('gym_shift_form');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) { }
+    }
+    return {
+      shift_name: shiftService.shiftOptions[0],
+      starting_cash: '',
+      ending_cash: '',
+      note: '',
+    };
   });
+
+  useEffect(() => {
+    localStorage.setItem('gym_shift_form', JSON.stringify(form));
+  }, [form]);
 
   const [selectedShiftSummary, setSelectedShiftSummary] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -65,18 +77,24 @@ export default function Shifts() {
     [shifts, form.shift_name],
   );
 
+  const previousShift = useMemo(
+    () => shifts.find((s) => s.status === 'closed') || null,
+    [shifts]
+  );
+  const previousEndingCash = previousShift ? Number(previousShift.ending_cash || 0) : 0;
+
   // Tính toán tiền bàn giao khi có ca đang mở
   const calculateHandoverCash = async (shift) => {
     try {
       if (!shift) return 0;
-      
+
       // Lấy tất cả TM payments cho ca này (Hội viên)
       const payments = await paymentService.getPaymentsByShift(shift.id, 'TM', true);
       const totalMemberCash = payments.reduce((sum, p) => sum + Number(p.amount), 0);
 
       // Lấy doanh thu nước bằng Tiền mặt (TM) cho ca này
       const totalDrinkCash = await productService.getDrinkRevenueForShift(shift.id, 'TM');
-      
+
       // Lấy tổng chi
       const shiftExpense = await expenseService.getTotalByShift(shift.id);
       setTotalExpense(shiftExpense);
@@ -146,17 +164,29 @@ export default function Shifts() {
 
     try {
       if (activeShift) {
+        if (form.ending_cash === '') {
+          throw new Error('Vui lòng nhập tiền kết ca trước khi chốt ca.');
+        }
+
+        if (activeShift.opened_by !== user?.id && profile?.role !== 'admin') {
+          throw new Error('Chỉ người mở ca hoặc Quản lý mới được phép chốt ca này.');
+        }
+
         await shiftService.closeShift({
           shiftId: activeShift.id,
-          endingCash: Number(form.ending_cash || 0),
+          endingCash: Number(form.ending_cash),
           note: form.note,
           staffId: user?.id,
           shiftName: activeShift.shift_name,
         });
       } else {
+        if (form.starting_cash === '') {
+          throw new Error('Vui lòng nhập tiền đầu ca trước khi mở ca.');
+        }
+
         await shiftService.openShift({
           shiftName: form.shift_name,
-          startingCash: Number(form.starting_cash || 0),
+          startingCash: Number(form.starting_cash),
           note: form.note,
           staffId: user?.id,
         });
@@ -182,52 +212,62 @@ export default function Shifts() {
         </div>
         <h3 className="modern-title flex-row"><Clock size={18} /> Bàn giao ca trực</h3>
         {activeTab === 'shift' && (
-        <form className="modern-form" onSubmit={handleSubmit}>
-          <label className="field-label">Chọn ca làm</label>
-          <select value={form.shift_name} onChange={(e) => setForm({ ...form, shift_name: e.target.value })}>
-            {shiftService.shiftOptions.map((item) => (
-              <option key={item} value={item}>{item}</option>
-            ))}
-          </select>
+          <form className="modern-form" onSubmit={handleSubmit}>
+            <label className="field-label">Chọn ca làm</label>
+            <select value={form.shift_name} onChange={(e) => setForm({ ...form, shift_name: e.target.value })}>
+              {shiftService.shiftOptions.map((item) => (
+                <option key={item} value={item}>{item}</option>
+              ))}
+            </select>
 
-          <div className="form-grid-2">
-            <div>
-              <label className="field-label">Tiền đầu ca (TM)</label>
-              <input
-                type="number"
-                value={form.starting_cash}
-                onChange={(e) => setForm({ ...form, starting_cash: e.target.value })}
-                placeholder="500000"
-              />
-            </div>
-            <div>
-              <label className="field-label">Tiền kết ca (TM)</label>
-              <input
-                type="number"
-                value={form.ending_cash}
-                onChange={(e) => setForm({ ...form, ending_cash: e.target.value })}
-                placeholder={activeShift ? `Gợi ý: ${suggestedEndingCash.toLocaleString('vi-VN')}` : "Chưa kết ca"}
-              />
-              {activeShift && suggestedEndingCash > 0 && (
-                <small className="field-hint">
-                  Du kien: {suggestedEndingCash.toLocaleString('vi-VN')}d (TM hoi vien + TM nuoc - chi)
-                </small>
+            <div style={{ marginBottom: '16px' }}>
+              {!activeShift ? (
+                <div>
+                  <label className="field-label">Tiền đầu ca (TM)</label>
+                  <input
+                    type="number"
+                    value={form.starting_cash}
+                    onChange={(e) => setForm({ ...form, starting_cash: e.target.value })}
+                    placeholder={previousEndingCash > 0 ? `Gợi ý: ${previousEndingCash.toLocaleString('vi-VN')}` : "Ví dụ: 500000"}
+                  />
+                  {previousEndingCash > 0 && (
+                    <small className="field-hint">
+                      Gợi ý lấy từ tiền kết ca của {previousShift?.shift_name || 'ca trước'}: {previousEndingCash.toLocaleString('vi-VN')}đ
+                    </small>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <label className="field-label">Tiền kết ca (TM)</label>
+                  <input
+                    type="number"
+                    value={form.ending_cash}
+                    onChange={(e) => setForm({ ...form, ending_cash: e.target.value })}
+                    placeholder={`Gợi ý: ${suggestedEndingCash.toLocaleString('vi-VN')}`}
+                  />
+                  {suggestedEndingCash > 0 && (
+                    <small className="field-hint">
+                      Dự kiến: {suggestedEndingCash.toLocaleString('vi-VN')}đ (Tiền đầu ca + TM hội viên + TM nước - chi)
+                    </small>
+                  )}
+
+                  <label className="field-label">Ghi chú bàn giao</label>
+                  <textarea
+                    rows={3}
+                    value={form.note}
+                    onChange={(e) => setForm({ ...form, note: e.target.value })}
+                    placeholder="Ví dụ: còn nợ khách 50k..."
+                  />
+                </div>
               )}
             </div>
-          </div>
 
-          <label className="field-label">Ghi chú bàn giao</label>
-          <textarea
-            rows={3}
-            value={form.note}
-            onChange={(e) => setForm({ ...form, note: e.target.value })}
-            placeholder="Ví dụ: còn nợ khách 50k..."
-          />
 
-          <button type="submit" className="primary-btn large">
-            {activeShift ? 'Chốt Ca Trực' : 'Mở Ca Trực'}
-          </button>
-        </form>
+
+            <button type="submit" className="primary-btn large">
+              {activeShift ? 'Chốt Ca Trực' : 'Mở Ca Trực'}
+            </button>
+          </form>
         )}
 
         {activeTab === 'expense' && (
@@ -291,7 +331,8 @@ export default function Shifts() {
               <th>Ca</th>
               <th>Bắt đầu</th>
               <th>Kết thúc</th>
-              <th>Tiền đầu/cuối</th>
+              <th>Tiền đầu ca</th>
+              <th>Tiền kết ca</th>
               <th>Trạng thái</th>
               <th>Hành động</th>
             </tr>
@@ -299,7 +340,7 @@ export default function Shifts() {
           <tbody>
             {shifts.length === 0 && (
               <tr>
-                <td colSpan={6} className="table-empty-cell">Chưa có dữ liệu ca làm</td>
+                <td colSpan={7} className="table-empty-cell">Chưa có dữ liệu ca làm</td>
               </tr>
             )}
             {shifts.map((shift) => (
@@ -307,10 +348,8 @@ export default function Shifts() {
                 <td className="cell-main">{shift.shift_name}</td>
                 <td>{formatDateTime(shift.start_time)}</td>
                 <td>{formatDateTime(shift.end_time) || '-'}</td>
-                <td>
-                  <p className="cell-main">{Number(shift.starting_cash || 0).toLocaleString('vi-VN')}đ</p>
-                  <p className="cell-sub">{shift.status === 'closed' ? `${Number(shift.ending_cash || 0).toLocaleString('vi-VN')}đ` : '---'}</p>
-                </td>
+                <td>{Number(shift.starting_cash || 0).toLocaleString('vi-VN')}đ</td>
+                <td>{shift.status === 'closed' ? `${Number(shift.ending_cash || 0).toLocaleString('vi-VN')}đ` : '---'}</td>
                 <td>
                   <span className={`status-badge ${shift.status === 'open' ? 'active' : 'expired'}`}>
                     {shift.status === 'open' ? 'Đang mở' : 'Đã chốt'}
@@ -337,7 +376,7 @@ export default function Shifts() {
               <div className="modern-info">Đang tải dữ liệu ca...</div>
             ) : selectedShiftSummary ? (
               <div className="modern-stack" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-                <div className="form-grid-2">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
                   <div className="modern-card" style={{ padding: '12px', background: '#f8fafc' }}>
                     <p className="cell-sub">Nhân viên mở ca</p>
                     <p className="cell-main">{selectedShiftSummary.shift?.profiles?.full_name || 'N/A'}</p>
@@ -351,6 +390,14 @@ export default function Shifts() {
                         selectedShiftSummary.sales.filter(s => s.payment_method === 'TM').reduce((s, p) => s + p.total_price, 0) -
                         selectedShiftSummary.expenses.reduce((s, e) => s + e.amount, 0)
                       ).toLocaleString()}đ
+                    </p>
+                  </div>
+                  <div className="modern-card" style={{ padding: '12px', background: '#f8fafc' }}>
+                    <p className="cell-sub">Doanh thu thực tế (TM)</p>
+                    <p className="cell-main">
+                      {selectedShiftSummary.shift?.status === 'closed'
+                        ? `${Number(selectedShiftSummary.shift?.ending_cash || 0).toLocaleString()}đ`
+                        : 'Chưa chốt ca'}
                     </p>
                   </div>
                 </div>

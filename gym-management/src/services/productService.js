@@ -74,5 +74,36 @@ export const productService = {
     if (error) throw new Error(error.message);
     return data.reduce((sum, item) => sum + Number(item.total_price || 0), 0);
   },
+
+  async getFilteredSalesLogs(filters = {}) {
+    let query = supabase
+      .from('sales_logs')
+      .select(`
+        *,
+        products (name),
+        profiles:sold_by (full_name),
+        shifts!inner (shift_name)
+      `)
+      .order('sold_at', { ascending: false });
+
+    if (filters.date) {
+      const startOfDay = new Date(filters.date);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(filters.date);
+      endOfDay.setHours(23, 59, 59, 999);
+      query = query.gte('sold_at', startOfDay.toISOString())
+                   .lte('sold_at', endOfDay.toISOString());
+    }
+
+    if (filters.shiftName) {
+      query = query.eq('shifts.shift_name', filters.shiftName);
+    }
+    
+    query = query.limit(200);
+
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    return data || [];
+  },
 };
 

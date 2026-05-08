@@ -369,11 +369,27 @@ CREATE TABLE IF NOT EXISTS salary_adjustments (
   reason TEXT,
   created_by UUID NOT NULL REFERENCES profiles(id),
   created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE (staff_id, adjustment_date)
 );
 
 -- Enable RLS for salary_adjustments
 ALTER TABLE salary_adjustments ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint c
+    JOIN pg_class t ON t.oid = c.conrelid
+    JOIN pg_namespace n ON n.oid = t.relnamespace
+    WHERE c.contype = 'u'
+      AND t.relname = 'salary_adjustments'
+      AND n.nspname = 'public'
+      AND c.conname = 'salary_adjustments_staff_date_unique'
+  ) THEN
+    ALTER TABLE salary_adjustments ADD CONSTRAINT salary_adjustments_staff_date_unique UNIQUE (staff_id, adjustment_date);
+  END IF;
+END $$;
 CREATE POLICY "salary_adjustments_select" ON salary_adjustments FOR SELECT TO authenticated USING (
   (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
   OR auth.uid() = staff_id
@@ -437,6 +453,8 @@ CREATE OR REPLACE FUNCTION create_member_transaction(
   p_payment_method TEXT,
   p_shift_id UUID,
   p_staff_id UUID,
+  p_fingerprint_status BOOLEAN DEFAULT FALSE,
+  p_note TEXT DEFAULT '',
   p_start_date DATE DEFAULT NOW(),
   p_created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 )
@@ -450,8 +468,8 @@ DECLARE
   v_result JSON;
 BEGIN
   -- Create member (Chỉ thông tin cơ bản)
-  INSERT INTO members (member_code, full_name, created_at)
-  VALUES (p_code, p_name, p_created_at)
+  INSERT INTO members (member_code, full_name, fingerprint_status, note, created_at)
+  VALUES (p_code, p_name, p_fingerprint_status, p_note, p_created_at)
   RETURNING id INTO v_member_id;
 
   -- Create payment log
@@ -483,6 +501,62 @@ BEGIN
   ) r INTO v_result;
 
   RETURN v_result;
+EXCEPTION WHEN OTHERS THEN
+  RETURN json_build_object('success', false, 'error', SQLERRM);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Atomic member renewal transaction
+CREATE OR REPLACE FUNCTION renew_member_transaction(
+  p_member_id UUID,
+  p_package_type INT,
+  p_membership_category TEXT,
+  p_fee NUMERIC,
+  p_payment_method TEXT,
+  p_shift_id UUID,
+  p_staff_id UUID,
+  p_start_date DATE DEFAULT NOW(),
+  p_created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+)
+RETURNS JSON AS $$
+DECLARE
+  v_payment_id UUID;
+  v_end_date DATE := (p_start_date + (p_package_type || ' months')::INTERVAL)::DATE;
+  v_is_verified BOOLEAN := (p_payment_method = 'TM');
+  v_result JSON;
+BEGIN
+  IF p_package_type < 1 OR p_package_type > 36 THEN
+    RETURN json_build_object('success', false, 'error', 'Goi tap phai tu 1 den 36 thang');
+  END IF;
+
+  INSERT INTO payment_logs (
+    member_id, shift_id, staff_id, amount, payment_method, payment_type, is_verified, created_at
+  ) VALUES (
+    p_member_id, p_shift_id, p_staff_id, p_fee, p_payment_method, 'renew', v_is_verified, p_created_at
+  ) RETURNING id INTO v_payment_id;
+
+  INSERT INTO member_logs (
+    member_id, staff_id, action,
+    package_type, membership_category, start_date, end_date, fee, payment_method, is_payment_verified,
+    details, note, created_at
+  ) VALUES (
+    p_member_id, p_staff_id, 'RENEW',
+    p_package_type, p_membership_category, p_start_date, v_end_date, p_fee, p_payment_method, v_is_verified,
+    json_build_object('payment_id', v_payment_id),
+    json_build_object('message', 'Gia han goi tap'),
+    p_created_at
+  );
+
+  INSERT INTO staff_logs (staff_id, action, target_item, details, created_at)
+  VALUES (p_staff_id, 'Gia han hoi vien', p_member_id,
+          json_build_object('payment_id', v_payment_id, 'fee', p_fee),
+          p_created_at);
+
+  SELECT row_to_json(r) FROM (
+    SELECT * FROM member_current_status WHERE id = p_member_id
+  ) r INTO v_result;
+
+  RETURN json_build_object('success', true, 'member', v_result, 'payment_id', v_payment_id);
 EXCEPTION WHEN OTHERS THEN
   RETURN json_build_object('success', false, 'error', SQLERRM);
 END;

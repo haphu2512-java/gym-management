@@ -5,6 +5,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { staffLogService } from '../../services/staffLogService';
 import { shiftService } from '../../services/shiftService';
 import { useToast, ToastContainer } from '../../components/ui/Toast';
+import { formatDateTime } from '../../utils/formatters';
 
 export default function Inventory() {
   const { user, profile, assignedShift } = useAuthStore();
@@ -26,6 +27,11 @@ export default function Inventory() {
 
   // Xác nhận xóa
   const [deletingProduct, setDeletingProduct] = useState(null);
+
+  // Thống kê
+  const [salesLogs, setSalesLogs] = useState([]);
+  const [statsDate, setStatsDate] = useState(new Date().toISOString().split('T')[0]);
+  const [statsShiftName, setStatsShiftName] = useState('');
 
   // Lấy ca đang mở nếu chưa có trong store
   useEffect(() => {
@@ -64,6 +70,16 @@ export default function Inventory() {
   useEffect(() => {
     loadProducts();
   }, [loadProducts]);
+
+  useEffect(() => {
+    if (viewMode === 'stats') {
+      setLoading(true);
+      productService.getFilteredSalesLogs({ date: statsDate, shiftName: statsShiftName })
+        .then(setSalesLogs)
+        .catch(e => setError("Lỗi tải thống kê: " + e.message))
+        .finally(() => setLoading(false));
+    }
+  }, [viewMode, statsDate, statsShiftName]);
 
   const handleQtyChange = (id, delta, stock) => {
     setSellQuantities(prev => {
@@ -225,12 +241,21 @@ export default function Inventory() {
             >
               Bán hàng
             </button>
+            {profile?.role === 'admin' && (
+              <button 
+                className={`tab-btn ${viewMode === 'admin' ? 'active' : ''}`}
+                onClick={() => setViewMode('admin')}
+                style={{ padding: '6px 12px', border: 'none', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', background: viewMode === 'admin' ? '#fff' : 'transparent', fontWeight: viewMode === 'admin' ? '600' : 'normal', boxShadow: viewMode === 'admin' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+              >
+                Quản lý kho
+              </button>
+            )}
             <button 
-              className={`tab-btn ${viewMode === 'admin' ? 'active' : ''}`}
-              onClick={() => setViewMode('admin')}
-              style={{ padding: '6px 12px', border: 'none', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', background: viewMode === 'admin' ? '#fff' : 'transparent', fontWeight: viewMode === 'admin' ? '600' : 'normal', boxShadow: viewMode === 'admin' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+              className={`tab-btn ${viewMode === 'stats' ? 'active' : ''}`}
+              onClick={() => setViewMode('stats')}
+              style={{ padding: '6px 12px', border: 'none', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', background: viewMode === 'stats' ? '#fff' : 'transparent', fontWeight: viewMode === 'stats' ? '600' : 'normal', boxShadow: viewMode === 'stats' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
             >
-              Quản lý kho
+              Thống kê
             </button>
           </div>
 
@@ -243,7 +268,7 @@ export default function Inventory() {
       </div>
 
       {error && <div className="modern-error">{error}</div>}
-      {loading && <div className="modern-info">Đang tải kho...</div>}
+      {loading && <div className="modern-info">Đang xử lý...</div>}
 
       {/* POS Grid View */}
       {viewMode === 'sales' ? (
@@ -307,6 +332,76 @@ export default function Inventory() {
               </div>
             );
           })}
+        </div>
+      ) : viewMode === 'stats' ? (
+        /* Thống kê bán hàng */
+        <div className="modern-stack">
+          <div style={{ display: 'flex', gap: '12px', background: '#f8fafc', padding: '12px', borderRadius: '12px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569' }}>Ngày:</label>
+              <input 
+                type="date" 
+                value={statsDate} 
+                onChange={(e) => setStatsDate(e.target.value)}
+                style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569' }}>Ca:</label>
+              <select 
+                value={statsShiftName} 
+                onChange={(e) => setStatsShiftName(e.target.value)}
+                style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+              >
+                <option value="">Tất cả các ca</option>
+                {shiftService.shiftOptions.map((item) => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="modern-table-wrap">
+            <table className="modern-table">
+              <thead>
+                <tr>
+                  <th>Thời gian</th>
+                  <th>Sản phẩm</th>
+                  <th>Số lượng</th>
+                  <th>Tổng tiền</th>
+                  <th>Phương thức</th>
+                  <th>Nhân viên</th>
+                </tr>
+              </thead>
+              <tbody>
+                {!loading && salesLogs.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="table-empty-cell">Chưa có dữ liệu bán hàng</td>
+                  </tr>
+                )}
+                {salesLogs.map((log) => (
+                  <tr key={log.id}>
+                    <td>
+                      <p className="cell-main">{formatDateTime(log.sold_at)}</p>
+                      {log.shifts?.shift_name && <p className="cell-sub">{log.shifts.shift_name}</p>}
+                    </td>
+                    <td><p className="cell-main">{log.products?.name || 'N/A'}</p></td>
+                    <td>{log.quantity}</td>
+                    <td><p className="cell-main">{Number(log.total_price || 0).toLocaleString('vi-VN')}đ</p></td>
+                    <td>
+                      <span style={{ 
+                        padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold',
+                        background: log.payment_method === 'CK' ? '#dbeafe' : '#f1f5f9',
+                        color: log.payment_method === 'CK' ? '#1d4ed8' : '#475569'
+                      }}>
+                        {log.payment_method === 'CK' ? 'Chuyển khoản' : 'Tiền mặt'}
+                      </span>
+                    </td>
+                    <td><p className="cell-main">{log.profiles?.full_name || 'N/A'}</p></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : (
         /* Admin Table View */
