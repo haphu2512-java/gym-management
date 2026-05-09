@@ -98,6 +98,10 @@ export const productService = {
     if (filters.shiftName) {
       query = query.eq('shifts.shift_name', filters.shiftName);
     }
+
+    if (filters.paymentMethod) {
+      query = query.eq('payment_method', filters.paymentMethod);
+    }
     
     query = query.limit(200);
 

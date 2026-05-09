@@ -32,6 +32,7 @@ export default function Inventory() {
   const [salesLogs, setSalesLogs] = useState([]);
   const [statsDate, setStatsDate] = useState(new Date().toISOString().split('T')[0]);
   const [statsShiftName, setStatsShiftName] = useState('');
+  const [statsPaymentMethod, setStatsPaymentMethod] = useState('');
 
   // Lấy ca đang mở nếu chưa có trong store
   useEffect(() => {
@@ -74,12 +75,16 @@ export default function Inventory() {
   useEffect(() => {
     if (viewMode === 'stats') {
       setLoading(true);
-      productService.getFilteredSalesLogs({ date: statsDate, shiftName: statsShiftName })
+      productService.getFilteredSalesLogs({ 
+        date: statsDate, 
+        shiftName: statsShiftName,
+        paymentMethod: statsPaymentMethod
+      })
         .then(setSalesLogs)
         .catch(e => setError("Lỗi tải thống kê: " + e.message))
         .finally(() => setLoading(false));
     }
-  }, [viewMode, statsDate, statsShiftName]);
+  }, [viewMode, statsDate, statsShiftName, statsPaymentMethod]);
 
   const handleQtyChange = (id, delta, stock) => {
     setSellQuantities(prev => {
@@ -357,6 +362,18 @@ export default function Inventory() {
                 {shiftService.shiftOptions.map((item) => (
                   <option key={item} value={item}>{item}</option>
                 ))}
+              </select>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569' }}>Thanh toán:</label>
+              <select 
+                value={statsPaymentMethod} 
+                onChange={(e) => setStatsPaymentMethod(e.target.value)}
+                style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+              >
+                <option value="">Tất cả</option>
+                <option value="TM">Tiền mặt</option>
+                <option value="CK">Chuyển khoản</option>
               </select>
             </div>
           </div>
