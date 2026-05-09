@@ -13,6 +13,7 @@ import Inventory from './pages/Inventory/Inventory';
 import Shifts from './pages/Shifts/Shifts';
 import Staff from './pages/Staff/Staff';
 import Logs from './pages/Logs/Logs';
+import Statistics from './pages/Statistics/Statistics';
 
 import { useAuthStore } from './store/useAuthStore';
 
@@ -64,6 +65,14 @@ function App() {
                         element={
                           <ProtectedRoute allowedRoles={['admin']}>
                             <Logs />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/statistics"
+                        element={
+                          <ProtectedRoute allowedRoles={['admin']}>
+                            <Statistics />
                           </ProtectedRoute>
                         }
                       />

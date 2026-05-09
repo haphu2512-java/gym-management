@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Clock, Droplets, LayoutDashboard, LogOut, Users, WalletCards, ScrollText } from 'lucide-react';
+import { Clock, Droplets, LayoutDashboard, LogOut, Users, WalletCards, ScrollText, TrendingUp } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 
 const icons = {
@@ -9,6 +9,7 @@ const icons = {
   shifts: Clock,
   staff: WalletCards,
   logs: ScrollText,
+  statistics: TrendingUp,
 };
 
 export default function Sidebar({ isOpen, onClose }) {
@@ -25,6 +26,7 @@ export default function Sidebar({ isOpen, onClose }) {
   const menuItems = profile?.role === 'admin'
     ? [
         ...baseItems, 
+        { key: 'statistics', path: '/statistics', label: 'Thống Kê Chi Tiết' },
         { key: 'staff', path: '/staff', label: 'Nhân Viên & Lương' },
         { key: 'logs', path: '/logs', label: 'Nhật Ký Hoạt Động' }
       ]
