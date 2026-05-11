@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
-import { BarChart3, PieChart, TrendingUp, Users, Droplets, Calendar, Download } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { BarChart3, PieChart, TrendingUp, Users, Droplets, Calendar, Download, User } from 'lucide-react';
+import { statisticsService } from '../../services/statisticsService';
 
-// --- MOCK DATA ---
+// --- MOCK DATA (Fallback) ---
 const REVENUE_DATA = [
   { day: 'Thứ 2', member: 1200000, water: 350000 },
   { day: 'Thứ 3', member: 900000, water: 280000 },
@@ -28,12 +29,57 @@ const TOP_PRODUCTS = [
 
 export default function Statistics() {
   const [dateRange, setDateRange] = useState('week');
+  const [waterStatsByStaff, setWaterStatsByStaff] = useState({});
+  const [overallStats, setOverallStats] = useState({ waterRevenue: 0, memberRevenue: 0, totalRevenue: 0 });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        let startDate = null;
+        const now = new Date();
+        
+        if (dateRange === 'today') {
+          startDate = new Date(now.setHours(0, 0, 0, 0)).toISOString();
+        } else if (dateRange === 'week') {
+          const first = now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1); // Monday
+          startDate = new Date(now.setDate(first)).toISOString();
+          startDate = new Date(new Date(startDate).setHours(0,0,0,0)).toISOString();
+        } else if (dateRange === 'month') {
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        }
+
+        const [waterStats, overall] = await Promise.all([
+          statisticsService.getWaterStatsByShiftAndStaff({ startDate }),
+          statisticsService.getOverallStats({ startDate })
+        ]);
+
+        setWaterStatsByStaff(waterStats);
+        setOverallStats(overall);
+      } catch (error) {
+        console.error("Error fetching statistics:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [dateRange]);
 
   const totals = useMemo(() => {
+    // If we have real data, use it, otherwise fallback to mock for visuals
+    if (overallStats.totalRevenue > 0) {
+        return {
+            memberTotal: overallStats.memberRevenue,
+            waterTotal: overallStats.waterRevenue,
+            combined: overallStats.totalRevenue
+        };
+    }
     const memberTotal = REVENUE_DATA.reduce((acc, curr) => acc + curr.member, 0);
     const waterTotal = REVENUE_DATA.reduce((acc, curr) => acc + curr.water, 0);
     return { memberTotal, waterTotal, combined: memberTotal + waterTotal };
-  }, []);
+  }, [overallStats]);
 
   const maxRevenue = Math.max(...REVENUE_DATA.map(d => d.member + d.water));
 
@@ -54,7 +100,7 @@ export default function Statistics() {
             <option value="today">Hôm nay</option>
             <option value="week">Tuần này</option>
             <option value="month">Tháng này</option>
-            <option value="custom">Tùy chọn</option>
+            <option value="all">Tất cả</option>
           </select>
           <button className="primary-btn">
             <Download size={16} /> Xuất báo cáo
@@ -69,7 +115,7 @@ export default function Statistics() {
           <div>
             <p className="stat-label-modern">Tổng doanh thu</p>
             <p className="stat-value-modern">{totals.combined.toLocaleString('vi-VN')}đ</p>
-            <p className="cell-sub">+12% so với tuần trước</p>
+            <p className="cell-sub">Dữ liệu {dateRange === 'all' ? 'từ trước đến nay' : `trong ${dateRange}`}</p>
           </div>
         </div>
         <div className="modern-card stat-card-modern">
@@ -77,7 +123,7 @@ export default function Statistics() {
           <div>
             <p className="stat-label-modern">Doanh thu học phí</p>
             <p className="stat-value-modern">{totals.memberTotal.toLocaleString('vi-VN')}đ</p>
-            <p className="cell-sub">82% tổng doanh thu</p>
+            <p className="cell-sub">{totals.combined > 0 ? Math.round((totals.memberTotal / totals.combined) * 100) : 0}% tổng doanh thu</p>
           </div>
         </div>
         <div className="modern-card stat-card-modern">
@@ -87,7 +133,7 @@ export default function Statistics() {
           <div>
             <p className="stat-label-modern">Doanh thu nước</p>
             <p className="stat-value-modern">{totals.waterTotal.toLocaleString('vi-VN')}đ</p>
-            <p className="cell-sub">18% tổng doanh thu</p>
+            <p className="cell-sub">{totals.combined > 0 ? Math.round((totals.waterTotal / totals.combined) * 100) : 0}% tổng doanh thu</p>
           </div>
         </div>
       </div>
@@ -158,6 +204,75 @@ export default function Statistics() {
               ))}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Water Stats by Shift & Staff */}
+      <div className="modern-card">
+        <h4 className="modern-title"><User size={18} /> Thống kê nước theo ca & nhân viên</h4>
+        <div className="modern-table-wrap" style={{ marginTop: '10px' }}>
+          <table className="modern-table">
+            <thead>
+              <tr>
+                <th>Nhân viên</th>
+                <th>Chi tiết bán hàng (Ca | Số lượng | Tên nước)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(waterStatsByStaff).map(([staffName, shifts], idx) => (
+                <tr key={idx}>
+                  <td style={{ verticalAlign: 'top', width: '200px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
+                            <User size={16} />
+                        </div>
+                        <p className="cell-main">{staffName}</p>
+                    </div>
+                  </td>
+                  <td>
+                    {Object.entries(shifts).map(([shiftName, products], sIdx) => (
+                      <div key={sIdx} style={{ marginBottom: '12px' }}>
+                        {Object.entries(products).map(([prodName, qty], pIdx) => (
+                          <div key={pIdx} style={{ 
+                            display: 'inline-block', 
+                            background: '#f8fafc', 
+                            border: '1px solid #e2e8f0', 
+                            borderRadius: '6px', 
+                            padding: '4px 10px', 
+                            marginRight: '8px', 
+                            marginBottom: '6px',
+                            fontSize: '13px',
+                            color: '#334155'
+                          }}>
+                            <span style={{ fontWeight: '600', color: '#3b82f6' }}>{shiftName}</span>
+                            <span style={{ margin: '0 6px', color: '#cbd5e1' }}>|</span>
+                            <span style={{ fontWeight: '600' }}>{qty}</span>
+                            <span style={{ margin: '0 6px', color: '#cbd5e1' }}>|</span>
+                            <span>{prodName}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                    {Object.keys(shifts).length === 0 && <p className="muted-text">Không có dữ liệu</p>}
+                  </td>
+                </tr>
+              ))}
+              {Object.keys(waterStatsByStaff).length === 0 && !loading && (
+                <tr>
+                  <td colSpan="2" style={{ textAlign: 'center', padding: '40px' }} className="muted-text">
+                    Không có dữ liệu bán hàng trong khoảng thời gian này.
+                  </td>
+                </tr>
+              )}
+              {loading && (
+                <tr>
+                  <td colSpan="2" style={{ textAlign: 'center', padding: '40px' }} className="muted-text">
+                    Đang tải dữ liệu...
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 

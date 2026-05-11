@@ -379,6 +379,7 @@ export default function Members() {
         <table className="modern-table">
           <thead>
             <tr>
+              <th>Ngày gia hạn</th>
               <th>Mã hội viên</th>
               <th>Ngày hết hạn</th>
               <th>Trạng thái</th>
@@ -389,13 +390,16 @@ export default function Members() {
           <tbody>
             {!loading && filtered.length === 0 && (
               <tr>
-                <td colSpan={5} className="table-empty-cell">Không có dữ liệu</td>
+                <td colSpan={6} className="table-empty-cell">Không có dữ liệu</td>
               </tr>
             )}
             {filtered.map((m) => {
               const status = getStatus(m.end_date);
               return (
                 <tr key={m.id}>
+                  <td>
+                    <p className="cell-main">{formatDate(m.start_date) || 'N/A'}</p>
+                  </td>
                   <td>
                     <p className="cell-main">{m.member_code}</p>
                     <p className="cell-sub">{m.full_name}</p>
@@ -563,11 +567,11 @@ export default function Members() {
                     </div>
                   )}
 
-                  <div style={{ 
-                    marginTop: '12px', 
-                    padding: '10px 14px', 
-                    background: '#f8fafc', 
-                    borderRadius: '10px', 
+                  <div style={{
+                    marginTop: '12px',
+                    padding: '10px 14px',
+                    background: '#f8fafc',
+                    borderRadius: '10px',
                     border: '1px solid #e2e8f0',
                     display: 'flex',
                     alignItems: 'center',
@@ -581,19 +585,19 @@ export default function Members() {
                       disabled={editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true')}
                       style={{ width: '20px', height: '20px', cursor: (editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true')) ? 'not-allowed' : 'pointer', accentColor: '#2563eb' }}
                     />
-                    <label 
-                      htmlFor="fingerprint_status" 
-                      style={{ 
-                        fontSize: '14px', 
-                        fontWeight: '600', 
-                        color: (editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true')) ? '#94a3b8' : '#334155', 
+                    <label
+                      htmlFor="fingerprint_status"
+                      style={{
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        color: (editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true')) ? '#94a3b8' : '#334155',
                         cursor: (editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true')) ? 'not-allowed' : 'pointer',
                         userSelect: 'none',
                         margin: 0
                       }}
                     >
-                      {editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true') 
-                        ? 'Đã đăng ký vân tay (Đã thiết lập)' 
+                      {editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true')
+                        ? 'Đã đăng ký vân tay (Đã thiết lập)'
                         : 'Đã đăng ký vân tay'}
                     </label>
                   </div>
