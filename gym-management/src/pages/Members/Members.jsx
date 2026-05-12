@@ -1,5 +1,4 @@
 import { useMemo, useState, useEffect } from 'react';
-import { CreditCard, Plus, Search, Eye, Trash2, RefreshCcw, PauseCircle } from 'lucide-react';
 import { useMembers } from '../../hooks/useMembers';
 import { memberService } from '../../services/memberService';
 import { staffLogService } from '../../services/staffLogService';
@@ -7,15 +6,13 @@ import { shiftService } from '../../services/shiftService';
 import { memberLogService } from '../../services/memberLogService';
 import supabase from '../../config/supabase';
 import { useAuthStore } from '../../store/useAuthStore';
-import { formatDate, getLocalISODate, addMonths } from '../../utils/formatters';
-
-function getStatus(member) {
-  if (member.suspended_at) return 'Suspended';
-  const today = new Date();
-  const target = new Date(member.end_date);
-  return target >= new Date(today.toDateString()) ? 'Active' : 'Expired';
-}
-
+import { getLocalISODate, addMonths } from '../../utils/formatters';
+import MembersToolbar from './MembersToolbar';
+import MembersTable from './MembersTable';
+import MemberFormModal from './MemberFormModal';
+import RenewModal from './RenewModal';
+import DeleteConfirmModal from './DeleteConfirmModal';
+import SuspendModal from './SuspendModal';
 
 
 const PRICING_TIERS = {
@@ -43,7 +40,7 @@ const initialForm = {
 export default function Members() {
   const { user, profile, activeStaff } = useAuthStore();
   const { members, loading, addMember, updateMember, fetchMembers, suspendMember, reactivateMember } = useMembers();
-  const [activeTab, setActiveTab] = useState('active'); // 'active', 'suspended'
+  const [activeTab, setActiveTab] = useState('active');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterDate, setFilterDate] = useState('');
@@ -58,7 +55,6 @@ export default function Members() {
 
   const [activeShift, setActiveShift] = useState(null);
 
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historyLogs, setHistoryLogs] = useState([]);
   const [deletingMember, setDeletingMember] = useState(null);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -74,20 +70,7 @@ export default function Members() {
     fetchShift();
   }, []);
 
-  const openHistoryModal = async (member) => {
-    setRenewingMember(member);
-    setShowHistoryModal(true);
-    setHistoryLoading(true);
-    try {
-      const logs = await memberLogService.getLogsByMember(member.id);
-      setHistoryLogs(logs);
-    } catch (err) {
-      setError("Không thể tải lịch sử: " + err.message);
-    } finally {
-      setHistoryLoading(false);
-    }
-  };
-
+  // Lọc dữ liệu thành viên
   const filtered = useMemo(() => {
     return members.filter((m) => {
       const keyword = searchTerm.toLowerCase();
@@ -102,7 +85,14 @@ export default function Members() {
       }
 
       let matchStatus = true;
+      const getStatus = (member) => {
+        if (member.suspended_at) return 'Suspended';
+        const today = new Date();
+        const target = new Date(member.end_date);
+        return target >= new Date(today.toDateString()) ? 'Active' : 'Expired';
+      };
       const status = getStatus(m);
+      
       if (activeTab === 'suspended') {
         matchStatus = status === 'Suspended';
       } else {
@@ -117,6 +107,7 @@ export default function Members() {
     });
   }, [members, searchTerm, filterStatus, filterDate, activeTab]);
 
+  // Xử lý xác nhận thanh toán từ lịch sử
   const handleLogVerification = async (log) => {
     if (!window.confirm(`Xác nhận đã nhận đủ ${Number(log.fee || 0).toLocaleString()}đ chuyển khoản cho lần gia hạn này?`)) return;
 
@@ -151,20 +142,21 @@ export default function Members() {
     }
   };
 
+  // Xử lý xóa hội viên
   const handleConfirmDelete = async () => {
     if (!deletingMember) return;
     try {
-    const effectiveStaffId = activeStaff?.id || user?.id;
+      const effectiveStaffId = activeStaff?.id || user?.id;
       await memberService.deleteMember(deletingMember.id);
 
-        await staffLogService.logAction({
-          staffId: effectiveStaffId,
-          staffMemberId: activeStaff?.id,
-          action: 'Xoa hoi vien',
-          targetItem: deletingMember.full_name,
-          details: { member_id: deletingMember.id, member_code: deletingMember.member_code },
-          note: 'Admin thuc hien xoa hoi vien (soft delete)',
-        });
+      await staffLogService.logAction({
+        staffId: effectiveStaffId,
+        staffMemberId: activeStaff?.id,
+        action: 'Xoa hoi vien',
+        targetItem: deletingMember.full_name,
+        details: { member_id: deletingMember.id, member_code: deletingMember.member_code },
+        note: 'Admin thuc hien xoa hoi vien (soft delete)',
+      });
 
       await fetchMembers();
       setDeletingMember(null);
@@ -173,6 +165,7 @@ export default function Members() {
     }
   };
 
+  // Mở modal tạo hội viên mới
   const openCreateModal = () => {
     setEditingMember(null);
     setForm(initialForm);
@@ -180,6 +173,7 @@ export default function Members() {
     setShowModal(true);
   };
 
+  // Mở modal chỉnh sửa hội viên
   const openEditModal = async (member) => {
     setEditingMember(member);
     setForm({
@@ -207,6 +201,7 @@ export default function Members() {
     }
   };
 
+  // Xử lý thay đổi form
   const handleFormChange = (field, value) => {
     setForm(prev => {
       const next = { ...prev, [field]: value };
@@ -218,6 +213,7 @@ export default function Members() {
     });
   };
 
+  // Xử lý thay đổi form gia hạn
   const handleRenewFormChange = (field, value) => {
     setRenewForm(prev => {
       const next = { ...prev, [field]: value };
@@ -229,6 +225,7 @@ export default function Members() {
     });
   };
 
+  // Submit form tạo/chỉnh sửa hội viên
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -301,6 +298,7 @@ export default function Members() {
     }
   };
 
+  // Mở modal gia hạn
   const openRenewModal = (member) => {
     setRenewingMember(member);
     const cat = member.membership_category || 'normal';
@@ -314,6 +312,7 @@ export default function Members() {
     setShowRenewModal(true);
   };
 
+  // Submit gia hạn
   const handleRenew = async (e) => {
     e.preventDefault();
     if (!renewingMember) return;
@@ -331,7 +330,7 @@ export default function Members() {
         return;
       }
 
-      const result = await memberService.renewMember(renewingMember.id, {
+      await memberService.renewMember(renewingMember.id, {
         packageType,
         membershipCategory: renewForm.membership_category,
         fee: Number(renewForm.fee || 0),
@@ -340,7 +339,7 @@ export default function Members() {
         shiftId: activeShift.id,
       });
 
-      // Quan trọng: Làm mới danh sách để cập nhật ngày hết hạn mới
+      // Làm mới danh sách để cập nhật ngày hết hạn mới
       await fetchMembers();
 
       setShowRenewModal(false);
@@ -350,11 +349,11 @@ export default function Members() {
     }
   };
 
+  // Mở modal bảo lưu
   const openSuspendModal = (member) => {
     const today = new Date();
     const expDate = new Date(member.end_date);
     
-    // Đặt giờ về 0 để so sánh ngày chính xác
     today.setHours(0,0,0,0);
     expDate.setHours(0,0,0,0);
     
@@ -371,6 +370,7 @@ export default function Members() {
     setShowSuspendModal(true);
   };
 
+  // Xác nhận bảo lưu
   const handleSuspendConfirm = async () => {
     if (!suspendingMember) return;
     try {
@@ -382,6 +382,7 @@ export default function Members() {
     }
   };
 
+  // Kích hoạt lại hội viên
   const handleReactivate = async (member) => {
     if (!window.confirm(`Kích hoạt lại cho hội viên ${member.full_name}? Ngày hết hạn mới sẽ được cộng thêm ${member.remaining_days} ngày kể từ hôm nay.`)) return;
     try {
@@ -391,544 +392,77 @@ export default function Members() {
     }
   };
 
+
   return (
     <div className="modern-stack">
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
-        <button
-          className={`tab-btn ${activeTab === 'active' ? 'active' : ''}`}
-          onClick={() => setActiveTab('active')}
-          style={{
-            padding: '8px 16px',
-            borderRadius: '8px',
-            border: 'none',
-            background: activeTab === 'active' ? '#2563eb' : '#f1f5f9',
-            color: activeTab === 'active' ? 'white' : '#64748b',
-            fontWeight: '600',
-            cursor: 'pointer'
-          }}
-        >
-          Hội viên đang tập
-        </button>
-        <button
-          className={`tab-btn ${activeTab === 'suspended' ? 'active' : ''}`}
-          onClick={() => setActiveTab('suspended')}
-          style={{
-            padding: '8px 16px',
-            borderRadius: '8px',
-            border: 'none',
-            background: activeTab === 'suspended' ? '#2563eb' : '#f1f5f9',
-            color: activeTab === 'suspended' ? 'white' : '#64748b',
-            fontWeight: '600',
-            cursor: 'pointer'
-          }}
-        >
-          Danh sách bảo lưu
-        </button>
-      </div>
-
-      <div className="modern-toolbar">
-        <div className="search-box">
-          <Search size={16} />
-          <input
-            type="text"
-            value={searchTerm}
-            placeholder="Tìm theo tên hoặc Mã HV..."
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-
-        <input
-          type="date"
-          value={filterDate}
-          onChange={(e) => setFilterDate(e.target.value)}
-          style={{ padding: '8px', borderRadius: '6px', border: '1px solid #ddd', minWidth: '130px' }}
-          title="Lọc theo ngày đăng ký hoặc hết hạn"
-        />
-
-        {profile?.role === 'admin' && (
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            style={{ padding: '8px', borderRadius: '6px', border: '1px solid #ddd' }}
-          >
-            <option value="all">Tất cả</option>
-            <option value="pending_ck">Chờ duyệt CK</option>
-          </select>
-        )}
-        <button type="button" className="primary-btn" onClick={openCreateModal}>
-          <Plus size={16} /> Thêm hội viên
-        </button>
-      </div>
+      <MembersToolbar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        filterStatus={filterStatus}
+        setFilterStatus={setFilterStatus}
+        filterDate={filterDate}
+        setFilterDate={setFilterDate}
+        onAddMember={openCreateModal}
+        profile={profile}
+      />
 
       {error && <div className="modern-error">{error}</div>}
 
-      <div className="modern-table-wrap">
-        <table className="modern-table">
-          <thead>
-            <tr>
-              <th>Ngày gia hạn</th>
-              <th>Mã hội viên</th>
-              <th>Ngày hết hạn</th>
-              <th>Trạng thái</th>
-              {activeTab === 'suspended' && <th>Ngày bảo lưu</th>}
-              <th>Ghi chú</th>
-              <th>Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {!loading && filtered.length === 0 && (
-              <tr>
-                <td colSpan={6} className="table-empty-cell">Không có dữ liệu</td>
-              </tr>
-            )}
-            {filtered.map((m) => {
-              const status = getStatus(m);
-              return (
-                <tr key={m.id}>
-                  <td>
-                    <p className="cell-main">{formatDate(m.start_date) || 'N/A'}</p>
-                  </td>
-                  <td>
-                    <p className="cell-main">{m.member_code}</p>
-                    <p className="cell-sub">{m.full_name}</p>
-                  </td>
-                  <td>
-                    <p className="cell-main">{formatDate(m.end_date) || 'N/A'}</p>
-                    <p className="cell-sub">
-                      {m.membership_category ? `(${m.membership_category.toUpperCase()}) ` : ''}
-                      {m.package_type ? `${m.package_type} tháng` : 'Chưa có gói'} - {Number(m.fee || 0).toLocaleString()}đ
-                    </p>
-                  </td>
-                  <td>
-                    <span className={`status-badge ${status === 'Active' ? 'active' : status === 'Suspended' ? 'suspended' : 'expired'}`}
-                        style={status === 'Suspended' ? { background: '#fef3c7', color: '#92400e' } : {}}
-                     >
-                       {status === 'Active' ? 'Đang tập' : status === 'Suspended' ? 'Bảo lưu' : 'Hết hạn'}
-                     </span>
-                    {m.payment_method === 'CK' && !m.is_payment_verified && (
-                      <span className="pay-badge" style={{ background: '#fef08a', color: '#854d0e', marginLeft: '4px' }}>Chờ duyệt</span>
-                    )}
-                  </td>
-                  {activeTab === 'suspended' && (
-                     <td>
-                       <p className="cell-main">{formatDate(m.suspended_at)}</p>
-                       <p className="cell-sub">Còn {m.remaining_days} ngày</p>
-                     </td>
-                   )}
-                  <td style={{ maxWidth: '150px' }}>
-                    <div
-                      style={{
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        fontSize: '12px',
-                        color: '#64748b'
-                      }}
-                      title={m.note}
-                    >
-                      {m.note || '-'}
-                    </div>
-                  </td>
-                  <td>
-                    <div className="table-actions" style={{ gap: '8px' }}>
-                      <button
-                        type="button"
-                        className="ghost-btn-sm"
-                        onClick={() => openEditModal(m)}
-                        title="Xem chi tiết & Sửa"
-                        style={{ padding: '6px', color: '#2563eb' }}
-                      >
-                        <Eye size={18} />
-                      </button>
-                      {status !== 'Suspended' && (
-                        <button
-                          type="button"
-                          className="ghost-btn-sm"
-                          onClick={() => openRenewModal(m)}
-                          title="Gia hạn gói tập"
-                          style={{ padding: '6px', color: '#10b981' }}
-                        >
-                          <RefreshCcw size={18} />
-                        </button>
-                      )}
-                      {status === 'Suspended' ? (
-                         <button
-                           type="button"
-                           className="ghost-btn-sm"
-                           onClick={() => handleReactivate(m)}
-                           title="Kích hoạt lại"
-                           style={{ padding: '6px', color: '#8b5cf6' }}
-                         >
-                           <Plus size={18} />
-                         </button>
-                       ) : status === 'Active' && (
-                         <button
-                           type="button"
-                           className="ghost-btn-sm"
-                           onClick={() => openSuspendModal(m)}
-                           title="Bảo lưu gói tập"
-                           style={{ padding: '6px', color: '#f59e0b' }}
-                         >
-                           <PauseCircle size={18} />
-                         </button>
-                       )}
-                      {profile?.role === 'admin' && (
-                        <button
-                          type="button"
-                          className="ghost-btn-sm"
-                          style={{ color: '#dc2626', padding: '6px' }}
-                          onClick={() => setDeletingMember(m)}
-                          title="Xóa hội viên"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <MembersTable
+        members={members}
+        loading={loading}
+        filtered={filtered}
+        activeTab={activeTab}
+        profile={profile}
+        onEditMember={openEditModal}
+        onRenewMember={openRenewModal}
+        onSuspendMember={openSuspendModal}
+        onReactivateMember={handleReactivate}
+        onDeleteMember={setDeletingMember}
+      />
 
       {showModal && (
-        <div className="modal-backdrop" onClick={() => setShowModal(false)}>
-          <div className="modal-panel" style={{ width: 'min(900px, 96vw)', maxWidth: '900px' }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0 }}>Chi tiết hội viên: {editingMember?.full_name || 'Mới'}</h3>
-              <button className="ghost-btn" onClick={() => setShowModal(false)}>Đóng</button>
-            </div>
-
-            <div className="form-grid-2" style={{ gap: '24px', alignItems: 'start' }}>
-              {/* Cột 1: Thông tin hội viên */}
-              <div className="modern-card" style={{ padding: '20px', border: '1px solid #e2e8f0' }}>
-                <h4 style={{ marginTop: 0, marginBottom: '16px', fontSize: '16px' }}>Thông tin cơ bản</h4>
-                <form className="modern-form" onSubmit={handleSubmit}>
-                  <div className="form-grid-2">
-                    <div>
-                      <label className="cell-sub">Mã HV</label>
-                      <input
-                        value={form.member_code}
-                        onChange={(e) => setForm({ ...form, member_code: e.target.value })}
-                        placeholder="Mã hội viên"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="cell-sub">Họ tên</label>
-                      <input
-                        value={form.full_name}
-                        onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                        placeholder="Họ tên hội viên"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  {!editingMember && (
-                    <>
-                      <div style={{ marginTop: '12px' }}>
-                        <label className="cell-sub">Ngày bắt đầu tập</label>
-                        <input
-                          type="date"
-                          value={form.start_date}
-                          onChange={(e) => setForm({ ...form, start_date: e.target.value })}
-                          required
-                        />
-                      </div>
-                      <div style={{ marginTop: '12px' }}>
-                        <label className="cell-sub">Loại thẻ</label>
-                        <select
-                          value={form.membership_category}
-                          onChange={(e) => handleFormChange('membership_category', e.target.value)}
-                        >
-                          <option value="normal">Thường</option>
-                          <option value="couple">Couple</option>
-                          <option value="team">Team</option>
-                        </select>
-                      </div>
-                      <div className="form-grid-2" style={{ marginTop: '12px' }}>
-                        <div>
-                          <label className="cell-sub">Gói (tháng)</label>
-                          <input
-                            type="number"
-                            value={form.package_type}
-                            onChange={(e) => handleFormChange('package_type', e.target.value)}
-                            placeholder="Gói (tháng)"
-                            required
-                          />
-                        </div>
-                        <div>
-                          <label className="cell-sub">Học phí</label>
-                          <input
-                            type="number"
-                            value={form.fee}
-                            onChange={(e) => handleFormChange('fee', e.target.value)}
-                            placeholder="Học phí"
-                            required
-                          />
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {!editingMember && (
-                    <div>
-                      <label className="cell-sub">Hình thức thanh toán</label>
-                      <select
-                        value={form.payment_method}
-                        onChange={(e) => setForm({ ...form, payment_method: e.target.value })}
-                      >
-                        <option value="TM">TM - Tiền mặt</option>
-                        <option value="CK">CK - Chuyển khoản</option>
-                      </select>
-                    </div>
-                  )}
-
-                  <div style={{
-                    marginTop: '12px',
-                    padding: '10px 14px',
-                    background: '#f8fafc',
-                    borderRadius: '10px',
-                    border: '1px solid #e2e8f0',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px'
-                  }}>
-                    <input
-                      type="checkbox"
-                      id="fingerprint_status"
-                      checked={form.fingerprint_status}
-                      onChange={(e) => setForm({ ...form, fingerprint_status: e.target.checked })}
-                      disabled={editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true')}
-                      style={{ width: '20px', height: '20px', cursor: (editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true')) ? 'not-allowed' : 'pointer', accentColor: '#2563eb' }}
-                    />
-                    <label
-                      htmlFor="fingerprint_status"
-                      style={{
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        color: (editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true')) ? '#94a3b8' : '#334155',
-                        cursor: (editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true')) ? 'not-allowed' : 'pointer',
-                        userSelect: 'none',
-                        margin: 0
-                      }}
-                    >
-                      {editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true')
-                        ? 'Đã đăng ký vân tay (Đã thiết lập)'
-                        : 'Đã đăng ký vân tay'}
-                    </label>
-                  </div>
-
-                  <div style={{ marginTop: '8px' }}>
-                    <label className="cell-sub">Ghi chú</label>
-                    <textarea
-                      rows={3}
-                      value={form.note}
-                      onChange={(e) => setForm({ ...form, note: e.target.value })}
-                      placeholder="Ghi chú"
-                    />
-                  </div>
-
-                  <div className="modal-actions" style={{ marginTop: '16px' }}>
-                    <button type="submit" className="primary-btn" style={{ width: '100%' }}>
-                      {editingMember ? 'Cập nhật thông tin' : 'Tạo hội viên mới'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-
-              {/* Cột 2: Lịch sử gia hạn */}
-              <div className="modern-card" style={{ padding: '20px', border: '1px solid #e2e8f0', flex: 1 }}>
-                <h4 style={{ marginTop: 0, marginBottom: '16px', fontSize: '16px' }}>Lịch sử gia hạn & Hoạt động</h4>
-
-                <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
-                  {editingMember ? (
-                    <div className="modern-table-wrap" style={{ border: 'none' }}>
-                      <table className="modern-table" style={{ minWidth: '100%' }}>
-                        <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-                          <tr>
-                            <th>Ngày</th>
-                            <th>Hành động</th>
-                            <th>Chi tiết gói</th>
-                            {profile?.role === 'admin' && <th>Nhân viên</th>}
-                            {profile?.role === 'admin' && <th>Thanh toán</th>}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {historyLoading ? (
-                            <tr><td colSpan={profile?.role === 'admin' ? 5 : 3} className="table-empty-cell">Đang tải...</td></tr>
-                          ) : historyLogs.length === 0 ? (
-                            <tr><td colSpan={profile?.role === 'admin' ? 5 : 3} className="table-empty-cell">Chưa có lịch sử</td></tr>
-                          ) : historyLogs.map(log => (
-                            <tr key={log.id} style={{ fontSize: '12px' }}>
-                              <td>{formatDate(log.created_at)}</td>
-                              <td>
-                                <strong style={{ color: '#0f172a' }}>
-                                  {log.action === 'CREATE' && '🆕 Đăng ký'}
-                                  {log.action === 'RENEW' && '⏳ Gia hạn'}
-                                  {log.action === 'UPDATE' && '📝 Sửa'}
-                                  {log.action === 'VERIFY_PAYMENT' && '✅ Duyệt'}
-                                </strong>
-                              </td>
-                              <td>
-                                {log.package_type && (
-                                  <div>{log.package_type} th - {Number(log.fee || 0).toLocaleString()}đ</div>
-                                )}
-                                <div className="cell-sub">{log.note}</div>
-                              </td>
-                              {profile?.role === 'admin' && (
-                                <td>{log.staff_members?.full_name || log.profiles?.full_name || 'Hệ thống'}</td>
-                              )}
-                              {profile?.role === 'admin' && (
-                                <td>
-                                  {log.payment_method === 'CK' && !log.is_payment_verified ? (
-                                    <button
-                                      className="primary-btn"
-                                      style={{ background: '#f59e0b', padding: '6px 10px', fontSize: '11px' }}
-                                      onClick={() => handleLogVerification(log)}
-                                    >
-                                      Duyệt CK
-                                    </button>
-                                  ) : log.payment_method === 'CK' ? (
-                                    <span style={{ color: '#16a34a', fontWeight: 'bold' }}>✓ Đã duyệt</span>
-                                  ) : log.payment_method === 'TM' ? (
-                                    <span style={{ color: '#64748b' }}>Tiền mặt</span>
-                                  ) : null}
-                                </td>
-                              )}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <div className="modern-info">Lịch sử sẽ hiển thị sau khi hội viên được tạo.</div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <MemberFormModal
+          editingMember={editingMember}
+          form={form}
+          onFormChange={handleFormChange}
+          onSubmit={handleSubmit}
+          onCancel={() => setShowModal(false)}
+          historyLogs={historyLogs}
+          historyLoading={historyLoading}
+          profile={profile}
+          onLogVerification={handleLogVerification}
+        />
       )}
 
       {showRenewModal && (
-        <div className="modal-backdrop" onClick={() => setShowRenewModal(false)}>
-          <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
-            <h3>Gia hạn hội viên: {renewingMember?.full_name}</h3>
-            <form className="modern-form" onSubmit={handleRenew}>
-              <div>
-                <label className="cell-sub">Loại thẻ</label>
-                <select
-                  value={renewForm.membership_category}
-                  onChange={(e) => handleRenewFormChange('membership_category', e.target.value)}
-                >
-                  <option value="normal">Thường</option>
-                  <option value="couple">Couple</option>
-                  <option value="team">Team</option>
-                </select>
-              </div>
-              <div className="form-grid-2" style={{ marginTop: '12px' }}>
-                <div>
-                  <label className="cell-sub">Gói (tháng)</label>
-                  <input
-                    type="number"
-                    value={renewForm.package_type}
-                    onChange={(e) => handleRenewFormChange('package_type', e.target.value)}
-                    placeholder="Gói (tháng)"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="cell-sub">Học phí</label>
-                  <input
-                    type="number"
-                    value={renewForm.fee}
-                    onChange={(e) => handleRenewFormChange('fee', e.target.value)}
-                    placeholder="Học phí"
-                    required
-                  />
-                </div>
-              </div>
-              <div style={{ marginTop: '12px' }}>
-                <label className="cell-sub">Hình thức thanh toán</label>
-                <select
-                  value={renewForm.payment_method}
-                  onChange={(e) => setRenewForm({ ...renewForm, payment_method: e.target.value })}
-                >
-                  <option value="TM">TM - Tiền mặt</option>
-                  <option value="CK">CK - Chuyển khoản</option>
-                </select>
-              </div>
-              <div className="modal-actions" style={{ marginTop: '16px' }}>
-                <button type="button" className="ghost-btn" onClick={() => setShowRenewModal(false)}>Hủy</button>
-                <button type="submit" className="primary-btn">Xác nhận gia hạn</button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <RenewModal
+          member={renewingMember}
+          renewForm={renewForm}
+          onFormChange={handleRenewFormChange}
+          onSubmit={handleRenew}
+          onCancel={() => setShowRenewModal(false)}
+        />
       )}
 
-      {/* Modal xác nhận xóa hội viên */}
       {deletingMember && (
-        <div className="modal-backdrop" onClick={() => setDeletingMember(null)}>
-          <div className="modal-panel" style={{ maxWidth: '380px' }} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ color: '#dc2626' }}>Xác nhận xóa hội viên</h3>
-            <p>
-              Bạn có chắc muốn xóa hội viên <strong>{deletingMember.full_name}</strong> ({deletingMember.member_code})?
-              Hành động này sẽ ẩn hội viên khỏi danh sách quản lý.
-            </p>
-            <div className="modal-actions">
-              <button type="button" className="ghost-btn" onClick={() => setDeletingMember(null)}>Hủy</button>
-              <button
-                type="button"
-                className="primary-btn"
-                style={{ background: '#dc2626' }}
-                onClick={handleConfirmDelete}
-              >
-                Xác nhận xóa
-              </button>
-            </div>
-          </div>
-        </div>
+        <DeleteConfirmModal
+          member={deletingMember}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeletingMember(null)}
+        />
       )}
 
-       {/* Modal bảo lưu */}
-       {showSuspendModal && (
-         <div className="modal-backdrop" onClick={() => setShowSuspendModal(false)}>
-           <div className="modal-panel" style={{ maxWidth: '400px' }} onClick={(e) => e.stopPropagation()}>
-             <h3 style={{ color: '#f59e0b' }}>Bảo lưu hội viên</h3>
-             <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '20px' }}>
-               Hội viên <strong>{suspendingMember?.full_name}</strong> sẽ được tạm dừng gói tập từ hôm nay.
-             </p>
-             <div className="modern-info" style={{ background: '#fffbeb', border: '1px solid #fef3c7', marginBottom: '20px' }}>
-               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                 <span>Ngày hết hạn hiện tại:</span>
-                 <strong>{formatDate(suspendInfo.endDate)}</strong>
-               </div>
-               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                 <span>Số ngày còn lại:</span>
-                 <strong style={{ color: '#b45309', fontSize: '18px' }}>{suspendInfo.remainingDays} ngày</strong>
-               </div>
-             </div>
-             <p style={{ fontSize: '12px', color: '#94a3b8' }}>
-               * Lưu ý: Sau khi bảo lưu, hội viên sẽ không thể check-in cho đến khi được kích hoạt lại.
-             </p>
-             <div className="modal-actions" style={{ marginTop: '24px' }}>
-               <button type="button" className="ghost-btn" onClick={() => setShowSuspendModal(false)}>Hủy</button>
-               <button
-                 type="button"
-                 className="primary-btn"
-                 style={{ background: '#f59e0b' }}
-                 onClick={handleSuspendConfirm}
-               >
-                 Xác nhận bảo lưu
-               </button>
-             </div>
-           </div>
-         </div>
-       )}
+      {showSuspendModal && (
+        <SuspendModal
+          member={suspendingMember}
+          suspendInfo={suspendInfo}
+          onConfirm={handleSuspendConfirm}
+          onCancel={() => setShowSuspendModal(false)}
+        />
+      )}
     </div>
   );
 }

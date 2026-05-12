@@ -48,7 +48,9 @@ export default function Sidebar({ isOpen, onClose }) {
             <Link
               key={item.path}
               to={item.path}
-              onClick={onClose}
+              onClick={() => {
+                if (window.innerWidth < 768) onClose();
+              }}
               className={`side-nav-item ${active ? 'active' : ''}`}
             >
               <Icon size={18} />
