@@ -178,7 +178,7 @@ export const memberService = {
     return { member: result.member || result, payment: { id: result.payment_id } };
   },
 
-  async verifyLogPayment(logId, staffId) {
+  async verifyLogPayment(logId, staffId, staffMemberId = null) {
     const { data: log, error: logError } = await supabase
       .from('member_logs')
       .select('*')
@@ -195,6 +195,7 @@ export const memberService = {
     const { data, error } = await supabase.rpc('verify_payment_atomic', {
       p_payment_id: paymentId,
       p_admin_id: staffId,
+      p_staff_member_id: staffMemberId,
       p_verified_at: new Date().toISOString()
     });
 

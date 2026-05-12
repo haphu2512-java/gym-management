@@ -121,8 +121,7 @@ export default function Members() {
     if (!window.confirm(`Xác nhận đã nhận đủ ${Number(log.fee || 0).toLocaleString()}đ chuyển khoản cho lần gia hạn này?`)) return;
 
     try {
-      const effectiveStaffId = activeStaff?.id || user?.id;
-      await memberService.verifyLogPayment(log.id, effectiveStaffId);
+      await memberService.verifyLogPayment(log.id, user?.id, activeStaff?.id);
 
       setHistoryLogs(prevLogs =>
         prevLogs.map(l => l.id === log.id ? { ...l, is_payment_verified: true } : l)
@@ -140,7 +139,8 @@ export default function Members() {
       }
 
       await staffLogService.logAction({
-        staffId: effectiveStaffId,
+        staffId: user?.id,
+        staffMemberId: activeStaff?.id,
         action: 'Duyệt thanh toán CK',
         targetItem: `Gia hạn ID: ${log.id}`,
         details: { log_id: log.id, member_id: log.member_id },

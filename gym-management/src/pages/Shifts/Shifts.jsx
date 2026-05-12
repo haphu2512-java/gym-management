@@ -131,7 +131,7 @@ export default function Shifts() {
     if (activeShift) {
       calculateHandoverCash(activeShift).then(setSuggestedEndingCash);
       expenseService.getByShift(activeShift.id).then(setExpenses).catch(() => setExpenses([]));
-      
+
       // Đồng bộ nhân viên đang trực nếu local state chưa có (Quan trọng cho Admin xem ca của nhân viên)
       if (!activeStaff && activeShift.staff_members) {
         setActiveStaff(activeShift.staff_members);
@@ -236,189 +236,212 @@ export default function Shifts() {
   };
 
   return (
-    <div className="modern-stack max-width-2">
-      <div className="modern-card">
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-          <button type="button" className={activeTab === 'shift' ? 'primary-btn' : 'ghost-btn'} onClick={() => setActiveTab('shift')}>
-            Ca truc
-          </button>
-          <button type="button" className={activeTab === 'expense' ? 'primary-btn' : 'ghost-btn'} onClick={() => setActiveTab('expense')}>
-            Chi
-          </button>
-        </div>
-        <h3 className="modern-title flex-row"><Clock size={18} /> Bàn giao ca trực</h3>
-        {activeTab === 'shift' && (
-          <form className="modern-form" onSubmit={handleSubmit}>
-            {/* Dropdown chọn nhân viên trực */}
-            <label className="field-label">Nhân viên trực</label>
-            {activeShift ? (
-              <div style={{ padding: '10px 14px', background: '#eff6ff', borderRadius: '10px', border: '1px solid #bfdbfe', fontWeight: '600', color: '#1d4ed8', marginBottom: '4px' }}>
-                👤 {activeStaff?.full_name || activeShift.staff_members?.full_name || 'Không xác định'}
-              </div>
-            ) : (
-              <select
-                value={activeStaff?.id || ''}
-                onChange={(e) => {
-                  const found = staffMembers.find(s => s.id === e.target.value);
-                  setActiveStaff(found || null);
-                }}
-                required
-              >
-                <option value="">-- Chọn nhân viên trực --</option>
-                {staffMembers.map(s => (
-                  <option key={s.id} value={s.id}>{s.full_name}</option>
-                ))}
-              </select>
-            )}
-
-            <label className="field-label">Chọn ca làm</label>
-            <select value={form.shift_name} onChange={(e) => setForm({ ...form, shift_name: e.target.value })} disabled={!!activeShift}>
-              {shiftService.shiftOptions.map((item) => (
-                <option key={item} value={item}>{item}</option>
-              ))}
-            </select>
-            {!activeShift && (() => {
-              const schedule = shiftService.shiftTimeMap?.[form.shift_name];
-              return schedule ? (
-                <small className="field-hint">
-                  ⏰ Khung giờ: <strong>{schedule.label}</strong>
-                </small>
-              ) : null;
-            })()}
-
-            <div style={{ marginBottom: '16px' }}>
-              {!activeShift ? (
-                <div>
-                  <label className="field-label">Tiền đầu ca (TM)</label>
-                  <input
-                    type="number"
-                    value={form.starting_cash}
-                    onChange={(e) => setForm({ ...form, starting_cash: e.target.value })}
-                    placeholder={previousEndingCash > 0 ? `Gợi ý: ${previousEndingCash.toLocaleString('vi-VN')}` : "Ví dụ: 500000"}
-                  />
-                  {previousEndingCash > 0 && (
-                    <small className="field-hint">
-                      Gợi ý lấy từ tiền kết ca của {previousShift?.shift_name || 'ca trước'}: {previousEndingCash.toLocaleString('vi-VN')}đ
-                    </small>
-                  )}
+    <div className="modern-stack">
+      <div className="shifts-grid-layout">
+        <div className="modern-card">
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+            <button type="button" className={activeTab === 'shift' ? 'primary-btn' : 'ghost-btn'} onClick={() => setActiveTab('shift')}>
+              Ca truc
+            </button>
+            <button type="button" className={activeTab === 'expense' ? 'primary-btn' : 'ghost-btn'} onClick={() => setActiveTab('expense')}>
+              Chi
+            </button>
+          </div>
+          <h3 className="modern-title flex-row"><Clock size={18} /> Bàn giao ca trực</h3>
+          {activeTab === 'shift' && (
+            <form className="modern-form" onSubmit={handleSubmit}>
+              {/* Dropdown chọn nhân viên trực */}
+              <label className="field-label">Nhân viên trực</label>
+              {activeShift ? (
+                <div style={{ padding: '10px 14px', background: '#eff6ff', borderRadius: '10px', border: '1px solid #bfdbfe', fontWeight: '600', color: '#1d4ed8', marginBottom: '4px' }}>
+                  👤 {activeStaff?.full_name || activeShift.staff_members?.full_name || 'Không xác định'}
                 </div>
               ) : (
-                <div>
-                  <label className="field-label">Tiền kết ca (TM)</label>
-                  <input
-                    type="number"
-                    value={form.ending_cash}
-                    onChange={(e) => setForm({ ...form, ending_cash: e.target.value })}
-                    placeholder={`Gợi ý: ${suggestedEndingCash.toLocaleString('vi-VN')}`}
-                  />
-                  {suggestedEndingCash > 0 && (
-                    <small className="field-hint">
-                      Dự kiến: {suggestedEndingCash.toLocaleString('vi-VN')}đ (Tiền đầu ca + TM hội viên + TM nước - chi)
-                    </small>
-                  )}
+                <select
+                  value={activeStaff?.id || ''}
+                  onChange={(e) => {
+                    const found = staffMembers.find(s => s.id === e.target.value);
+                    setActiveStaff(found || null);
+                  }}
+                  required
+                >
+                  <option value="">-- Chọn nhân viên trực --</option>
+                  {staffMembers.map(s => (
+                    <option key={s.id} value={s.id}>{s.full_name}</option>
+                  ))}
+                </select>
+              )}
 
-                  <label className="field-label">Ghi chú bàn giao</label>
-                  <textarea
-                    rows={3}
-                    value={form.note}
-                    onChange={(e) => setForm({ ...form, note: e.target.value })}
-                    placeholder="Ví dụ: còn nợ khách 50k..."
+              <label className="field-label">Chọn ca làm</label>
+              <select value={form.shift_name} onChange={(e) => setForm({ ...form, shift_name: e.target.value })} disabled={!!activeShift}>
+                {shiftService.shiftOptions.map((item) => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </select>
+              {!activeShift && (() => {
+                const schedule = shiftService.shiftTimeMap?.[form.shift_name];
+                return schedule ? (
+                  <small className="field-hint">
+                    ⏰ Khung giờ: <strong>{schedule.label}</strong>
+                  </small>
+                ) : null;
+              })()}
+
+              <div style={{ marginBottom: '16px' }}>
+                {!activeShift ? (
+                  <div>
+                    <label className="field-label">Tiền đầu ca (TM)</label>
+                    <input
+                      type="number"
+                      value={form.starting_cash}
+                      onChange={(e) => setForm({ ...form, starting_cash: e.target.value })}
+                      placeholder={previousEndingCash > 0 ? `Gợi ý: ${previousEndingCash.toLocaleString('vi-VN')}` : "Ví dụ: 500000"}
+                    />
+                    {previousEndingCash > 0 && (
+                      <small className="field-hint">
+                        Gợi ý lấy từ tiền kết ca của {previousShift?.shift_name || 'ca trước'}: {previousEndingCash.toLocaleString('vi-VN')}đ
+                      </small>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <label className="field-label">Tiền kết ca (TM)</label>
+                    <input
+                      type="number"
+                      value={form.ending_cash}
+                      onChange={(e) => setForm({ ...form, ending_cash: e.target.value })}
+                      placeholder={`Gợi ý: ${suggestedEndingCash.toLocaleString('vi-VN')}`}
+                    />
+                    {suggestedEndingCash > 0 && (
+                      <small className="field-hint">
+                        Dự kiến: {suggestedEndingCash.toLocaleString('vi-VN')}đ (Tiền đầu ca + TM hội viên + TM nước - chi)
+                      </small>
+                    )}
+
+                    <label className="field-label">Ghi chú bàn giao</label>
+                    <textarea
+                      rows={3}
+                      value={form.note}
+                      onChange={(e) => setForm({ ...form, note: e.target.value })}
+                      placeholder="Ví dụ: còn nợ khách 50k..."
+                    />
+                  </div>
+                )}
+              </div>
+
+              {!activeShift && profile?.role === 'admin' && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '12px',
+                  marginBottom: '20px',
+                  padding: '12px 20px',
+                  background: '#eff6ff',
+                  borderRadius: '12px',
+                  border: '1px solid #bfdbfe',
+                  width: 'fit-content',
+                  margin: '0 auto 20px auto'
+                }}>
+                  <input
+                    type="checkbox"
+                    id="skipTimeCheck"
+                    checked={skipTimeCheck}
+                    onChange={(e) => setSkipTimeCheck(e.target.checked)}
+                    style={{ width: '22px', height: '22px', cursor: 'pointer', accentColor: '#2563eb' }}
                   />
+                  <label
+                    htmlFor="skipTimeCheck"
+                    style={{
+                      fontSize: '14px',
+                      fontWeight: '700',
+                      color: '#1e40af',
+                      cursor: 'pointer',
+                      userSelect: 'none'
+                    }}
+                  >
+                    Bỏ qua giới hạn giờ (Admin override)
+                  </label>
                 </div>
               )}
-            </div>
 
-            {!activeShift && profile?.role === 'admin' && (
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                gap: '12px', 
-                marginBottom: '20px',
-                padding: '12px 20px',
-                background: '#eff6ff',
-                borderRadius: '12px',
-                border: '1px solid #bfdbfe',
-                width: 'fit-content',
-                margin: '0 auto 20px auto'
-              }}>
-                <input
-                  type="checkbox"
-                  id="skipTimeCheck"
-                  checked={skipTimeCheck}
-                  onChange={(e) => setSkipTimeCheck(e.target.checked)}
-                  style={{ width: '22px', height: '22px', cursor: 'pointer', accentColor: '#2563eb' }}
-                />
-                <label 
-                  htmlFor="skipTimeCheck" 
-                  style={{ 
-                    fontSize: '14px', 
-                    fontWeight: '700', 
-                    color: '#1e40af', 
-                    cursor: 'pointer',
-                    userSelect: 'none'
-                  }}
-                >
-                  Bỏ qua giới hạn giờ (Admin override)
-                </label>
-              </div>
-            )}
-
-            <button type="submit" className="primary-btn large">
-              {activeShift ? 'Chốt Ca Trực' : 'Mở Ca Trực'}
-            </button>
-          </form>
-        )}
-
-        {activeTab === 'expense' && (
-          <div className="modern-stack">
-            <form className="modern-form" onSubmit={handleAddExpense}>
-              <div className="form-grid-2">
-                <input
-                  type="number"
-                  value={expenseForm.amount}
-                  onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
-                  placeholder="So tien chi"
-                  required
-                />
-                <input
-                  value={expenseForm.reason}
-                  onChange={(e) => setExpenseForm({ ...expenseForm, reason: e.target.value })}
-                  placeholder="Ly do chi"
-                />
-              </div>
-              <button type="submit" className="primary-btn" disabled={!activeShift}>
-                Them khoan chi
+              <button type="submit" className="primary-btn large">
+                {activeShift ? 'Chốt Ca Trực' : 'Mở Ca Trực'}
               </button>
             </form>
-            <div className="modern-info">
-              Tong chi ca hien tai: {Number(totalExpense || 0).toLocaleString('vi-VN')}d
-            </div>
-            <div className="modern-table-wrap">
-              <table className="modern-table">
-                <thead>
-                  <tr>
-                    <th>So tien</th>
-                    <th>Ly do</th>
-                    <th>Thoi gian</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {expenses.length === 0 && (
-                    <tr><td colSpan={3} className="table-empty-cell">Chua co khoan chi</td></tr>
-                  )}
-                  {expenses.map((item) => (
-                    <tr key={item.id}>
-                      <td>{Number(item.amount || 0).toLocaleString('vi-VN')}d</td>
-                      <td>{item.reason || '-'}</td>
-                      <td>{formatDateTime(item.created_at)}</td>
+          )}
+
+          {activeTab === 'expense' && (
+            <div className="modern-stack">
+              <form className="modern-form" onSubmit={handleAddExpense}>
+                <div className="form-grid-2">
+                  <input
+                    type="number"
+                    value={expenseForm.amount}
+                    onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
+                    placeholder="So tien chi"
+                    required
+                  />
+                  <input
+                    value={expenseForm.reason}
+                    onChange={(e) => setExpenseForm({ ...expenseForm, reason: e.target.value })}
+                    placeholder="Ly do chi"
+                  />
+                </div>
+                <button type="submit" className="primary-btn" disabled={!activeShift}>
+                  Them khoan chi
+                </button>
+              </form>
+              <div className="modern-info">
+                Tong chi ca hien tai: {Number(totalExpense || 0).toLocaleString('vi-VN')}d
+              </div>
+              <div className="modern-table-wrap">
+                <table className="modern-table">
+                  <thead>
+                    <tr>
+                      <th>So tien</th>
+                      <th>Ly do</th>
+                      <th>Thoi gian</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {expenses.length === 0 && (
+                      <tr><td colSpan={2} className="table-empty-cell">Chua co khoan chi</td></tr>
+                    )}
+                    {expenses.map((item) => (
+                      <tr key={item.id}>
+                        <td>{Number(item.amount || 0).toLocaleString('vi-VN')}d</td>
+                        <td>{item.reason || '-'}</td>
+                        <td>{formatDateTime(item.created_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
+          )}
+        </div>
+
+        <div className="modern-card notes-panel">
+          <h3 className="modern-title flex-row" style={{ color: '#92400e' }}>📜 Nhật ký bàn giao</h3>
+          <div className="notes-list">
+            {shifts.filter(s => s.note).map((s) => (
+              <div key={s.id} className="note-item">
+                <div className="note-header">
+                  <strong>{s.shift_name}</strong>
+                  <span>{formatDateTime(s.start_time)}</span>
+                </div>
+                <div className="note-staff">
+                  👤 {s.staff_members?.full_name || 'Hệ thống'} {s.status === 'open' && <span className="status-badge active">Đang trực</span>}
+                </div>
+                <p className="note-content">{s.note}</p>
+              </div>
+            ))}
+            {shifts.filter(s => s.note).length === 0 && (
+              <div className="muted-text" style={{ textAlign: 'center', padding: '20px' }}>Chưa có ghi chú nào</div>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
       {error && <div className="modern-error">{error}</div>}

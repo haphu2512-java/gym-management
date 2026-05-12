@@ -109,6 +109,7 @@ CREATE TABLE IF NOT EXISTS payment_logs (
   payment_type TEXT CHECK (payment_type IN ('new', 'renew')),
   is_verified BOOLEAN DEFAULT TRUE,
   verified_by UUID REFERENCES profiles(id),
+  verified_by_member UUID REFERENCES staff_members(id),
   verified_at TIMESTAMP WITH TIME ZONE,
   note TEXT,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL
@@ -168,12 +169,22 @@ WHERE m.deleted_at IS NULL;
 -- ============================================================
 
 -- A. Duyệt thanh toán CK (Atomic)
-CREATE OR REPLACE FUNCTION verify_payment_atomic(p_payment_id UUID, p_admin_id UUID, p_verified_at TIMESTAMP WITH TIME ZONE DEFAULT NOW())
+CREATE OR REPLACE FUNCTION verify_payment_atomic(
+  p_payment_id UUID, 
+  p_admin_id UUID, 
+  p_staff_member_id UUID DEFAULT NULL,
+  p_verified_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+)
 RETURNS JSON AS $$
 DECLARE
   v_updated_id UUID; v_member_id UUID; v_already_verified BOOLEAN := FALSE;
 BEGIN
-  UPDATE payment_logs SET is_verified = true, verified_by = p_admin_id, verified_at = p_verified_at
+  UPDATE payment_logs 
+  SET 
+    is_verified = true, 
+    verified_by = p_admin_id, 
+    verified_by_member = p_staff_member_id,
+    verified_at = p_verified_at
   WHERE id = p_payment_id AND (is_verified = false OR is_verified IS NULL) AND payment_method = 'CK'
   RETURNING id, member_id INTO v_updated_id, v_member_id;
 
@@ -182,11 +193,13 @@ BEGIN
     IF v_member_id IS NULL THEN RETURN json_build_object('success', false, 'error', 'Không tìm thấy thanh toán.'); END IF;
   END IF;
 
-  UPDATE member_logs SET is_payment_verified = true WHERE member_id = v_member_id AND (details->>'payment_id' = p_payment_id::text);
+  UPDATE member_logs 
+  SET is_payment_verified = true 
+  WHERE member_id = v_member_id AND (details->>'payment_id' = p_payment_id::text);
   
   IF v_already_verified = FALSE OR v_updated_id IS NOT NULL THEN
-    INSERT INTO member_logs (member_id, staff_id, action, is_payment_verified, note, created_at)
-    VALUES (v_member_id, p_admin_id, 'VERIFY_PAYMENT', true, 'Admin duyệt thanh toán', p_verified_at);
+    INSERT INTO member_logs (member_id, staff_id, staff_member_id, action, is_payment_verified, note, created_at)
+    VALUES (v_member_id, p_admin_id, p_staff_member_id, 'VERIFY_PAYMENT', true, 'Admin duyệt thanh toán', p_verified_at);
   END IF;
   RETURN json_build_object('success', true);
 END;

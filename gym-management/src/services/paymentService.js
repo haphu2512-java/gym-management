@@ -39,11 +39,12 @@ export const paymentService = {
     return data;
   },
 
-  async verifyPayment(paymentId, adminId) {
+  async verifyPayment(paymentId, adminId, staffMemberId = null) {
     // Use atomic verification function
     const { data, error } = await supabase.rpc('verify_payment_atomic', {
       p_payment_id: paymentId,
       p_admin_id: adminId,
+      p_staff_member_id: staffMemberId,
       p_verified_at: new Date().toISOString()
     });
 
