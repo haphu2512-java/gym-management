@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS member_logs (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   member_id UUID REFERENCES members(id) ON DELETE CASCADE,
   staff_id UUID REFERENCES profiles(id),
-  action TEXT NOT NULL, -- 'CREATE', 'UPDATE', 'RENEW', 'VERIFY_PAYMENT'
+  action TEXT NOT NULL, -- 'CREATE', 'UPDATE', 'RENEW', 'VERIFY_PAYMENT', 'SUSPEND', 'REACTIVATE'
   
   -- Thông tin gói tập tại thời điểm log
   package_type INT,
@@ -96,12 +96,15 @@ CREATE TABLE IF NOT EXISTS member_logs (
   end_date DATE,
   fee NUMERIC,
   payment_method TEXT CHECK (payment_method IN ('TM', 'CK')),
-  is_payment_verified BOOLEAN DEFAULT FALSE,
+  is_payment_verified BOOLEAN DEFAULT NULL, -- Đổi từ FALSE thành NULL để tránh đè trạng thái
 
   details JSONB,        -- { "old": ..., "new": ... }
   note TEXT,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
+
+-- Cập nhật cấu trúc nếu đã tồn tại
+ALTER TABLE member_logs ALTER COLUMN is_payment_verified SET DEFAULT NULL;
 
 -- View để lấy trạng thái hiện tại của hội viên (Ưu tiên lấy từ Log Gia hạn/Tạo mới)
 CREATE OR REPLACE VIEW member_current_status AS
@@ -127,7 +130,7 @@ LatestStatus AS (
       is_payment_verified,
       created_at
     FROM member_logs
-    WHERE is_payment_verified IS NOT NULL
+    WHERE is_payment_verified IS NOT NULL -- NULL sẽ bị bỏ qua, không làm sai lệch trạng thái
     ORDER BY member_id, created_at DESC
 )
 SELECT 
@@ -150,6 +153,65 @@ FROM members m
 LEFT JOIN LatestPackage lp ON m.id = lp.member_id
 LEFT JOIN LatestStatus ls ON m.id = ls.member_id
 WHERE m.deleted_at IS NULL;
+
+-- Atomic payment verification
+CREATE OR REPLACE FUNCTION verify_payment_atomic(
+  p_payment_id UUID,
+  p_admin_id UUID,
+  p_verified_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+)
+RETURNS JSON AS $$
+DECLARE
+  v_updated_id UUID;
+  v_member_id UUID;
+  v_already_verified BOOLEAN := FALSE;
+BEGIN
+  -- 1. Thử update payment_logs
+  UPDATE payment_logs
+  SET
+    is_verified = true,
+    verified_by = p_admin_id,
+    verified_at = p_verified_at
+  WHERE
+    id = p_payment_id
+    AND (is_verified = false OR is_verified IS NULL)
+    AND payment_method = 'CK'
+  RETURNING id, member_id INTO v_updated_id, v_member_id;
+
+  -- 2. Nếu không update được, kiểm tra xem có phải đã duyệt rồi không
+  IF v_updated_id IS NULL THEN
+    SELECT member_id, is_verified INTO v_member_id, v_already_verified 
+    FROM payment_logs WHERE id = p_payment_id;
+    
+    IF v_member_id IS NULL THEN
+      RETURN json_build_object('success', false, 'error', 'Không tìm thấy bản ghi thanh toán.');
+    END IF;
+    
+    -- Nếu đã duyệt rồi, chúng ta vẫn tiếp tục để đồng bộ hóa bảng member_logs (Fix lỗi lệch pha)
+  END IF;
+
+  -- 3. Cập nhật log gốc (CREATE/RENEW) liên quan đến payment này
+  UPDATE member_logs
+  SET is_payment_verified = true
+  WHERE member_id = v_member_id
+    AND (details->>'payment_id' = p_payment_id::text);
+
+  -- 4. Nếu chưa được đánh dấu là đã duyệt trước đó, tạo thêm log VERIFY_PAYMENT
+  IF v_already_verified = FALSE OR v_updated_id IS NOT NULL THEN
+    INSERT INTO member_logs (member_id, staff_id, action, is_payment_verified, note, created_at)
+    VALUES (v_member_id, p_admin_id, 'VERIFY_PAYMENT', true, 'Admin duyệt thanh toán chuyển khoản', p_verified_at);
+
+    INSERT INTO staff_logs (staff_id, action, target_item, details, created_at)
+    VALUES (p_admin_id, 'Xác thực thanh toán', 'Payment #' || p_payment_id,
+            json_build_object('payment_id', p_payment_id, 'member_id', v_member_id),
+            p_verified_at);
+  END IF;
+
+  RETURN json_build_object('success', true, 'payment_id', p_payment_id);
+EXCEPTION WHEN OTHERS THEN
+  RETURN json_build_object('success', false, 'error', SQLERRM);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- 9. Cấu hình lương theo ca
 CREATE TABLE IF NOT EXISTS salary_configs (
@@ -543,7 +605,7 @@ BEGIN
     p_member_id, p_staff_id, 'RENEW',
     p_package_type, p_membership_category, p_start_date, v_end_date, p_fee, p_payment_method, v_is_verified,
     json_build_object('payment_id', v_payment_id),
-    json_build_object('message', 'Gia han goi tap'),
+    'Gia hạn gói tập',
     p_created_at
   );
 
@@ -574,6 +636,7 @@ DECLARE
   v_member_id UUID;
 BEGIN
   -- 1. Update payment_logs
+  -- Chạy với SECURITY DEFINER để đảm bảo Admin có thể update bất kể RLS
   UPDATE payment_logs
   SET
     is_verified = true,
@@ -581,25 +644,30 @@ BEGIN
     verified_at = p_verified_at
   WHERE
     id = p_payment_id
-    AND is_verified = false  -- Only if not already verified
-    AND payment_method = 'CK'  -- Only for bank transfers
+    AND (is_verified = false OR is_verified IS NULL) -- Chấp nhận cả NULL
+    AND payment_method = 'CK'
   RETURNING id, member_id INTO v_updated_id, v_member_id;
 
+  -- Nếu không update được, kiểm tra xem có phải đã duyệt rồi không
   IF v_updated_id IS NULL THEN
-    RETURN json_build_object('success', false, 'error', 'Payment already verified or not found');
+    IF EXISTS (SELECT 1 FROM payment_logs WHERE id = p_payment_id AND is_verified = true) THEN
+      RETURN json_build_object('success', false, 'error', 'Thanh toán này đã được duyệt trước đó.');
+    ELSE
+      RETURN json_build_object('success', false, 'error', 'Không tìm thấy bản ghi thanh toán phù hợp.');
+    END IF;
   END IF;
 
-  -- 2. Update the original log entry (CREATE/RENEW) for consistency
+  -- 2. Cập nhật log gốc (CREATE/RENEW) để đồng bộ trạng thái
   UPDATE member_logs
   SET is_payment_verified = true
   WHERE member_id = v_member_id
     AND (details->>'payment_id' = p_payment_id::text);
 
-  -- 3. Create verification log in member_logs (For audit trail and to update current status view)
+  -- 3. Tạo log VERIFY_PAYMENT để View current_status cập nhật ngay
   INSERT INTO member_logs (member_id, staff_id, action, is_payment_verified, note, created_at)
   VALUES (v_member_id, p_admin_id, 'VERIFY_PAYMENT', true, 'Admin duyệt thanh toán chuyển khoản', p_verified_at);
 
-  -- 4. Log verification in staff_logs
+  -- 4. Log vào staff_logs
   INSERT INTO staff_logs (staff_id, action, target_item, details, created_at)
   VALUES (p_admin_id, 'Xác thực thanh toán', 'Payment #' || p_payment_id,
           json_build_object('payment_id', p_payment_id, 'member_id', v_member_id),
@@ -609,7 +677,7 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RETURN json_build_object('success', false, 'error', SQLERRM);
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER; -- Thêm SECURITY DEFINER ở đây
 
 -- ===========================================
 -- SOFT DELETE COLUMNS

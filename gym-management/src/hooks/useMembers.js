@@ -54,9 +54,9 @@ export function useMembers() {
     }
   };
 
-  const suspendMember = async (id, staffId, remainingDays) => {
+  const suspendMember = async (id, staffId) => {
     try {
-      await memberService.suspendMember(id, staffId, remainingDays);
+      await memberService.suspendMember(id, staffId);
       await fetchMembers();
     } catch (err) {
       setError(err.message);

@@ -3,6 +3,7 @@ ALTER TABLE members ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMP WITH TIME ZO
 ALTER TABLE members ADD COLUMN IF NOT EXISTS remaining_days INT;
 
 -- 2. Cập nhật View để lấy thêm thông tin bảo lưu
+DROP VIEW IF EXISTS member_current_status CASCADE;
 CREATE OR REPLACE VIEW member_current_status AS
 WITH LatestPackage AS (
     SELECT DISTINCT ON (member_id)
@@ -54,23 +55,64 @@ WHERE m.deleted_at IS NULL;
 CREATE OR REPLACE FUNCTION suspend_member(
   p_member_id UUID,
   p_staff_id UUID,
-  p_remaining_days INT,
   p_suspended_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 )
 RETURNS JSON AS $$
+DECLARE
+  v_end_date DATE;
+  v_remaining_days INT;
 BEGIN
+  -- 1. Lấy ngày hết hạn hiện tại từ log gói tập gần nhất
+  SELECT end_date INTO v_end_date
+  FROM member_logs
+  WHERE member_id = p_member_id AND package_type IS NOT NULL
+  ORDER BY created_at DESC LIMIT 1;
+
+  IF v_end_date IS NULL THEN
+    RETURN json_build_object('success', false, 'error', 'Hội viên không có gói tập để bảo lưu');
+  END IF;
+
+  -- 2. Tính số ngày còn lại (bao gồm cả ngày hôm nay)
+  -- Sử dụng múi giờ Việt Nam để đồng bộ với nghiệp vụ tại quầy
+  v_remaining_days := v_end_date - (p_suspended_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::DATE;
+
+  -- 3. Kiểm tra điều kiện 13 ngày
+  IF v_remaining_days < 13 THEN
+    RETURN json_build_object(
+      'success', false, 
+      'error', 'Chỉ hội viên còn từ 13 ngày tập trở lên mới được bảo lưu. Hiện tại chỉ còn ' || v_remaining_days || ' ngày.'
+    );
+  END IF;
+
+  -- 4. Kiểm tra xem đã bảo lưu chưa
+  IF EXISTS (SELECT 1 FROM members WHERE id = p_member_id AND suspended_at IS NOT NULL) THEN
+    RETURN json_build_object('success', false, 'error', 'Hội viên này đã ở trạng thái bảo lưu');
+  END IF;
+
+  -- 5. Cập nhật bảng members
   UPDATE members 
   SET 
     suspended_at = p_suspended_at,
-    remaining_days = p_remaining_days
+    remaining_days = v_remaining_days
   WHERE id = p_member_id;
 
+  -- 6. Lưu log hành động
   INSERT INTO member_logs (member_id, staff_id, action, details, note, created_at)
   VALUES (p_member_id, p_staff_id, 'SUSPEND', 
-          json_build_object('remaining_days', p_remaining_days, 'suspended_at', p_suspended_at),
-          'Bảo lưu hội viên', p_suspended_at);
+          json_build_object(
+            'remaining_days', v_remaining_days, 
+            'suspended_at', p_suspended_at,
+            'original_end_date', v_end_date
+          ),
+          'Bảo lưu hội viên (còn ' || v_remaining_days || ' ngày)', p_suspended_at);
 
-  RETURN json_build_object('success', true);
+  -- 7. Ghi vào nhật ký hoạt động (staff_logs) để hiện lên màn hình Admin
+  INSERT INTO staff_logs (staff_id, action, target_item, details, created_at)
+  VALUES (p_staff_id, 'Bảo lưu hội viên', (SELECT full_name FROM members WHERE id = p_member_id),
+          json_build_object('member_id', p_member_id, 'remaining_days', v_remaining_days),
+          p_suspended_at);
+
+  RETURN json_build_object('success', true, 'remaining_days', v_remaining_days);
 END;
 $$ LANGUAGE plpgsql;
 
@@ -119,6 +161,12 @@ BEGIN
     v_last_pkg.fee, v_last_pkg.payment_method, TRUE,
     'Kích hoạt lại sau bảo lưu', p_reactivated_at
   );
+
+  -- Ghi vào nhật ký hoạt động (staff_logs)
+  INSERT INTO staff_logs (staff_id, action, target_item, details, created_at)
+  VALUES (p_staff_id, 'Kích hoạt lại hội viên', (SELECT full_name FROM members WHERE id = p_member_id),
+          json_build_object('member_id', p_member_id, 'new_end_date', v_new_end_date),
+          p_reactivated_at);
 
   RETURN json_build_object('success', true, 'new_end_date', v_new_end_date);
 END;

@@ -86,9 +86,10 @@ export default function Shifts() {
     loadShifts();
   }, []);
 
+  // Tìm bất kỳ ca nào đang mở (không lọc theo tên dropdown)
   const activeShift = useMemo(
-    () => shifts.find((s) => s.shift_name === form.shift_name && s.status === 'open') || null,
-    [shifts, form.shift_name],
+    () => shifts.find((s) => s.status === 'open') || null,
+    [shifts],
   );
 
   const previousShift = useMemo(
@@ -161,9 +162,10 @@ export default function Shifts() {
       });
 
       setExpenseForm({ amount: '', reason: '' });
+      // Bug fix: truyền activeShift object, không phải activeShift.id
       const [rows, suggested] = await Promise.all([
         expenseService.getByShift(activeShift.id),
-        calculateHandoverCash(activeShift.id),
+        calculateHandoverCash(activeShift),
       ]);
       setExpenses(rows);
       setSuggestedEndingCash(suggested);

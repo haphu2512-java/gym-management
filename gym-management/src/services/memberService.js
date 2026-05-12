@@ -221,14 +221,14 @@ export const memberService = {
     }
   },
 
-  async suspendMember(id, staffId, remainingDays) {
+  async suspendMember(id, staffId) {
     const { data, error } = await supabase.rpc('suspend_member', {
       p_member_id: id,
-      p_staff_id: staffId,
-      p_remaining_days: remainingDays
+      p_staff_id: staffId
     });
 
     if (error) throw new Error('Bảo lưu thất bại: ' + error.message);
+    if (data?.success === false) throw new Error(data.error || 'Bảo lưu thất bại');
     return data;
   },
 

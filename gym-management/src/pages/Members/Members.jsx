@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { CreditCard, Plus, Search, Eye, Trash2 } from 'lucide-react';
+import { CreditCard, Plus, Search, Eye, Trash2, RefreshCcw, PauseCircle } from 'lucide-react';
 import { useMembers } from '../../hooks/useMembers';
 import { memberService } from '../../services/memberService';
 import { staffLogService } from '../../services/staffLogService';
@@ -352,8 +352,18 @@ export default function Members() {
   const openSuspendModal = (member) => {
     const today = new Date();
     const expDate = new Date(member.end_date);
+    
+    // Đặt giờ về 0 để so sánh ngày chính xác
+    today.setHours(0,0,0,0);
+    expDate.setHours(0,0,0,0);
+    
     const diffTime = expDate - today;
     const diffDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+
+    if (diffDays < 13) {
+      alert(`Không thể bảo lưu. Hội viên chỉ còn ${diffDays} ngày tập (yêu cầu tối thiểu 13 ngày).`);
+      return;
+    }
 
     setSuspendingMember(member);
     setSuspendInfo({ remainingDays: diffDays, endDate: member.end_date });
@@ -363,7 +373,7 @@ export default function Members() {
   const handleSuspendConfirm = async () => {
     if (!suspendingMember) return;
     try {
-      await suspendMember(suspendingMember.id, user.id, suspendInfo.remainingDays);
+      await suspendMember(suspendingMember.id, user.id);
       setShowSuspendModal(false);
       setSuspendingMember(null);
     } catch (err) {
@@ -529,6 +539,17 @@ export default function Members() {
                       >
                         <Eye size={18} />
                       </button>
+                      {status !== 'Suspended' && (
+                        <button
+                          type="button"
+                          className="ghost-btn-sm"
+                          onClick={() => openRenewModal(m)}
+                          title="Gia hạn gói tập"
+                          style={{ padding: '6px', color: '#10b981' }}
+                        >
+                          <RefreshCcw size={18} />
+                        </button>
+                      )}
                       {status === 'Suspended' ? (
                          <button
                            type="button"
@@ -547,7 +568,7 @@ export default function Members() {
                            title="Bảo lưu gói tập"
                            style={{ padding: '6px', color: '#f59e0b' }}
                          >
-                           <CreditCard size={18} style={{ opacity: 0.7 }} />
+                           <PauseCircle size={18} />
                          </button>
                        )}
                       {profile?.role === 'admin' && (
