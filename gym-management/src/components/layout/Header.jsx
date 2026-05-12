@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useState, useEffect } from 'react';
 import { shiftService } from '../../services/shiftService';
 import { formatDate } from '../../utils/formatters';
+import logo from '../../assets/logo.png';
 
 const titleMap = {
   '/dashboard': 'Tổng quan hệ thống',
@@ -49,7 +50,10 @@ export default function Header({ onMenuToggle }) {
   return (
     <header className="modern-header">
       <div className="mobile-topbar">
-        <h1>MAX POWER</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <img src={logo} alt="Logo" style={{ width: '32px', height: 'auto', borderRadius: '6px' }} />
+          <h1 style={{ fontSize: '18px' }}>MAX POWER</h1>
+        </div>
         <button type="button" onClick={onMenuToggle}>
           <LayoutDashboard size={18} />
         </button>

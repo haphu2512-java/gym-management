@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Clock, Droplets, LayoutDashboard, LogOut, Users, WalletCards, ScrollText, TrendingUp } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
+import logo from '../../assets/logo.png';
 
 const icons = {
   dashboard: LayoutDashboard,
@@ -35,6 +36,7 @@ export default function Sidebar({ isOpen, onClose }) {
   return (
     <aside className={`modern-sidebar ${isOpen ? 'open' : ''}`}>
       <div className="sidebar-brand">
+        <img src={logo} alt="Max Power Gym" style={{ width: '80px', height: 'auto', marginBottom: '12px', display: 'block', borderRadius: '12px' }} />
         <h1>MAX POWER GYM</h1>
         <p>Management System</p>
       </div>

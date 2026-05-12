@@ -1,4 +1,5 @@
 import { formatDate } from '../../utils/formatters';
+import logo from '../../assets/logo.png';
 
 function calculateFee(category, packageType) {
   const PRICING_TIERS = {
@@ -24,7 +25,10 @@ export default function MemberFormModal({
     <div className="modal-backdrop" onClick={onCancel}>
       <div className="modal-panel" style={{ width: 'min(900px, 96vw)', maxWidth: '900px' }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h3 style={{ margin: 0 }}>Chi tiết hội viên: {editingMember?.full_name || 'Mới'}</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <img src={logo} alt="Logo" style={{ width: '40px', height: 'auto', borderRadius: '8px' }} />
+            <h3 style={{ margin: 0 }}>Chi tiết hội viên: {editingMember?.full_name || 'Mới'}</h3>
+          </div>
           <button className="ghost-btn" onClick={onCancel}>Đóng</button>
         </div>
 
