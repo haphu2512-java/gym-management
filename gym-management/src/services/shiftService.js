@@ -51,7 +51,11 @@ export const shiftService = {
   async getLatestShifts(limit = 20) {
     const { data, error } = await supabase
       .from(SHIFT_TABLE)
-      .select('*')
+      .select(`
+        *,
+        profiles:opened_by (full_name),
+        staff_members:opened_by_member (id, full_name, staff_type)
+      `)
       .not('start_time', 'is', null)
       .order('start_time', { ascending: false })
       .limit(limit);
@@ -177,7 +181,7 @@ export const shiftService = {
       .select(`
         *,
         profiles:opened_by (full_name),
-        staff_members:opened_by_member (full_name)
+        staff_members:opened_by_member (id, full_name, staff_type)
       `)
       .eq('id', shiftId)
       .single();

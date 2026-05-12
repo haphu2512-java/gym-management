@@ -131,12 +131,22 @@ export default function Shifts() {
     if (activeShift) {
       calculateHandoverCash(activeShift).then(setSuggestedEndingCash);
       expenseService.getByShift(activeShift.id).then(setExpenses).catch(() => setExpenses([]));
+      
+      // Đồng bộ nhân viên đang trực nếu local state chưa có (Quan trọng cho Admin xem ca của nhân viên)
+      if (!activeStaff && activeShift.staff_members) {
+        setActiveStaff(activeShift.staff_members);
+      }
+
+      // Đồng bộ tên ca đang mở vào form
+      if (form.shift_name !== activeShift.shift_name) {
+        setForm(prev => ({ ...prev, shift_name: activeShift.shift_name }));
+      }
     } else {
       setSuggestedEndingCash(0);
       setTotalExpense(0);
       setExpenses([]);
     }
-  }, [activeShift]);
+  }, [activeShift, activeStaff, setActiveStaff]);
 
   const handleAddExpense = async (e) => {
     e.preventDefault();
@@ -243,7 +253,7 @@ export default function Shifts() {
             <label className="field-label">Nhân viên trực</label>
             {activeShift ? (
               <div style={{ padding: '10px 14px', background: '#eff6ff', borderRadius: '10px', border: '1px solid #bfdbfe', fontWeight: '600', color: '#1d4ed8', marginBottom: '4px' }}>
-                👤 {activeStaff?.full_name || 'Không xác định'}
+                👤 {activeStaff?.full_name || activeShift.staff_members?.full_name || 'Không xác định'}
               </div>
             ) : (
               <select

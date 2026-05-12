@@ -30,7 +30,7 @@ function App() {
     // 2. Lắng nghe thay đổi (ví dụ: đăng xuất từ tab khác)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
-        useAuthStore.getState().logout();
+        useAuthStore.getState().clearLocalState();
       } else if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
         initializeAuth();
       }

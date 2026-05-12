@@ -64,12 +64,17 @@ export const useAuthStore = create((set) => ({
   },
 
   logout: async () => {
+    // Xóa state local ngay lập tức để giao diện chuyển hướng ngay, không đợi Supabase phản hồi
+    useAuthStore.getState().clearLocalState();
     try {
       await authService.logout();
-      localStorage.removeItem('gym_active_staff');
-      set({ user: null, profile: null, assignedShift: null, activeStaff: null });
     } catch (error) {
-      set({ error: error.message });
+      console.error("Logout error (background):", error);
     }
+  },
+
+  clearLocalState: () => {
+    localStorage.removeItem('gym_active_staff');
+    set({ user: null, profile: null, assignedShift: null, activeStaff: null });
   },
 }));

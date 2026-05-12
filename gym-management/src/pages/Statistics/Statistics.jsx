@@ -29,30 +29,44 @@ const TOP_PRODUCTS = [
 
 export default function Statistics() {
   const [dateRange, setDateRange] = useState('week');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
   const [waterStatsByStaff, setWaterStatsByStaff] = useState({});
   const [overallStats, setOverallStats] = useState({ waterRevenue: 0, memberRevenue: 0, totalRevenue: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
+      if (dateRange === 'custom' && (!customStartDate || !customEndDate)) return;
+
       setLoading(true);
       try {
         let startDate = null;
+        let endDate = null;
         const now = new Date();
-        
+
         if (dateRange === 'today') {
           startDate = new Date(now.setHours(0, 0, 0, 0)).toISOString();
         } else if (dateRange === 'week') {
           const first = now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1); // Monday
-          startDate = new Date(now.setDate(first)).toISOString();
-          startDate = new Date(new Date(startDate).setHours(0,0,0,0)).toISOString();
+          startDate = new Date(now.setDate(first));
+          startDate.setHours(0, 0, 0, 0);
+          startDate = startDate.toISOString();
         } else if (dateRange === 'month') {
           startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        } else if (dateRange === 'custom') {
+          startDate = new Date(customStartDate);
+          startDate.setHours(0, 0, 0, 0);
+          startDate = startDate.toISOString();
+
+          endDate = new Date(customEndDate);
+          endDate.setHours(23, 59, 59, 999);
+          endDate = endDate.toISOString();
         }
 
         const [waterStats, overall] = await Promise.all([
-          statisticsService.getWaterStatsByShiftAndStaff({ startDate }),
-          statisticsService.getOverallStats({ startDate })
+          statisticsService.getWaterStatsByShiftAndStaff({ startDate, endDate }),
+          statisticsService.getOverallStats({ startDate, endDate })
         ]);
 
         setWaterStatsByStaff(waterStats);
@@ -65,16 +79,16 @@ export default function Statistics() {
     };
 
     fetchData();
-  }, [dateRange]);
+  }, [dateRange, customStartDate, customEndDate]);
 
   const totals = useMemo(() => {
     // If we have real data, use it, otherwise fallback to mock for visuals
     if (overallStats.totalRevenue > 0) {
-        return {
-            memberTotal: overallStats.memberRevenue,
-            waterTotal: overallStats.waterRevenue,
-            combined: overallStats.totalRevenue
-        };
+      return {
+        memberTotal: overallStats.memberRevenue,
+        waterTotal: overallStats.waterRevenue,
+        combined: overallStats.totalRevenue
+      };
     }
     const memberTotal = REVENUE_DATA.reduce((acc, curr) => acc + curr.member, 0);
     const waterTotal = REVENUE_DATA.reduce((acc, curr) => acc + curr.water, 0);
@@ -90,9 +104,28 @@ export default function Statistics() {
           <h3 className="modern-title">Thống Kê Chi Tiết</h3>
           <p className="muted-text">Phân tích doanh thu và tăng trưởng của phòng tập.</p>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <select 
-            className="ghost-btn" 
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {dateRange === 'custom' && (
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginRight: '10px' }}>
+              <input
+                type="date"
+                className="ghost-btn"
+                style={{ padding: '6px 10px', fontSize: '13px' }}
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+              />
+              <span style={{ fontSize: '12px', color: '#64748b' }}>đến</span>
+              <input
+                type="date"
+                className="ghost-btn"
+                style={{ padding: '6px 10px', fontSize: '13px' }}
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+              />
+            </div>
+          )}
+          <select
+            className="ghost-btn"
             style={{ padding: '8px 12px' }}
             value={dateRange}
             onChange={(e) => setDateRange(e.target.value)}
@@ -100,6 +133,7 @@ export default function Statistics() {
             <option value="today">Hôm nay</option>
             <option value="week">Tuần này</option>
             <option value="month">Tháng này</option>
+            <option value="custom">Tùy chọn</option>
             <option value="all">Tất cả</option>
           </select>
           <button className="primary-btn">
@@ -157,16 +191,16 @@ export default function Statistics() {
               const total = data.member + data.water;
               const height = (total / maxRevenue) * 100;
               const memberHeight = (data.member / total) * 100;
-              
+
               return (
                 <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                  <div 
-                    className="chart-bar-group" 
-                    style={{ 
-                      width: '100%', 
-                      height: `${height}%`, 
-                      background: '#93c5fd', 
-                      borderRadius: '4px 4px 0 0', 
+                  <div
+                    className="chart-bar-group"
+                    style={{
+                      width: '100%',
+                      height: `${height}%`,
+                      background: '#93c5fd',
+                      borderRadius: '4px 4px 0 0',
                       position: 'relative',
                       display: 'flex',
                       flexDirection: 'column-reverse',
@@ -223,23 +257,23 @@ export default function Statistics() {
                 <tr key={idx}>
                   <td style={{ verticalAlign: 'top', width: '200px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
-                            <User size={16} />
-                        </div>
-                        <p className="cell-main">{staffName}</p>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
+                        <User size={16} />
+                      </div>
+                      <p className="cell-main">{staffName}</p>
                     </div>
                   </td>
                   <td>
                     {Object.entries(shifts).map(([shiftName, products], sIdx) => (
                       <div key={sIdx} style={{ marginBottom: '12px' }}>
                         {Object.entries(products).map(([prodName, qty], pIdx) => (
-                          <div key={pIdx} style={{ 
-                            display: 'inline-block', 
-                            background: '#f8fafc', 
-                            border: '1px solid #e2e8f0', 
-                            borderRadius: '6px', 
-                            padding: '4px 10px', 
-                            marginRight: '8px', 
+                          <div key={pIdx} style={{
+                            display: 'inline-block',
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '6px',
+                            padding: '4px 10px',
+                            marginRight: '8px',
                             marginBottom: '6px',
                             fontSize: '13px',
                             color: '#334155'
@@ -277,7 +311,7 @@ export default function Statistics() {
       </div>
 
       {/* Top Products */}
-      <div className="modern-card">
+      {/* <div className="modern-card">
         <h4 className="modern-title"><Droplets size={18} /> Top sản phẩm bán chạy nhất</h4>
         <div className="modern-table-wrap" style={{ marginTop: '10px' }}>
           <table className="modern-table">
@@ -309,7 +343,7 @@ export default function Statistics() {
             </tbody>
           </table>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 }

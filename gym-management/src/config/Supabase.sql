@@ -135,7 +135,9 @@ CREATE TABLE IF NOT EXISTS member_logs (
 -- ============================================================
 -- 5. VIEW: MẶT BẰNG TRẠNG THÁI HỘI VIÊN (Quan trọng nhất)
 -- ============================================================
-CREATE OR REPLACE VIEW member_current_status AS
+CREATE OR REPLACE VIEW member_current_status 
+WITH (security_invoker = true)
+AS
 WITH LatestPackage AS (
     SELECT DISTINCT ON (member_id)
       member_id, package_type, membership_category, start_date, end_date, fee, payment_method, created_at
