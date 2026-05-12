@@ -41,7 +41,7 @@ const initialForm = {
 };
 
 export default function Members() {
-  const { user, profile } = useAuthStore();
+  const { user, profile, activeStaff } = useAuthStore();
   const { members, loading, addMember, updateMember, fetchMembers, suspendMember, reactivateMember } = useMembers();
   const [activeTab, setActiveTab] = useState('active'); // 'active', 'suspended'
   const [searchTerm, setSearchTerm] = useState('');
@@ -121,17 +121,15 @@ export default function Members() {
     if (!window.confirm(`Xác nhận đã nhận đủ ${Number(log.fee || 0).toLocaleString()}đ chuyển khoản cho lần gia hạn này?`)) return;
 
     try {
-      await memberService.verifyLogPayment(log.id, user.id);
+      const effectiveStaffId = activeStaff?.id || user?.id;
+      await memberService.verifyLogPayment(log.id, effectiveStaffId);
 
-      // 1. Cập nhật ngay lập tức state History Logs để UI thay đổi nút -> dấu tích
       setHistoryLogs(prevLogs =>
         prevLogs.map(l => l.id === log.id ? { ...l, is_payment_verified: true } : l)
       );
 
-      // 2. Làm mới danh sách hội viên tổng quát
       await fetchMembers();
 
-      // 3. Nếu đang xem đúng hội viên này, cập nhật lại editingMember để đồng bộ thông tin
       if (editingMember && editingMember.id === log.member_id) {
         const { data: freshMember } = await supabase
           .from('member_current_status')
@@ -141,9 +139,8 @@ export default function Members() {
         if (freshMember) setEditingMember(freshMember);
       }
 
-      // Ghi log hoạt động của Admin
       await staffLogService.logAction({
-        staffId: user?.id,
+        staffId: effectiveStaffId,
         action: 'Duyệt thanh toán CK',
         targetItem: `Gia hạn ID: ${log.id}`,
         details: { log_id: log.id, member_id: log.member_id },
@@ -157,10 +154,11 @@ export default function Members() {
   const handleConfirmDelete = async () => {
     if (!deletingMember) return;
     try {
+    const effectiveStaffId = activeStaff?.id || user?.id;
       await memberService.deleteMember(deletingMember.id);
 
       await staffLogService.logAction({
-        staffId: user?.id,
+        staffId: effectiveStaffId,
         action: 'Xoa hoi vien',
         targetItem: deletingMember.full_name,
         details: { member_id: deletingMember.id, member_code: deletingMember.member_code },
@@ -257,7 +255,7 @@ export default function Members() {
         fingerprint_status: Boolean(form.fingerprint_status),
         note: form.note,
         shift_id: activeShift.id,
-        staff_id: user?.id,
+        staff_id: activeStaff?.id || user?.id,
       };
 
       if (editingMember?.id) {
@@ -278,7 +276,7 @@ export default function Members() {
         });
 
         await staffLogService.logAction({
-          staffId: user?.id,
+          staffId: activeStaff?.id || user?.id,
           action: 'Cập nhật hội viên',
           targetItem: updated.full_name,
           details: { before: editingMember, after: updated },
@@ -335,7 +333,7 @@ export default function Members() {
         membershipCategory: renewForm.membership_category,
         fee: Number(renewForm.fee || 0),
         paymentMethod: renewForm.payment_method,
-        staffId: user?.id,
+        staffId: activeStaff?.id || user?.id,
         shiftId: activeShift.id,
       });
 
@@ -373,7 +371,7 @@ export default function Members() {
   const handleSuspendConfirm = async () => {
     if (!suspendingMember) return;
     try {
-      await suspendMember(suspendingMember.id, user.id);
+      await suspendMember(suspendingMember.id, activeStaff?.id || user?.id);
       setShowSuspendModal(false);
       setSuspendingMember(null);
     } catch (err) {
@@ -384,7 +382,7 @@ export default function Members() {
   const handleReactivate = async (member) => {
     if (!window.confirm(`Kích hoạt lại cho hội viên ${member.full_name}? Ngày hết hạn mới sẽ được cộng thêm ${member.remaining_days} ngày kể từ hôm nay.`)) return;
     try {
-      await reactivateMember(member.id, user.id);
+      await reactivateMember(member.id, activeStaff?.id || user?.id);
     } catch (err) {
       setError("Lỗi kích hoạt lại: " + err.message);
     }

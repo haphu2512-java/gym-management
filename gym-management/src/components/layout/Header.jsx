@@ -23,7 +23,7 @@ function getGreeting() {
 export default function Header({ onMenuToggle }) {
   const location = useLocation();
   const title = titleMap[location.pathname] || 'Gym Management';
-  const { profile } = useAuthStore();
+  const { profile, activeStaff } = useAuthStore();
 
   const [activeShift, setActiveShift] = useState(null);
 
@@ -38,6 +38,13 @@ export default function Header({ onMenuToggle }) {
     };
     fetchInfo();
   }, [location.pathname]);
+
+  // Tên hiển thị: "Trâm Anh — Ca 3" hoặc tên tài khoản nếu chưa chọn nhân viên
+  const displayName = activeStaff
+    ? activeShift
+      ? `${activeStaff.full_name} — ${activeShift.shift_name}`
+      : activeStaff.full_name
+    : (profile?.full_name || 'Đang tải...');
 
   return (
     <header className="modern-header">
@@ -56,16 +63,19 @@ export default function Header({ onMenuToggle }) {
         <div className="system-status" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span className="status-dot" />
-            <span>{profile?.full_name || 'Đang tải...'}</span>
+            <span>{displayName}</span>
           </div>
-          <div style={{ borderLeft: '1px solid #ddd', paddingLeft: '12px' }}>
-            <span>Ca: {activeShift ? activeShift.shift_name : 'Chưa mở ca'}</span>
-          </div>
+          {!activeStaff && (
+            <div style={{ borderLeft: '1px solid #ddd', paddingLeft: '12px' }}>
+              <span>Ca: {activeShift ? activeShift.shift_name : 'Chưa mở ca'}</span>
+            </div>
+          )}
         </div>
       </div>
     </header>
   );
 }
+
 
 
 

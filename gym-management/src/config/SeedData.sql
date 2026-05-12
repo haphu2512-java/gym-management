@@ -1,19 +1,21 @@
 DO $$
 DECLARE
-  -- Resolve users from auth.users (create these users in Supabase Auth first)
-  uuid_nhu UUID := (SELECT id FROM auth.users WHERE email = 'nhu.manager@gymmanage.com' LIMIT 1);
-  uuid_tramanh UUID := (SELECT id FROM auth.users WHERE email = 'tramanh.staff@gymmanage.com' LIMIT 1);
-  uuid_phu UUID := (SELECT id FROM auth.users WHERE email = 'phu.staff@gymmanage.com' LIMIT 1);
+  -- Lấy UUID của các tài khoản Auth (Phải tạo User trong Supabase Auth trước với các email này)
+  uuid_admin UUID := (SELECT id FROM auth.users WHERE email = 'admin@gym.com' LIMIT 1);
+  uuid_staff UUID := (SELECT id FROM auth.users WHERE email = 'staff@gym.com' LIMIT 1);
 
+  -- Biến lưu ID của nhân viên mẫu (staff_members)
+  v_staff_1 UUID;
+  v_staff_2 UUID;
+  v_staff_3 UUID;
+
+  -- Biến lưu ID nghiệp vụ
   v_member_1 UUID;
   v_member_2 UUID;
-  v_member_3 UUID;
   v_shift_1 UUID;
-  v_shift_2 UUID;
   v_product_1 UUID;
-  v_product_2 UUID;
 BEGIN
-  -- 1) Clean old data (children first)
+  -- 1) Làm sạch dữ liệu cũ
   TRUNCATE TABLE
     shift_expenses,
     sales_logs,
@@ -26,131 +28,72 @@ BEGIN
     members,
     products,
     salary_configs,
+    staff_members,
     profiles
   CASCADE;
 
-  -- 2) Seed profiles only when auth user exists
-  IF uuid_nhu IS NOT NULL THEN
-    INSERT INTO profiles (id, full_name, role, staff_type, note)
-    VALUES (uuid_nhu, 'Nhu', 'admin', 'CT', 'Quan ly he thong');
+  -- 2) Tạo Profile cho 2 tài khoản Auth chính
+  IF uuid_admin IS NOT NULL THEN
+    INSERT INTO profiles (id, full_name, role) VALUES (uuid_admin, 'Quản trị viên', 'admin');
+  END IF;
+  IF uuid_staff IS NOT NULL THEN
+    INSERT INTO profiles (id, full_name, role) VALUES (uuid_staff, 'Nhân viên hệ thống', 'staff');
   END IF;
 
-  IF uuid_tramanh IS NOT NULL THEN
-    INSERT INTO profiles (id, full_name, role, staff_type, note)
-    VALUES (uuid_tramanh, 'Tram Anh', 'staff', 'CT', 'Nhan vien truc ca');
-  END IF;
+  -- 3) Tạo danh sách nhân viên thực tế (staff_members)
+  INSERT INTO staff_members (full_name, staff_type, note) VALUES
+    ('Trâm Anh', 'CT', 'Nhân viên ca sáng'),
+    ('Anh Phú', 'CT', 'Nhân viên ca tối'),
+    ('Hồng Nhung', 'TV', 'Nhân viên thử việc')
+  RETURNING id INTO v_staff_1;
+  
+  SELECT id INTO v_staff_2 FROM staff_members WHERE full_name = 'Anh Phú';
+  SELECT id INTO v_staff_3 FROM staff_members WHERE full_name = 'Hồng Nhung';
 
-  IF uuid_phu IS NOT NULL THEN
-    INSERT INTO profiles (id, full_name, role, staff_type, note)
-    VALUES (uuid_phu, 'Phu', 'staff', 'TV', 'Nhan vien thu viec');
-  END IF;
-
-  IF uuid_nhu IS NULL AND uuid_tramanh IS NULL AND uuid_phu IS NULL THEN
-    RAISE NOTICE 'No matching auth.users found. Create auth users first, then re-run SeedData.sql';
-  END IF;
-
-  -- 3) Products
+  -- 4) Sản phẩm
   INSERT INTO products (name, price, stock_quantity, note) VALUES
-    ('Nuoc suoi', 10000, 100, 'Chai nho'),
-    ('Nuoc suoi lon', 15000, 80, 'Chai lon'),
-    ('Revive vang', 15000, 50, 'Vi chanh muoi'),
-    ('Revive trang', 15000, 60, 'Vi truyen thong'),
-    ('Revive 0 calo', 18000, 40, 'Ho tro an kieng'),
-    ('Pocari', 15000, 70, 'Chai nho'),
-    ('Pocari lon', 22000, 45, 'Chai lon'),
-    ('Sua', 20000, 30, 'Sua hop bo sung'),
-    ('Monster', 35000, 25, 'Nuoc tang luc'),
-    ('Nutri', 15000, 40, 'Nuoc trai cay milk');
+    ('Nước suối 500ml', 10000, 100, 'Lavie'),
+    ('Pocari Sweat', 15000, 50, 'Bù khoáng'),
+    ('Revive', 15000, 60, 'Chanh muối'),
+    ('Monster Energy', 35000, 20, 'Tăng lực');
 
-  SELECT id INTO v_product_1 FROM products WHERE name = 'Nuoc suoi' LIMIT 1;
-  SELECT id INTO v_product_2 FROM products WHERE name = 'Pocari' LIMIT 1;
-
-  -- 4) Salary configs
+  -- 5) Cấu hình lương (Salary Configs)
   INSERT INTO salary_configs (shift_name, staff_type, rate_per_shift) VALUES
-    ('Ca 1', 'CT', 150000), ('Ca 1', 'TV', 100000),
-    ('Ca 2', 'CT', 150000), ('Ca 2', 'TV', 100000),
-    ('Ca 3', 'CT', 150000), ('Ca 3', 'TV', 100000),
-    ('Ca 4', 'CT', 200000), ('Ca 4', 'TV', 130000),
-    ('Ca 5', 'CT', 200000), ('Ca 5', 'TV', 130000);
+    ('Ca 1', 'CT', 150000), ('Ca 1', 'TV', 120000),
+    ('Ca 2', 'CT', 150000), ('Ca 2', 'TV', 120000),
+    ('Ca 3', 'CT', 180000), ('Ca 3', 'TV', 140000);
 
-  -- 5) Members (Basic information only)
-  INSERT INTO members (
-    member_code, full_name, fingerprint_status, note
-  ) VALUES
-    ('HV001', 'Nguyen Van A', true, 'Tap sang'),
-    ('HV002', 'Tran Thi B', false, 'Can gia han'),
-    ('HV003', 'Le Van C', true, 'Da xac minh CK');
+  -- 6) Hội viên mẫu (Members)
+  INSERT INTO members (member_code, full_name, note) VALUES
+    ('HV001', 'Nguyễn Văn An', 'Hội viên lâu năm'),
+    ('HV002', 'Lê Thị Bình', 'Hội viên mới');
 
-  SELECT id INTO v_member_1 FROM members WHERE member_code = 'HV001' LIMIT 1;
-  SELECT id INTO v_member_2 FROM members WHERE member_code = 'HV002' LIMIT 1;
-  SELECT id INTO v_member_3 FROM members WHERE member_code = 'HV003' LIMIT 1;
+  SELECT id INTO v_member_1 FROM members WHERE member_code = 'HV001';
+  SELECT id INTO v_member_2 FROM members WHERE member_code = 'HV002';
 
-  -- 6) Shifts
-  INSERT INTO shifts (
-    shift_name, default_start, default_end, start_time, end_time,
-    starting_cash, ending_cash, opened_by, status, note
-  ) VALUES
-    ('Ca 1', '05:00:00', '09:00:00', NOW() - INTERVAL '10 hours', NOW() - INTERVAL '6 hours', 500000, 870000, 
-     uuid_tramanh, 'closed', 'Ca sang da chot'),
-    ('Ca 2', '09:00:00', '13:00:00', NOW() - INTERVAL '2 hours', NULL, 400000, NULL, 
-     uuid_phu, 'open', 'Ca hien tai');
+  -- 7) Ca làm việc (Shifts)
+  INSERT INTO shifts (shift_name, default_start, default_end, start_time, end_time, starting_cash, ending_cash, opened_by, opened_by_member, status)
+  VALUES 
+    ('Ca 1', '05:00:00', '13:00:00', NOW() - INTERVAL '5 hours', NULL, 500000, NULL, uuid_staff, v_staff_1, 'open');
 
-  SELECT id INTO v_shift_1 FROM shifts WHERE shift_name = 'Ca 1' ORDER BY start_time DESC LIMIT 1;
-  SELECT id INTO v_shift_2 FROM shifts WHERE shift_name = 'Ca 2' ORDER BY start_time DESC LIMIT 1;
+  SELECT id INTO v_shift_1 FROM shifts WHERE status = 'open' LIMIT 1;
 
-  -- 7) Member Logs (Membership state)
-  INSERT INTO member_logs (
-    member_id, staff_id, action, 
-    package_type, membership_category, start_date, end_date, fee, payment_method, is_payment_verified,
-    note, created_at
-  ) VALUES
-    (v_member_1, uuid_tramanh, 'CREATE', 1, 'normal', CURRENT_DATE - 10, CURRENT_DATE + 20, 500000, 'TM', true, 'Dang ky moi HV001', NOW() - INTERVAL '10 days'),
-    (v_member_2, uuid_phu, 'RENEW', 3, 'couple', CURRENT_DATE - 40, CURRENT_DATE - 5, 1200000, 'CK', false, 'Gia han HV002', NOW() - INTERVAL '40 days'),
-    (v_member_3, uuid_phu, 'CREATE', 1, 'team', CURRENT_DATE - 2, CURRENT_DATE + 28, 500000, 'CK', true, 'Dang ky moi HV003', NOW() - INTERVAL '2 days');
+  -- 8) Nhật ký hội viên (Member Logs)
+  INSERT INTO member_logs (member_id, staff_member_id, action, package_type, membership_category, start_date, end_date, fee, payment_method, is_payment_verified, created_at)
+  VALUES
+    (v_member_1, v_staff_1, 'CREATE', 1, 'normal', CURRENT_DATE - 5, CURRENT_DATE + 25, 500000, 'TM', true, NOW() - INTERVAL '5 days'),
+    (v_member_2, v_staff_1, 'CREATE', 3, 'normal', CURRENT_DATE, CURRENT_DATE + 90, 1200000, 'CK', false, NOW());
 
-  -- 8) Payment logs
-  INSERT INTO payment_logs (
-    member_id, shift_id, staff_id, amount, payment_method,
-    payment_type, is_verified, verified_by, verified_at, note, created_at
-  ) VALUES
-    (v_member_1, v_shift_1, uuid_tramanh, 500000, 'TM', 'new', true, uuid_tramanh, NOW() - INTERVAL '9 hours', 'Dang ky moi HV001', NOW() - INTERVAL '10 days'),
-    (v_member_2, v_shift_2, uuid_phu, 1200000, 'CK', 'renew', false, NULL, NULL, 'Gia han HV002 cho duyet CK', NOW() - INTERVAL '40 days'),
-    (v_member_3, v_shift_2, uuid_phu, 500000, 'CK', 'new', true, uuid_nhu, NOW() - INTERVAL '30 minutes', 'CK da xac minh', NOW() - INTERVAL '2 days');
+  -- 9) Nhật ký nhân viên (Staff Logs)
+  INSERT INTO staff_logs (staff_member_id, action, target_item, details, created_at)
+  VALUES
+    (v_staff_1, 'Mở ca trực', 'Ca 1', '{"starting_cash": 500000}', NOW() - INTERVAL '5 hours');
 
-  -- 9) Sales logs
-  INSERT INTO sales_logs (product_id, shift_id, sold_by, quantity, total_price, payment_method, sold_at) VALUES
-    (v_product_1, v_shift_2, uuid_phu, 2, 20000, 'TM', NOW() - INTERVAL '1 hour'),
-    (v_product_2, v_shift_2, uuid_phu, 1, 15000, 'TM', NOW() - INTERVAL '30 minutes');
+  -- 10) Lịch làm việc tuần
+  INSERT INTO weekly_schedules (week_start, staff_member_id, day_of_week, shift_name)
+  VALUES
+    (date_trunc('week', CURRENT_DATE)::date, v_staff_1, 1, 'Ca 1'),
+    (date_trunc('week', CURRENT_DATE)::date, v_staff_2, 1, 'Ca 2');
 
-  -- 10) Shift expenses (tab Chi)
-  INSERT INTO shift_expenses (shift_id, amount, reason, created_by, created_at) VALUES
-    (v_shift_2, 30000, 'Mua dung cu ve sinh', uuid_phu, NOW() - INTERVAL '45 minutes'),
-    (v_shift_2, 15000, 'In hoa don', uuid_phu, NOW() - INTERVAL '15 minutes');
-
-  -- 11) Staff logs
-  INSERT INTO staff_logs (staff_id, action, target_item, details, note, created_at) VALUES
-    (uuid_tramanh, 'Mo ca truc', 'Ca 1', jsonb_build_object('starting_cash', 500000), 'Mo ca sang', NOW() - INTERVAL '10 hours'),
-    (uuid_tramanh, 'Chot ca truc', 'Ca 1', jsonb_build_object('ending_cash', 870000), 'Ket ca sang', NOW() - INTERVAL '6 hours'),
-    (uuid_phu, 'Them khoan chi', 'Ca 2', jsonb_build_object('amount', 30000), 'Mua dung cu ve sinh', NOW() - INTERVAL '45 minutes');
-
-  -- 12) Weekly schedules
-  IF uuid_tramanh IS NOT NULL AND EXISTS (SELECT 1 FROM profiles WHERE id = uuid_tramanh) THEN
-    INSERT INTO weekly_schedules (week_start, staff_id, day_of_week, shift_name)
-    VALUES (date_trunc('week', CURRENT_DATE)::date, uuid_tramanh, 1, 'Ca 1');
-  END IF;
-
-  IF uuid_phu IS NOT NULL AND EXISTS (SELECT 1 FROM profiles WHERE id = uuid_phu) THEN
-    INSERT INTO weekly_schedules (week_start, staff_id, day_of_week, shift_name)
-    VALUES (date_trunc('week', CURRENT_DATE)::date, uuid_phu, 1, 'Ca 2');
-  END IF;
-
-  -- 13) Salary adjustments
-  IF uuid_nhu IS NOT NULL AND uuid_phu IS NOT NULL 
-     AND EXISTS (SELECT 1 FROM profiles WHERE id = uuid_nhu) 
-     AND EXISTS (SELECT 1 FROM profiles WHERE id = uuid_phu) THEN
-    INSERT INTO salary_adjustments (
-      staff_id, adjustment_date, commission, shortage, penalty, reason, created_by
-    ) VALUES
-      (uuid_phu, CURRENT_DATE, 50000, 0, 0, 'Thuong doanh so nuoc', uuid_nhu);
-  END IF;
+  RAISE NOTICE 'Seed data completed successfully!';
 END $$;

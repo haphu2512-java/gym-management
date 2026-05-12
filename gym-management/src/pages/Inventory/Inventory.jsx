@@ -8,7 +8,7 @@ import { useToast, ToastContainer } from '../../components/ui/Toast';
 import { formatDateTime } from '../../utils/formatters';
 
 export default function Inventory() {
-  const { user, profile, assignedShift } = useAuthStore();
+  const { user, profile, activeStaff } = useAuthStore();
   const { showError, showSuccess, toasts } = useToast();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -126,7 +126,7 @@ export default function Inventory() {
       if (editingProduct) {
         await productService.updateProduct(editingProduct.id, payload);
         await staffLogService.logAction({
-          staffId: user?.id,
+          staffId: activeStaff?.id || user?.id,
           action: 'Nhập/Sửa kho',
           targetItem: editingProduct.name,
           details: { before: editingProduct.stock_quantity, after: payload.stock_quantity },
@@ -135,7 +135,7 @@ export default function Inventory() {
       } else {
         await productService.addProduct(payload);
         await staffLogService.logAction({
-          staffId: user?.id,
+          staffId: activeStaff?.id || user?.id,
           action: 'Thêm sản phẩm',
           targetItem: payload.name,
           details: { quantity: payload.stock_quantity },
@@ -167,7 +167,7 @@ export default function Inventory() {
     }
 
     try {
-      await productService.sellProduct(product, qty, shiftId, user?.id, method);
+      await productService.sellProduct(product, qty, shiftId, activeStaff?.id || user?.id, method);
 
       // Update local state
       setProducts((prev) => prev.map((item) =>
@@ -197,7 +197,7 @@ export default function Inventory() {
     try {
       await productService.deleteProduct(deletingProduct.id);
       await staffLogService.logAction({
-        staffId: user?.id,
+        staffId: activeStaff?.id || user?.id,
         action: 'Xóa sản phẩm',
         targetItem: deletingProduct.name,
         details: { id: deletingProduct.id },

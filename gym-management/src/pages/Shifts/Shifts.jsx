@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Clock } from 'lucide-react';
 import { shiftService } from '../../services/shiftService';
+import { staffService } from '../../services/staffService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { paymentService } from '../../services/paymentService';
 import { productService } from '../../services/productService';
@@ -9,7 +10,8 @@ import { staffLogService } from '../../services/staffLogService';
 import { formatDateTime } from '../../utils/formatters';
 
 export default function Shifts() {
-  const { user, profile } = useAuthStore();
+  const { user, profile, activeStaff, setActiveStaff } = useAuthStore();
+  const [staffMembers, setStaffMembers] = useState([]);
   const [shifts, setShifts] = useState([]);
   const [skipTimeCheck, setSkipTimeCheck] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -84,6 +86,8 @@ export default function Shifts() {
 
   useEffect(() => {
     loadShifts();
+    // Tải danh sách nhân viên cho dropdown
+    staffService.getStaffMembers().then(setStaffMembers).catch(console.error);
   }, []);
 
   // Tìm bất kỳ ca nào đang mở (không lọc theo tên dropdown)
@@ -184,18 +188,20 @@ export default function Shifts() {
           throw new Error('Vui lòng nhập tiền kết ca trước khi chốt ca.');
         }
 
-        if (activeShift.opened_by !== user?.id && profile?.role !== 'admin') {
-          throw new Error('Chỉ người mở ca hoặc Quản lý mới được phép chốt ca này.');
-        }
-
         await shiftService.closeShift({
           shiftId: activeShift.id,
           endingCash: Number(form.ending_cash),
           note: form.note,
-          staffId: user?.id,
+          staffId: activeStaff?.id || user?.id,
           shiftName: activeShift.shift_name,
         });
+
+        // Reset nhân viên đang trực sau khi chốt ca
+        setActiveStaff(null);
       } else {
+        if (!activeStaff) {
+          throw new Error('Vui lòng chọn nhân viên trực trước khi mở ca.');
+        }
         if (form.starting_cash === '') {
           throw new Error('Vui lòng nhập tiền đầu ca trước khi mở ca.');
         }
@@ -204,7 +210,7 @@ export default function Shifts() {
           shiftName: form.shift_name,
           startingCash: Number(form.starting_cash),
           note: form.note,
-          staffId: user?.id,
+          staffId: activeStaff.id,
           skipTimeCheck: profile?.role === 'admin' && skipTimeCheck,
         });
       }
@@ -230,6 +236,28 @@ export default function Shifts() {
         <h3 className="modern-title flex-row"><Clock size={18} /> Bàn giao ca trực</h3>
         {activeTab === 'shift' && (
           <form className="modern-form" onSubmit={handleSubmit}>
+            {/* Dropdown chọn nhân viên trực */}
+            <label className="field-label">Nhân viên trực</label>
+            {activeShift ? (
+              <div style={{ padding: '10px 14px', background: '#eff6ff', borderRadius: '10px', border: '1px solid #bfdbfe', fontWeight: '600', color: '#1d4ed8', marginBottom: '4px' }}>
+                👤 {activeStaff?.full_name || 'Không xác định'}
+              </div>
+            ) : (
+              <select
+                value={activeStaff?.id || ''}
+                onChange={(e) => {
+                  const found = staffMembers.find(s => s.id === e.target.value);
+                  setActiveStaff(found || null);
+                }}
+                required
+              >
+                <option value="">-- Chọn nhân viên trực --</option>
+                {staffMembers.map(s => (
+                  <option key={s.id} value={s.id}>{s.full_name}</option>
+                ))}
+              </select>
+            )}
+
             <label className="field-label">Chọn ca làm</label>
             <select value={form.shift_name} onChange={(e) => setForm({ ...form, shift_name: e.target.value })} disabled={!!activeShift}>
               {shiftService.shiftOptions.map((item) => (
