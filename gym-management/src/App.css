@@ -521,6 +521,11 @@ a {
   color: #b91c1c;
 }
 
+.status-badge.suspended {
+  background: #fef3c7;
+  color: #92400e;
+}
+
 .pay-badge.cash {
   background: #ffedd5;
   color: #c2410c;

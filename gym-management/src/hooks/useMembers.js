@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { memberService } from '../services/memberService';
 
 export function useMembers() {
@@ -54,5 +54,25 @@ export function useMembers() {
     }
   };
 
-  return { members, loading, error, fetchMembers, addMember, updateMember, deleteMember };
+  const suspendMember = async (id, staffId, remainingDays) => {
+    try {
+      await memberService.suspendMember(id, staffId, remainingDays);
+      await fetchMembers();
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  };
+
+  const reactivateMember = async (id, staffId) => {
+    try {
+      await memberService.reactivateMember(id, staffId);
+      await fetchMembers();
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  };
+
+  return { members, loading, error, fetchMembers, addMember, updateMember, deleteMember, suspendMember, reactivateMember };
 }

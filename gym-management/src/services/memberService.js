@@ -220,4 +220,25 @@ export const memberService = {
       if (error) throw new Error(error.message);
     }
   },
+
+  async suspendMember(id, staffId, remainingDays) {
+    const { data, error } = await supabase.rpc('suspend_member', {
+      p_member_id: id,
+      p_staff_id: staffId,
+      p_remaining_days: remainingDays
+    });
+
+    if (error) throw new Error('Bảo lưu thất bại: ' + error.message);
+    return data;
+  },
+
+  async reactivateMember(id, staffId) {
+    const { data, error } = await supabase.rpc('reactivate_member', {
+      p_member_id: id,
+      p_staff_id: staffId
+    });
+
+    if (error) throw new Error('Kích hoạt lại thất bại: ' + error.message);
+    return data;
+  },
 };

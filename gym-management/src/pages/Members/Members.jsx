@@ -9,9 +9,10 @@ import supabase from '../../config/supabase';
 import { useAuthStore } from '../../store/useAuthStore';
 import { formatDate, getLocalISODate, addMonths } from '../../utils/formatters';
 
-function getStatus(endDate) {
+function getStatus(member) {
+  if (member.suspended_at) return 'Suspended';
   const today = new Date();
-  const target = new Date(endDate);
+  const target = new Date(member.end_date);
   return target >= new Date(today.toDateString()) ? 'Active' : 'Expired';
 }
 
@@ -41,7 +42,8 @@ const initialForm = {
 
 export default function Members() {
   const { user, profile } = useAuthStore();
-  const { members, loading, addMember, updateMember, fetchMembers } = useMembers();
+  const { members, loading, addMember, updateMember, fetchMembers, suspendMember, reactivateMember } = useMembers();
+  const [activeTab, setActiveTab] = useState('active'); // 'active', 'suspended'
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterDate, setFilterDate] = useState('');
@@ -60,6 +62,9 @@ export default function Members() {
   const [historyLogs, setHistoryLogs] = useState([]);
   const [deletingMember, setDeletingMember] = useState(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [showSuspendModal, setShowSuspendModal] = useState(false);
+  const [suspendingMember, setSuspendingMember] = useState(null);
+  const [suspendInfo, setSuspendInfo] = useState({ remainingDays: 0, endDate: '' });
 
   useEffect(() => {
     const fetchShift = async () => {
@@ -97,13 +102,20 @@ export default function Members() {
       }
 
       let matchStatus = true;
-      if (filterStatus === 'pending_ck') {
+      const status = getStatus(m);
+      if (activeTab === 'suspended') {
+        matchStatus = status === 'Suspended';
+      } else {
+        matchStatus = status !== 'Suspended';
+      }
+
+      if (filterStatus === 'pending_ck' && matchStatus) {
         matchStatus = m.payment_method === 'CK' && !m.is_payment_verified;
       }
 
       return matchSearch && matchDate && matchStatus;
     });
-  }, [members, searchTerm, filterStatus, filterDate]);
+  }, [members, searchTerm, filterStatus, filterDate, activeTab]);
 
   const handleLogVerification = async (log) => {
     if (!window.confirm(`Xác nhận đã nhận đủ ${Number(log.fee || 0).toLocaleString()}đ chuyển khoản cho lần gia hạn này?`)) return;
@@ -337,8 +349,72 @@ export default function Members() {
     }
   };
 
+  const openSuspendModal = (member) => {
+    const today = new Date();
+    const expDate = new Date(member.end_date);
+    const diffTime = expDate - today;
+    const diffDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+
+    setSuspendingMember(member);
+    setSuspendInfo({ remainingDays: diffDays, endDate: member.end_date });
+    setShowSuspendModal(true);
+  };
+
+  const handleSuspendConfirm = async () => {
+    if (!suspendingMember) return;
+    try {
+      await suspendMember(suspendingMember.id, user.id, suspendInfo.remainingDays);
+      setShowSuspendModal(false);
+      setSuspendingMember(null);
+    } catch (err) {
+      setError("Lỗi bảo lưu: " + err.message);
+    }
+  };
+
+  const handleReactivate = async (member) => {
+    if (!window.confirm(`Kích hoạt lại cho hội viên ${member.full_name}? Ngày hết hạn mới sẽ được cộng thêm ${member.remaining_days} ngày kể từ hôm nay.`)) return;
+    try {
+      await reactivateMember(member.id, user.id);
+    } catch (err) {
+      setError("Lỗi kích hoạt lại: " + err.message);
+    }
+  };
+
   return (
     <div className="modern-stack">
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+        <button
+          className={`tab-btn ${activeTab === 'active' ? 'active' : ''}`}
+          onClick={() => setActiveTab('active')}
+          style={{
+            padding: '8px 16px',
+            borderRadius: '8px',
+            border: 'none',
+            background: activeTab === 'active' ? '#2563eb' : '#f1f5f9',
+            color: activeTab === 'active' ? 'white' : '#64748b',
+            fontWeight: '600',
+            cursor: 'pointer'
+          }}
+        >
+          Hội viên đang tập
+        </button>
+        <button
+          className={`tab-btn ${activeTab === 'suspended' ? 'active' : ''}`}
+          onClick={() => setActiveTab('suspended')}
+          style={{
+            padding: '8px 16px',
+            borderRadius: '8px',
+            border: 'none',
+            background: activeTab === 'suspended' ? '#2563eb' : '#f1f5f9',
+            color: activeTab === 'suspended' ? 'white' : '#64748b',
+            fontWeight: '600',
+            cursor: 'pointer'
+          }}
+        >
+          Danh sách bảo lưu
+        </button>
+      </div>
+
       <div className="modern-toolbar">
         <div className="search-box">
           <Search size={16} />
@@ -383,6 +459,7 @@ export default function Members() {
               <th>Mã hội viên</th>
               <th>Ngày hết hạn</th>
               <th>Trạng thái</th>
+              {activeTab === 'suspended' && <th>Ngày bảo lưu</th>}
               <th>Ghi chú</th>
               <th>Thao tác</th>
             </tr>
@@ -394,7 +471,7 @@ export default function Members() {
               </tr>
             )}
             {filtered.map((m) => {
-              const status = getStatus(m.end_date);
+              const status = getStatus(m);
               return (
                 <tr key={m.id}>
                   <td>
@@ -412,13 +489,21 @@ export default function Members() {
                     </p>
                   </td>
                   <td>
-                    <span className={`status-badge ${status === 'Active' ? 'active' : 'expired'}`}>
-                      {status === 'Active' ? 'Đang tập' : 'Hết hạn'}
-                    </span>
+                    <span className={`status-badge ${status === 'Active' ? 'active' : status === 'Suspended' ? 'suspended' : 'expired'}`}
+                        style={status === 'Suspended' ? { background: '#fef3c7', color: '#92400e' } : {}}
+                     >
+                       {status === 'Active' ? 'Đang tập' : status === 'Suspended' ? 'Bảo lưu' : 'Hết hạn'}
+                     </span>
                     {m.payment_method === 'CK' && !m.is_payment_verified && (
                       <span className="pay-badge" style={{ background: '#fef08a', color: '#854d0e', marginLeft: '4px' }}>Chờ duyệt</span>
                     )}
                   </td>
+                  {activeTab === 'suspended' && (
+                     <td>
+                       <p className="cell-main">{formatDate(m.suspended_at)}</p>
+                       <p className="cell-sub">Còn {m.remaining_days} ngày</p>
+                     </td>
+                   )}
                   <td style={{ maxWidth: '150px' }}>
                     <div
                       style={{
@@ -444,15 +529,27 @@ export default function Members() {
                       >
                         <Eye size={18} />
                       </button>
-                      <button
-                        type="button"
-                        className="ghost-btn-sm"
-                        onClick={() => openRenewModal(m)}
-                        title="Gia hạn thành viên"
-                        style={{ padding: '6px', color: '#059669' }}
-                      >
-                        <CreditCard size={18} />
-                      </button>
+                      {status === 'Suspended' ? (
+                         <button
+                           type="button"
+                           className="ghost-btn-sm"
+                           onClick={() => handleReactivate(m)}
+                           title="Kích hoạt lại"
+                           style={{ padding: '6px', color: '#8b5cf6' }}
+                         >
+                           <Plus size={18} />
+                         </button>
+                       ) : status === 'Active' && (
+                         <button
+                           type="button"
+                           className="ghost-btn-sm"
+                           onClick={() => openSuspendModal(m)}
+                           title="Bảo lưu gói tập"
+                           style={{ padding: '6px', color: '#f59e0b' }}
+                         >
+                           <CreditCard size={18} style={{ opacity: 0.7 }} />
+                         </button>
+                       )}
                       {profile?.role === 'admin' && (
                         <button
                           type="button"
@@ -774,6 +871,42 @@ export default function Members() {
           </div>
         </div>
       )}
+
+       {/* Modal bảo lưu */}
+       {showSuspendModal && (
+         <div className="modal-backdrop" onClick={() => setShowSuspendModal(false)}>
+           <div className="modal-panel" style={{ maxWidth: '400px' }} onClick={(e) => e.stopPropagation()}>
+             <h3 style={{ color: '#f59e0b' }}>Bảo lưu hội viên</h3>
+             <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '20px' }}>
+               Hội viên <strong>{suspendingMember?.full_name}</strong> sẽ được tạm dừng gói tập từ hôm nay.
+             </p>
+             <div className="modern-info" style={{ background: '#fffbeb', border: '1px solid #fef3c7', marginBottom: '20px' }}>
+               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                 <span>Ngày hết hạn hiện tại:</span>
+                 <strong>{formatDate(suspendInfo.endDate)}</strong>
+               </div>
+               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                 <span>Số ngày còn lại:</span>
+                 <strong style={{ color: '#b45309', fontSize: '18px' }}>{suspendInfo.remainingDays} ngày</strong>
+               </div>
+             </div>
+             <p style={{ fontSize: '12px', color: '#94a3b8' }}>
+               * Lưu ý: Sau khi bảo lưu, hội viên sẽ không thể check-in cho đến khi được kích hoạt lại.
+             </p>
+             <div className="modal-actions" style={{ marginTop: '24px' }}>
+               <button type="button" className="ghost-btn" onClick={() => setShowSuspendModal(false)}>Hủy</button>
+               <button
+                 type="button"
+                 className="primary-btn"
+                 style={{ background: '#f59e0b' }}
+                 onClick={handleSuspendConfirm}
+               >
+                 Xác nhận bảo lưu
+               </button>
+             </div>
+           </div>
+         </div>
+       )}
     </div>
   );
 }
