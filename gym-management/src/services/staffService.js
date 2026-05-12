@@ -87,17 +87,15 @@ export const staffService = {
   },
 
   upsertWeeklySchedule: async (schedule) => {
-    // Dùng staff_member_id thay vì staff_id
     const payload = {
-      staff_id: schedule.staff_id,
-      staff_member_id: schedule.staff_id, // Cùng giá trị
+      staff_member_id: schedule.staff_id, // staff_id từ UI là staff_member_id trong DB
       week_start: schedule.week_start,
       shift_name: schedule.shift_name,
       day_of_week: schedule.day_of_week,
     };
     const { data, error } = await supabase
       .from('weekly_schedules')
-      .upsert(payload, { onConflict: 'week_start, shift_name, day_of_week' })
+      .upsert(payload, { onConflict: 'week_start, day_of_week, shift_name' })
       .select()
       .single();
     if (error) throw error;
@@ -144,12 +142,16 @@ export const staffService = {
 
   upsertSalaryAdjustment: async (adjustment) => {
     const payload = {
-      ...adjustment,
-      staff_member_id: adjustment.staff_id, // Đồng bộ cả 2 cột
+      staff_member_id: adjustment.staff_id, // staff_id từ UI map sang staff_member_id trong DB
+      adjustment_date: adjustment.adjustment_date,
+      commission: adjustment.commission,
+      shortage: adjustment.shortage,
+      penalty: adjustment.penalty,
+      reason: adjustment.reason,
     };
     const { data, error } = await supabase
       .from('salary_adjustments')
-      .upsert(payload, { onConflict: 'staff_id, adjustment_date' })
+      .upsert(payload, { onConflict: 'staff_member_id, adjustment_date' })
       .select()
       .single();
     if (error) throw error;

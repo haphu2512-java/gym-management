@@ -28,6 +28,8 @@ export default function Staff() {
   const [schedule, setSchedule] = useState({});
   const [salaryConfigs, setSalaryConfigs] = useState([]);
   const [adjustments, setAdjustments] = useState({});
+  const [newStaffName, setNewStaffName] = useState('');
+  const [showAddForm, setShowAddForm] = useState(false);
 
   // Fetch initial data
   const loadData = useCallback(async () => {
@@ -114,6 +116,29 @@ export default function Staff() {
       setStaffs(prev => prev.map(s => s.id === staffId ? { ...s, staff_type: val } : s));
     } catch (e) {
       alert("Lỗi cập nhật loại nhân viên: " + e.message);
+    }
+  };
+
+  const handleAddStaff = async (e) => {
+    e.preventDefault();
+    if (!newStaffName.trim()) return;
+    try {
+      await staffService.addStaffMember({ full_name: newStaffName, staff_type: 'CT' });
+      setNewStaffName('');
+      setShowAddForm(false);
+      loadData();
+    } catch (e) {
+      alert("Lỗi thêm nhân viên: " + e.message);
+    }
+  };
+
+  const handleDeleteStaff = async (id, name) => {
+    if (!window.confirm(`Bạn có chắc muốn xóa nhân viên "${name}"? Các lịch làm việc liên quan cũng sẽ bị ảnh hưởng.`)) return;
+    try {
+      await staffService.deleteStaffMember(id);
+      loadData();
+    } catch (e) {
+      alert("Lỗi xóa nhân viên: " + e.message);
     }
   };
 
@@ -214,8 +239,28 @@ export default function Staff() {
                }
             }
           }}>Xóa lịch tuần</button>
+          <button className="modern-btn" onClick={() => setShowAddForm(!showAddForm)}>
+            {showAddForm ? 'Hủy' : '+ Thêm nhân viên'}
+          </button>
         </div>
       </div>
+
+      {showAddForm && (
+        <div className="modern-card" style={{ padding: '20px', marginBottom: '20px', border: '2px solid #3b82f6', background: '#eff6ff' }}>
+          <h4 style={{ marginBottom: '15px' }}>Thêm nhân viên mới</h4>
+          <form onSubmit={handleAddStaff} style={{ display: 'flex', gap: '10px' }}>
+            <input 
+              type="text" 
+              placeholder="Nhập họ tên đầy đủ..." 
+              value={newStaffName} 
+              onChange={e => setNewStaffName(e.target.value)}
+              style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+              required
+            />
+            <button type="submit" className="modern-btn">Xác nhận thêm</button>
+          </form>
+        </div>
+      )}
 
       {loading && <div className="modern-info">Đang tải dữ liệu nhân viên...</div>}
       
@@ -300,7 +345,16 @@ export default function Staff() {
           <tbody>
             {calculations.map(calc => (
               <tr key={calc.id}>
-                <td style={{ fontWeight: 'bold', borderRight: '1px solid #e2e8f0' }}>{calc.full_name}</td>
+                <td style={{ fontWeight: 'bold', borderRight: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px' }}>
+                  <span>{calc.full_name}</span>
+                  <button 
+                    onClick={() => handleDeleteStaff(calc.id, calc.full_name)}
+                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '16px', padding: '4px' }}
+                    title="Xóa nhân viên"
+                  >
+                    🗑️
+                  </button>
+                </td>
                 <td style={{ borderRight: '1px solid #e2e8f0' }}>
                   <select value={calc.type} onChange={e => updateStaffType(calc.id, e.target.value)} style={{ padding: '4px', width: '100%', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
                     <option value="CT">Chính thức</option>

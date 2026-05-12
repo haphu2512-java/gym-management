@@ -16,6 +16,7 @@ import Logs from './pages/Logs/Logs';
 import Statistics from './pages/Statistics/Statistics';
 
 import { useAuthStore } from './store/useAuthStore';
+import supabase from './config/supabase';
 
 function App() {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
@@ -23,7 +24,19 @@ function App() {
   const profile = useAuthStore((state) => state.profile);
 
   useEffect(() => {
+    // 1. Khởi tạo auth lần đầu (đọc từ localStorage)
     initializeAuth();
+
+    // 2. Lắng nghe thay đổi (ví dụ: đăng xuất từ tab khác)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        useAuthStore.getState().logout();
+      } else if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+        initializeAuth();
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, [initializeAuth]);
 
   return (

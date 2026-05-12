@@ -31,13 +31,14 @@ export const productService = {
     return data;
   },
 
-  async sellProduct(product, quantity, shiftId, userId, paymentMethod = 'TM') {
+  async sellProduct(product, quantity, shiftId, authId, staffId, paymentMethod = 'TM') {
     const qty = Number(quantity || 1);
     // Use atomic transaction function
     const { data, error } = await supabase.rpc('sell_bottle_transaction', {
       p_product_id: product.id,
       p_shift_id: shiftId,
-      p_staff_id: userId,
+      p_auth_id: authId,
+      p_staff_id: staffId,
       p_quantity: qty,
       p_total_price: Number(product.price || 0) * qty,
       p_payment_method: paymentMethod,
@@ -82,6 +83,7 @@ export const productService = {
         *,
         products (name),
         profiles:sold_by (full_name),
+        staff_members:sold_by_member (full_name),
         shifts!inner (shift_name)
       `)
       .order('sold_at', { ascending: false });

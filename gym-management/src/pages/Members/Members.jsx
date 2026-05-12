@@ -157,13 +157,14 @@ export default function Members() {
     const effectiveStaffId = activeStaff?.id || user?.id;
       await memberService.deleteMember(deletingMember.id);
 
-      await staffLogService.logAction({
-        staffId: effectiveStaffId,
-        action: 'Xoa hoi vien',
-        targetItem: deletingMember.full_name,
-        details: { member_id: deletingMember.id, member_code: deletingMember.member_code },
-        note: 'Admin thuc hien xoa hoi vien (soft delete)',
-      });
+        await staffLogService.logAction({
+          staffId: effectiveStaffId,
+          staffMemberId: activeStaff?.id,
+          action: 'Xoa hoi vien',
+          targetItem: deletingMember.full_name,
+          details: { member_id: deletingMember.id, member_code: deletingMember.member_code },
+          note: 'Admin thuc hien xoa hoi vien (soft delete)',
+        });
 
       await fetchMembers();
       setDeletingMember(null);
@@ -270,13 +271,15 @@ export default function Members() {
         await memberLogService.logAction({
           memberId: editingMember.id,
           staffId: user?.id,
+          staffMemberId: activeStaff?.id,
           action: 'UPDATE',
           details: { before: editingMember, after: updated },
           note: 'Cập nhật thông tin hội viên'
         });
 
         await staffLogService.logAction({
-          staffId: activeStaff?.id || user?.id,
+          staffId: user?.id,
+          staffMemberId: activeStaff?.id,
           action: 'Cập nhật hội viên',
           targetItem: updated.full_name,
           details: { before: editingMember, after: updated },
@@ -776,7 +779,7 @@ export default function Members() {
                                 <div className="cell-sub">{log.note}</div>
                               </td>
                               {profile?.role === 'admin' && (
-                                <td>{log.profiles?.full_name || 'Hệ thống'}</td>
+                                <td>{log.staff_members?.full_name || log.profiles?.full_name || 'Hệ thống'}</td>
                               )}
                               {profile?.role === 'admin' && (
                                 <td>

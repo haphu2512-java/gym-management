@@ -14,7 +14,7 @@ const icons = {
 
 export default function Sidebar({ isOpen, onClose }) {
   const location = useLocation();
-  const { user, profile, logout } = useAuthStore();
+  const { user, profile, activeStaff, logout } = useAuthStore();
 
   const baseItems = [
     { key: 'dashboard', path: '/dashboard', label: 'Báo Cáo Chung' },
@@ -60,8 +60,13 @@ export default function Sidebar({ isOpen, onClose }) {
 
       <div className="sidebar-footer">
         <div className="user-box">
-          <p>Đang đăng nhập</p>
-          <strong>{profile?.role || 'staff'} - {profile?.full_name || user?.email || 'User'}</strong>
+          <p>{activeStaff ? 'Đang trực' : 'Đang đăng nhập'}</p>
+          <strong>
+            {activeStaff 
+              ? `${activeStaff.full_name} — ${activeStaff.staff_type === 'CT' ? 'Chính thức' : 'Thử việc'}`
+              : `${profile?.role === 'admin' ? 'Quản trị' : 'Nhân viên'} — ${profile?.full_name || 'User'}`
+            }
+          </strong>
         </div>
         <button type="button" className="logout-btn-modern" onClick={logout}>
           <LogOut size={18} /> Đăng xuất

@@ -61,6 +61,18 @@ CREATE TABLE IF NOT EXISTS shifts (
 );
 
 -- ============================================================
+-- 3b. SHIFT EXPENSES (Quản lý chi tiêu trong ca)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS shift_expenses (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  shift_id UUID NOT NULL REFERENCES shifts(id) ON DELETE CASCADE,
+  amount NUMERIC NOT NULL CHECK (amount > 0),
+  reason TEXT,
+  created_by UUID REFERENCES profiles(id),
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+-- ============================================================
 -- 4. LOGS & TRANSACTIONS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS staff_logs (
@@ -76,13 +88,13 @@ CREATE TABLE IF NOT EXISTS staff_logs (
 
 CREATE TABLE IF NOT EXISTS sales_logs (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  product_id UUID REFERENCES products(id) ON DELETE CASCADE,
+  product_id UUID REFERENCES products(id),
   shift_id UUID REFERENCES shifts(id) ON DELETE SET NULL,
-  sold_by UUID REFERENCES profiles(id),
-  sold_by_member UUID REFERENCES staff_members(id),
-  quantity INT DEFAULT 1,
+  sold_by UUID REFERENCES profiles(id), -- Tài khoản đăng nhập
+  sold_by_member UUID REFERENCES staff_members(id), -- Nhân viên trực thực tế
+  quantity INT NOT NULL,
   total_price NUMERIC NOT NULL,
-  payment_method TEXT DEFAULT 'TM' CHECK (payment_method IN ('TM', 'CK')),
+  payment_method TEXT DEFAULT 'TM',
   sold_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
@@ -90,7 +102,8 @@ CREATE TABLE IF NOT EXISTS payment_logs (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   member_id UUID REFERENCES members(id) ON DELETE CASCADE,
   shift_id UUID REFERENCES shifts(id) ON DELETE SET NULL,
-  staff_id UUID REFERENCES staff_members(id),
+  staff_id UUID REFERENCES profiles(id), -- Tài khoản đăng nhập
+  staff_member_id UUID REFERENCES staff_members(id), -- Nhân viên trực thực tế
   amount NUMERIC NOT NULL,
   payment_method TEXT DEFAULT 'TM' CHECK (payment_method IN ('TM', 'CK')),
   payment_type TEXT CHECK (payment_type IN ('new', 'renew')),
@@ -178,14 +191,14 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- B. Bán hàng nước (Atomic)
-CREATE OR REPLACE FUNCTION sell_bottle_transaction(p_product_id UUID, p_shift_id UUID, p_staff_id UUID, p_quantity INT, p_total_price NUMERIC, p_payment_method TEXT, p_sold_at TIMESTAMP WITH TIME ZONE)
+CREATE OR REPLACE FUNCTION sell_bottle_transaction(p_product_id UUID, p_shift_id UUID, p_auth_id UUID, p_staff_id UUID, p_quantity INT, p_total_price NUMERIC, p_payment_method TEXT, p_sold_at TIMESTAMP WITH TIME ZONE)
 RETURNS JSON AS $$
 DECLARE v_sale_id UUID;
 BEGIN
   IF (SELECT stock_quantity FROM products WHERE id = p_product_id) < p_quantity THEN RAISE EXCEPTION 'Hết hàng'; END IF;
   UPDATE products SET stock_quantity = stock_quantity - p_quantity WHERE id = p_product_id;
-  INSERT INTO sales_logs (product_id, shift_id, sold_by_member, quantity, total_price, payment_method, sold_at)
-  VALUES (p_product_id, p_shift_id, p_staff_id, p_quantity, p_total_price, p_payment_method, p_sold_at) RETURNING id INTO v_sale_id;
+  INSERT INTO sales_logs (product_id, shift_id, sold_by, sold_by_member, quantity, total_price, payment_method, sold_at)
+  VALUES (p_product_id, p_shift_id, p_auth_id, p_staff_id, p_quantity, p_total_price, p_payment_method, p_sold_at) RETURNING id INTO v_sale_id;
   RETURN json_build_object('success', true, 'sale_id', v_sale_id);
 END;
 $$ LANGUAGE plpgsql;
@@ -217,6 +230,59 @@ BEGIN
   INSERT INTO member_logs (member_id, staff_member_id, action, package_type, start_date, end_date, note, created_at)
   VALUES (p_member_id, p_staff_id, 'REACTIVATE', 0, p_reactivated_at, v_new_end, 'Kích hoạt lại sau bảo lưu', p_created_at);
   RETURN json_build_object('success', true, 'new_end', v_new_end);
+END;
+$$ LANGUAGE plpgsql;
+
+-- E. Tạo hội viên mới (Atomic)
+CREATE OR REPLACE FUNCTION create_member_transaction(
+  p_code TEXT, p_name TEXT, p_package_type INT, p_membership_category TEXT, 
+  p_fee NUMERIC, p_payment_method TEXT, p_shift_id UUID, p_staff_id UUID, 
+  p_fingerprint_status BOOLEAN, p_note TEXT, p_start_date DATE, p_created_at TIMESTAMP WITH TIME ZONE
+) RETURNS JSON AS $$
+DECLARE v_member_id UUID; v_payment_id UUID; v_end_date DATE;
+BEGIN
+  v_end_date := p_start_date + (p_package_type || ' months')::INTERVAL;
+  INSERT INTO members (member_code, full_name, fingerprint_status, note, created_at)
+  VALUES (p_code, p_name, p_fingerprint_status, p_note, p_created_at) RETURNING id INTO v_member_id;
+
+  INSERT INTO member_logs (member_id, staff_id, staff_member_id, action, package_type, membership_category, start_date, end_date, fee, payment_method, is_payment_verified, created_at)
+  VALUES (v_member_id, (SELECT opened_by FROM shifts WHERE id = p_shift_id), p_staff_id, 'CREATE', p_package_type, p_membership_category, p_start_date, v_end_date, p_fee, p_payment_method, (p_payment_method = 'TM'), p_created_at);
+
+  INSERT INTO payment_logs (member_id, shift_id, staff_id, staff_member_id, amount, payment_method, payment_type, is_verified, created_at)
+  VALUES (v_member_id, p_shift_id, (SELECT opened_by FROM shifts WHERE id = p_shift_id), p_staff_id, p_fee, p_payment_method, 'new', (p_payment_method = 'TM'), p_created_at) RETURNING id INTO v_payment_id;
+
+  UPDATE member_logs SET details = jsonb_build_object('payment_id', v_payment_id) WHERE member_id = v_member_id AND action = 'CREATE';
+
+  INSERT INTO staff_logs (staff_member_id, action, target_item, details, created_at)
+  VALUES (p_staff_id, 'Tạo hội viên mới', p_name, json_build_object('code', p_code, 'fee', p_fee), p_created_at);
+
+  RETURN json_build_object('success', true, 'member_id', v_member_id);
+END;
+$$ LANGUAGE plpgsql;
+
+-- F. Gia hạn hội viên (Atomic)
+CREATE OR REPLACE FUNCTION renew_member_transaction(
+  p_member_id UUID, p_package_type INT, p_membership_category TEXT, 
+  p_fee NUMERIC, p_payment_method TEXT, p_shift_id UUID, p_staff_id UUID, 
+  p_start_date DATE, p_created_at TIMESTAMP WITH TIME ZONE
+) RETURNS JSON AS $$
+DECLARE v_payment_id UUID; v_end_date DATE; v_name TEXT;
+BEGIN
+  v_end_date := p_start_date + (p_package_type || ' months')::INTERVAL;
+  SELECT full_name INTO v_name FROM members WHERE id = p_member_id;
+
+  INSERT INTO member_logs (member_id, staff_id, staff_member_id, action, package_type, membership_category, start_date, end_date, fee, payment_method, is_payment_verified, created_at)
+  VALUES (p_member_id, (SELECT opened_by FROM shifts WHERE id = p_shift_id), p_staff_id, 'RENEW', p_package_type, p_membership_category, p_start_date, v_end_date, p_fee, p_payment_method, (p_payment_method = 'TM'), p_created_at);
+
+  INSERT INTO payment_logs (member_id, shift_id, staff_id, staff_member_id, amount, payment_method, payment_type, is_verified, created_at)
+  VALUES (p_member_id, p_shift_id, (SELECT opened_by FROM shifts WHERE id = p_shift_id), p_staff_id, p_fee, p_payment_method, 'renew', (p_payment_method = 'TM'), p_created_at) RETURNING id INTO v_payment_id;
+
+  UPDATE member_logs SET details = jsonb_build_object('payment_id', v_payment_id) WHERE member_id = p_member_id AND action = 'RENEW' AND created_at = p_created_at;
+
+  INSERT INTO staff_logs (staff_member_id, action, target_item, details, created_at)
+  VALUES (p_staff_id, 'Gia hạn hội viên', v_name, json_build_object('fee', p_fee, 'months', p_package_type), p_created_at);
+
+  RETURN json_build_object('success', true, 'payment_id', v_payment_id);
 END;
 $$ LANGUAGE plpgsql;
 
@@ -261,6 +327,7 @@ ALTER TABLE members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE shifts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE staff_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE shift_expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payment_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE member_logs ENABLE ROW LEVEL SECURITY;
@@ -269,10 +336,16 @@ ALTER TABLE salary_configs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE salary_adjustments ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow all authenticated" ON profiles FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Full access staff_members" ON staff_members FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "View staff_members" ON staff_members FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Manage staff_members" ON staff_members FOR ALL TO authenticated USING (
+  EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin')
+) WITH CHECK (
+  EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin')
+);
 CREATE POLICY "Full access members" ON members FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Full access products" ON products FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Full access shifts" ON shifts FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Full access expenses" ON shift_expenses FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Full access logs" ON staff_logs FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Full access sales" ON sales_logs FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Full access payments" ON payment_logs FOR ALL TO authenticated USING (true) WITH CHECK (true);
@@ -280,3 +353,52 @@ CREATE POLICY "Full access m_logs" ON member_logs FOR ALL TO authenticated USING
 CREATE POLICY "Full access schedule" ON weekly_schedules FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Full access salary_cfg" ON salary_configs FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Full access salary_adj" ON salary_adjustments FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- ============================================================
+-- 9. AUTH TRIGGERS (Tự động tạo Profile khi có User mới)
+-- ============================================================
+
+-- Xóa trigger cũ trước để tránh lỗi dependency khi cập nhật hàm
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+
+-- Hàm xử lý khi có user mới
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, full_name, role)
+  VALUES (
+    new.id, 
+    COALESCE(new.raw_user_meta_data->>'full_name', new.email), 
+    'staff' -- Mặc định là nhân viên, admin sẽ chỉnh tay sau
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Tạo lại trigger
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- ============================================================
+-- 10. PERMISSIONS (Cấp quyền cho các role của Supabase)
+-- ============================================================
+
+-- Cấp quyền USAGE trên schema public
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+
+-- Cấp tất cả quyền trên các bảng hiện tại cho authenticated và service_role
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO authenticated, service_role;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO authenticated, service_role;
+GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO authenticated, service_role;
+
+-- Cấp quyền SELECT cho anon (để có thể thực hiện một số kiểm tra trước khi đăng nhập nếu cần)
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
+
+-- Đảm bảo các bảng tạo mới trong tương lai cũng được cấp quyền tự động
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO authenticated, service_role;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO anon;
+

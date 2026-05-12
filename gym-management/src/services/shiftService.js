@@ -84,7 +84,10 @@ export const shiftService = {
     return { valid: Boolean(active), shift: active || null };
   },
 
-  async openShift({ shiftName, startingCash = 0, note = '', staffId = null, skipTimeCheck = false }) {
+  async openShift({ shiftName, startingCash = 0, note = '', authId = null, staffId = null, skipTimeCheck = false }) {
+    // authId: id tài khoản đăng nhập (Admin/Staff)
+    // staffId: id nhân viên thực tế chọn từ dropdown (staff_members)
+
     // Validate thời gian mở ca
     validateShiftTime(shiftName, skipTimeCheck);
 
@@ -108,7 +111,8 @@ export const shiftService = {
       start_time: new Date().toISOString(),
       starting_cash: Number(startingCash || 0),
       status: 'open',
-      opened_by: staffId,
+      opened_by: authId,
+      opened_by_member: staffId,
       note,
     };
 
@@ -116,7 +120,8 @@ export const shiftService = {
     if (error) throw new Error(error.message);
 
     await staffLogService.logAction({
-      staffId,
+      staffId: authId,
+      staffMemberId: staffId,
       action: 'Mở ca trực',
       targetItem: shiftName,
       details: { startingCash },
@@ -127,11 +132,11 @@ export const shiftService = {
     return data;
   },
 
-  async closeShift({ shiftId, endingCash = 0, note = '', staffId = null, shiftName = '' }) {
-    if (staffId) {
+  async closeShift({ shiftId, endingCash = 0, note = '', authId = null, staffId = null, shiftName = '' }) {
+    if (authId) {
       const { data: shiftInfo } = await supabase.from(SHIFT_TABLE).select('opened_by').eq('id', shiftId).single();
-      if (shiftInfo && shiftInfo.opened_by !== staffId) {
-        const { data: profile } = await supabase.from('profiles').select('role').eq('id', staffId).single();
+      if (shiftInfo && shiftInfo.opened_by !== authId) {
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', authId).single();
         if (!profile || profile.role !== 'admin') {
           throw new Error('Bạn không có quyền chốt ca này. Chỉ người mở ca hoặc Quản lý mới có quyền chốt ca.');
         }
@@ -153,7 +158,8 @@ export const shiftService = {
     if (error) throw new Error(error.message);
 
     await staffLogService.logAction({
-      staffId,
+      staffId: authId,
+      staffMemberId: staffId,
       action: 'Chốt ca trực',
       targetItem: shiftName || data.shift_name,
       details: { endingCash },
@@ -170,7 +176,8 @@ export const shiftService = {
       .from(SHIFT_TABLE)
       .select(`
         *,
-        profiles:opened_by (full_name)
+        profiles:opened_by (full_name),
+        staff_members:opened_by_member (full_name)
       `)
       .eq('id', shiftId)
       .single();

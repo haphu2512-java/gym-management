@@ -60,7 +60,9 @@ export default function Logs() {
               <tr key={log.id}>
                 <td style={{ whiteSpace: 'nowrap' }}>{formatDateTime(log.created_at)}</td>
                 <td>
-                  <span className="stock-badge ok">{log.profiles?.full_name || 'Không xác định'}</span>
+                  <span className={`stock-badge ${log.staff_members?.full_name ? 'ok' : 'warning'}`}>
+                    {log.staff_members?.full_name || log.profiles?.full_name || 'Hệ thống'}
+                  </span>
                 </td>
                 <td>
                   <strong>{log.action}</strong>

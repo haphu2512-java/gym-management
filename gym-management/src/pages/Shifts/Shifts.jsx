@@ -155,6 +155,7 @@ export default function Shifts() {
 
       await staffLogService.logAction({
         staffId: user?.id,
+        staffMemberId: activeStaff?.id,
         action: 'Them khoan chi',
         targetItem: activeShift.shift_name,
         details: {
@@ -192,7 +193,8 @@ export default function Shifts() {
           shiftId: activeShift.id,
           endingCash: Number(form.ending_cash),
           note: form.note,
-          staffId: activeStaff?.id || user?.id,
+          authId: user?.id,
+          staffId: activeStaff?.id,
           shiftName: activeShift.shift_name,
         });
 
@@ -210,6 +212,7 @@ export default function Shifts() {
           shiftName: form.shift_name,
           startingCash: Number(form.starting_cash),
           note: form.note,
+          authId: user?.id,
           staffId: activeStaff.id,
           skipTimeCheck: profile?.role === 'admin' && skipTimeCheck,
         });
@@ -465,8 +468,8 @@ export default function Shifts() {
               <div className="modern-stack" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
                   <div className="modern-card" style={{ padding: '12px', background: '#f8fafc' }}>
-                    <p className="cell-sub">Nhân viên mở ca</p>
-                    <p className="cell-main">{selectedShiftSummary.shift?.profiles?.full_name || 'N/A'}</p>
+                    <p className="cell-sub">Nhân viên trực ca</p>
+                    <p className="cell-main">{selectedShiftSummary.shift?.staff_members?.full_name || selectedShiftSummary.shift?.profiles?.full_name || 'N/A'}</p>
                   </div>
                   <div className="modern-card" style={{ padding: '12px', background: '#f8fafc' }}>
                     <p className="cell-sub">Doanh thu dự kiến (TM)</p>

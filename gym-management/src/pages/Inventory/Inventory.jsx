@@ -23,7 +23,7 @@ export default function Inventory() {
 
   // Doanh thu nước của ca hiện tại
   const [drinkRevenue, setDrinkRevenue] = useState(0);
-  const [activeShift, setActiveShift] = useState(assignedShift || null);
+  const [activeShift, setActiveShift] = useState(null);
 
   // Xác nhận xóa
   const [deletingProduct, setDeletingProduct] = useState(null);
@@ -167,7 +167,14 @@ export default function Inventory() {
     }
 
     try {
-      await productService.sellProduct(product, qty, shiftId, activeStaff?.id || user?.id, method);
+      await productService.sellProduct(
+        product, 
+        qty, 
+        activeShift.id, 
+        user?.id, 
+        activeStaff?.id,
+        method
+      );
 
       // Update local state
       setProducts((prev) => prev.map((item) =>
@@ -413,7 +420,7 @@ export default function Inventory() {
                         {log.payment_method === 'CK' ? 'Chuyển khoản' : 'Tiền mặt'}
                       </span>
                     </td>
-                    <td><p className="cell-main">{log.profiles?.full_name || 'N/A'}</p></td>
+                    <td><p className="cell-main">{log.staff_members?.full_name || log.profiles?.full_name || 'N/A'}</p></td>
                   </tr>
                 ))}
               </tbody>

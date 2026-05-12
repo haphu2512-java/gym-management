@@ -41,14 +41,9 @@ BEGIN
   END IF;
 
   -- 3) Tạo danh sách nhân viên thực tế (staff_members)
-  INSERT INTO staff_members (full_name, staff_type, note) VALUES
-    ('Trâm Anh', 'CT', 'Nhân viên ca sáng'),
-    ('Anh Phú', 'CT', 'Nhân viên ca tối'),
-    ('Hồng Nhung', 'TV', 'Nhân viên thử việc')
-  RETURNING id INTO v_staff_1;
-  
-  SELECT id INTO v_staff_2 FROM staff_members WHERE full_name = 'Anh Phú';
-  SELECT id INTO v_staff_3 FROM staff_members WHERE full_name = 'Hồng Nhung';
+  INSERT INTO staff_members (full_name, staff_type, note) VALUES ('Trâm Anh', 'CT', 'Nhân viên ca sáng') RETURNING id INTO v_staff_1;
+  INSERT INTO staff_members (full_name, staff_type, note) VALUES ('Anh Phú', 'CT', 'Nhân viên ca tối') RETURNING id INTO v_staff_2;
+  INSERT INTO staff_members (full_name, staff_type, note) VALUES ('Hồng Nhung', 'TV', 'Nhân viên thử việc') RETURNING id INTO v_staff_3;
 
   -- 4) Sản phẩm
   INSERT INTO products (name, price, stock_quantity, note) VALUES
@@ -56,6 +51,20 @@ BEGIN
     ('Pocari Sweat', 15000, 50, 'Bù khoáng'),
     ('Revive', 15000, 60, 'Chanh muối'),
     ('Monster Energy', 35000, 20, 'Tăng lực');
+
+
+  INSERT INTO products (name, price, stock_quantity, note) VALUES
+    ('Nuoc suoi', 10000, 100, 'Chai nho'),
+    ('Nuoc suoi lon', 15000, 80, 'Chai lon'),
+    ('Revive vang', 15000, 50, 'Vi chanh muoi'),
+    ('Revive trang', 15000, 60, 'Vi truyen thong'),
+    ('Revive 0 calo', 18000, 40, 'Ho tro an kieng'),
+    ('Pocari', 15000, 70, 'Chai nho'),
+    ('Pocari lon', 22000, 45, 'Chai lon'),
+    ('Sua', 20000, 30, 'Sua hop bo sung'),
+    ('Monster', 35000, 25, 'Nuoc tang luc'),
+    ('Nutri', 15000, 40, 'Nuoc trai cay milk');
+
 
   -- 5) Cấu hình lương (Salary Configs)
   INSERT INTO salary_configs (shift_name, staff_type, rate_per_shift) VALUES

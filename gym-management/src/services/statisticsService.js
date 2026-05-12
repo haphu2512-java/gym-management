@@ -10,6 +10,7 @@ export const statisticsService = {
         sold_at,
         products (name),
         profiles:sold_by (full_name),
+        staff_members:sold_by_member (full_name),
         shifts (shift_name)
       `);
 
@@ -27,7 +28,7 @@ export const statisticsService = {
     const grouped = {};
 
     (data || []).forEach(log => {
-      const staffName = log.profiles?.full_name || 'Không xác định';
+      const staffName = log.staff_members?.full_name || log.profiles?.full_name || 'Hệ thống';
       const shiftName = log.shifts?.shift_name || 'N/A';
       const productName = log.products?.name || 'Sản phẩm lạ';
 
