@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { staffService } from '../../services/staffService';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useUIStore } from '../../store/useUIStore';
 import { formatDate } from '../../utils/formatters';
 
 const DAYS = ['Mon', 'Tues', 'Wed', 'Thur', 'Fri', 'Sat', 'Sun'];
@@ -20,6 +21,7 @@ function getMonday(d) {
 
 export default function Staff() {
   const { profile } = useAuthStore();
+  const { showConfirm, addToast } = useUIStore();
   const [staffs, setStaffs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -97,7 +99,7 @@ export default function Staff() {
       }
       setSchedule(prev => ({ ...prev, [`${shift}-${day}`]: staffId }));
     } catch (e) {
-      alert("Lỗi cập nhật lịch: " + e.message);
+      addToast("Lỗi cập nhật lịch: " + e.message, "error");
     }
   };
 
@@ -106,7 +108,7 @@ export default function Staff() {
       await staffService.updateSalaryRate(id, Number(val));
       setSalaryConfigs(prev => prev.map(c => c.id === id ? { ...c, rate_per_shift: Number(val) } : c));
     } catch (e) {
-      alert("Lỗi cập nhật đơn giá: " + e.message);
+      addToast("Lỗi cập nhật đơn giá: " + e.message, "error");
     }
   };
 
@@ -115,7 +117,7 @@ export default function Staff() {
       await staffService.updateStaffProfile(staffId, { staff_type: val });
       setStaffs(prev => prev.map(s => s.id === staffId ? { ...s, staff_type: val } : s));
     } catch (e) {
-      alert("Lỗi cập nhật loại nhân viên: " + e.message);
+      addToast("Lỗi cập nhật loại nhân viên: " + e.message, "error");
     }
   };
 
@@ -128,18 +130,25 @@ export default function Staff() {
       setShowAddForm(false);
       loadData();
     } catch (e) {
-      alert("Lỗi thêm nhân viên: " + e.message);
+      addToast("Lỗi thêm nhân viên: " + e.message, "error");
     }
   };
 
   const handleDeleteStaff = async (id, name) => {
-    if (!window.confirm(`Bạn có chắc muốn xóa nhân viên "${name}"? Các lịch làm việc liên quan cũng sẽ bị ảnh hưởng.`)) return;
-    try {
-      await staffService.deleteStaffMember(id);
-      loadData();
-    } catch (e) {
-      alert("Lỗi xóa nhân viên: " + e.message);
-    }
+    showConfirm({
+      title: 'Xóa nhân viên',
+      message: `Bạn có chắc muốn xóa nhân viên "${name}"? Các lịch làm việc liên quan cũng sẽ bị ảnh hưởng.`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await staffService.deleteStaffMember(id);
+          loadData();
+          addToast("Đã xóa nhân viên thành công!");
+        } catch (e) {
+          addToast("Lỗi xóa nhân viên: " + e.message, "error");
+        }
+      }
+    });
   };
 
   const updateAdj = async (staffId, field, val) => {
@@ -229,15 +238,21 @@ export default function Staff() {
             onChange={(e) => setWeekStart(getMonday(e.target.value))}
             style={{ padding: '6px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
           />
-          <button className="ghost-btn" onClick={async () => {
-            if(window.confirm('Bạn có chắc muốn xóa sạch bảng xếp ca tuần này trên hệ thống?')) {
-               try {
-                 await staffService.deleteWeeklySchedule(weekStart);
-                 setSchedule({});
-               } catch(e) {
-                 alert("Lỗi: " + e.message);
-               }
-            }
+          <button className="ghost-btn" onClick={() => {
+            showConfirm({
+              title: 'Xóa lịch tuần',
+              message: 'Bạn có chắc muốn xóa sạch bảng xếp ca tuần này trên hệ thống?',
+              type: 'danger',
+              onConfirm: async () => {
+                try {
+                  await staffService.deleteWeeklySchedule(weekStart);
+                  setSchedule({});
+                  addToast("Đã xóa lịch tuần thành công!");
+                } catch(e) {
+                  addToast("Lỗi: " + e.message, "error");
+                }
+              }
+            });
           }}>Xóa lịch tuần</button>
           <button className="modern-btn" onClick={() => setShowAddForm(!showAddForm)}>
             {showAddForm ? 'Hủy' : '+ Thêm nhân viên'}

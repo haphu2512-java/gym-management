@@ -14,6 +14,8 @@ import Shifts from './pages/Shifts/Shifts';
 import Staff from './pages/Staff/Staff';
 import Logs from './pages/Logs/Logs';
 import Statistics from './pages/Statistics/Statistics';
+import ToastContainer from './components/common/ToastContainer';
+import ConfirmDialog from './components/common/ConfirmDialog';
 
 import { useAuthStore } from './store/useAuthStore';
 import supabase from './config/supabase';
@@ -41,6 +43,8 @@ function App() {
 
   return (
     <BrowserRouter>
+      <ToastContainer />
+      <ConfirmDialog />
       <Routes>
         <Route path="/login" element={<Login />} />
 

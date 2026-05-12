@@ -6,6 +6,7 @@ import { shiftService } from '../../services/shiftService';
 import { memberLogService } from '../../services/memberLogService';
 import supabase from '../../config/supabase';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useUIStore } from '../../store/useUIStore';
 import { getLocalISODate, addMonths } from '../../utils/formatters';
 import MembersToolbar from './MembersToolbar';
 import MembersTable from './MembersTable';
@@ -39,6 +40,7 @@ const initialForm = {
 
 export default function Members() {
   const { user, profile, activeStaff } = useAuthStore();
+  const { showConfirm, addToast } = useUIStore();
   const { members, loading, addMember, updateMember, fetchMembers, suspendMember, reactivateMember } = useMembers();
   const [activeTab, setActiveTab] = useState('active');
   const [searchTerm, setSearchTerm] = useState('');
@@ -109,37 +111,44 @@ export default function Members() {
 
   // Xử lý xác nhận thanh toán từ lịch sử
   const handleLogVerification = async (log) => {
-    if (!window.confirm(`Xác nhận đã nhận đủ ${Number(log.fee || 0).toLocaleString()}đ chuyển khoản cho lần gia hạn này?`)) return;
+    showConfirm({
+      title: 'Xác nhận chuyển khoản',
+      message: `Xác nhận đã nhận đủ ${Number(log.fee || 0).toLocaleString()}đ chuyển khoản cho lần gia hạn này?`,
+      onConfirm: async () => {
+        try {
+          await memberService.verifyLogPayment(log.id, user?.id, activeStaff?.id);
 
-    try {
-      await memberService.verifyLogPayment(log.id, user?.id, activeStaff?.id);
+          setHistoryLogs(prevLogs =>
+            prevLogs.map(l => l.id === log.id ? { ...l, is_payment_verified: true } : l)
+          );
 
-      setHistoryLogs(prevLogs =>
-        prevLogs.map(l => l.id === log.id ? { ...l, is_payment_verified: true } : l)
-      );
+          await fetchMembers();
 
-      await fetchMembers();
+          if (editingMember && editingMember.id === log.member_id) {
+            const { data: freshMember } = await supabase
+              .from('member_current_status')
+              .select('*')
+              .eq('id', log.member_id)
+              .single();
+            if (freshMember) setEditingMember(freshMember);
+          }
 
-      if (editingMember && editingMember.id === log.member_id) {
-        const { data: freshMember } = await supabase
-          .from('member_current_status')
-          .select('*')
-          .eq('id', log.member_id)
-          .single();
-        if (freshMember) setEditingMember(freshMember);
+          await staffLogService.logAction({
+            staffId: user?.id,
+            staffMemberId: activeStaff?.id,
+            action: 'Duyệt thanh toán CK',
+            targetItem: `Gia hạn ID: ${log.id}`,
+            details: { log_id: log.id, member_id: log.member_id },
+            note: 'Admin duyệt thanh toán từ bảng lịch sử chi tiết',
+          });
+          
+          addToast("Đã duyệt thanh toán thành công!");
+        } catch (err) {
+          setError("Lỗi duyệt thanh toán: " + err.message);
+          addToast("Lỗi duyệt thanh toán", "error");
+        }
       }
-
-      await staffLogService.logAction({
-        staffId: user?.id,
-        staffMemberId: activeStaff?.id,
-        action: 'Duyệt thanh toán CK',
-        targetItem: `Gia hạn ID: ${log.id}`,
-        details: { log_id: log.id, member_id: log.member_id },
-        note: 'Admin duyệt thanh toán từ bảng lịch sử chi tiết',
-      });
-    } catch (err) {
-      setError("Lỗi duyệt thanh toán: " + err.message);
-    }
+    });
   };
 
   // Xử lý xóa hội viên
@@ -361,7 +370,7 @@ export default function Members() {
     const diffDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
     if (diffDays < 13) {
-      alert(`Không thể bảo lưu. Hội viên chỉ còn ${diffDays} ngày tập (yêu cầu tối thiểu 13 ngày).`);
+      addToast(`Không thể bảo lưu. Hội viên chỉ còn ${diffDays} ngày tập (yêu cầu tối thiểu 13 ngày).`, "error");
       return;
     }
 
@@ -384,12 +393,19 @@ export default function Members() {
 
   // Kích hoạt lại hội viên
   const handleReactivate = async (member) => {
-    if (!window.confirm(`Kích hoạt lại cho hội viên ${member.full_name}? Ngày hết hạn mới sẽ được cộng thêm ${member.remaining_days} ngày kể từ hôm nay.`)) return;
-    try {
-      await reactivateMember(member.id, activeStaff?.id || user?.id);
-    } catch (err) {
-      setError("Lỗi kích hoạt lại: " + err.message);
-    }
+    showConfirm({
+      title: 'Kích hoạt lại hội viên',
+      message: `Kích hoạt lại cho hội viên ${member.full_name}? Ngày hết hạn mới sẽ được cộng thêm ${member.remaining_days} ngày kể từ hôm nay.`,
+      onConfirm: async () => {
+        try {
+          await reactivateMember(member.id, activeStaff?.id || user?.id);
+          addToast("Đã kích hoạt lại hội viên thành công!");
+        } catch (err) {
+          setError("Lỗi kích hoạt lại: " + err.message);
+          addToast("Lỗi kích hoạt lại", "error");
+        }
+      }
+    });
   };
 
 
