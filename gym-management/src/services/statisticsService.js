@@ -78,21 +78,43 @@ export const statisticsService = {
   },
 
   async getDailyRevenue(filters = {}) {
-    const { data: sales } = await supabase.from('sales_logs').select('total_price, sold_at').gte('sold_at', filters.startDate || '2000-01-01');
-    const { data: payments } = await supabase.from('payment_logs').select('amount, created_at').eq('is_verified', true).gte('created_at', filters.startDate || '2000-01-01');
+    let salesQuery = supabase.from('sales_logs').select('total_price, sold_at');
+    let paymentQuery = supabase.from('payment_logs').select('amount, created_at').eq('is_verified', true);
 
+    if (filters.startDate) {
+      salesQuery = salesQuery.gte('sold_at', filters.startDate);
+      paymentQuery = paymentQuery.gte('created_at', filters.startDate);
+    }
+    if (filters.endDate) {
+      salesQuery = salesQuery.lte('sold_at', filters.endDate);
+      paymentQuery = paymentQuery.lte('created_at', filters.endDate);
+    }
+
+    const [salesRes, paymentRes] = await Promise.all([salesQuery, paymentQuery]);
+    const sales = salesRes.data || [];
+    const payments = paymentRes.data || [];
+
+    const dayLabels = ['CN', 'Th 2', 'Th 3', 'Th 4', 'Th 5', 'Th 6', 'Th 7'];
     const daily = {};
 
-    (sales || []).forEach(s => {
-      const day = new Date(s.sold_at).toLocaleDateString('vi-VN', { weekday: 'short' });
+    sales.forEach(s => {
+      const date = s.sold_at ? new Date(s.sold_at) : null;
+      if (!date || isNaN(date.getTime())) return;
+      
+      const dayIndex = date.getDay();
+      const day = dayLabels[dayIndex];
       if (!daily[day]) daily[day] = { day, member: 0, water: 0 };
-      daily[day].water += Number(s.total_price);
+      daily[day].water += Number(s.total_price || 0);
     });
 
-    (payments || []).forEach(p => {
-      const day = new Date(p.created_at).toLocaleDateString('vi-VN', { weekday: 'short' });
+    payments.forEach(p => {
+      const date = p.created_at ? new Date(p.created_at) : null;
+      if (!date || isNaN(date.getTime())) return;
+
+      const dayIndex = date.getDay();
+      const day = dayLabels[dayIndex];
       if (!daily[day]) daily[day] = { day, member: 0, water: 0 };
-      daily[day].member += Number(p.amount);
+      daily[day].member += Number(p.amount || 0);
     });
 
     const order = ['Th 2', 'Th 3', 'Th 4', 'Th 5', 'Th 6', 'Th 7', 'CN'];
@@ -100,11 +122,14 @@ export const statisticsService = {
   },
 
   async getPackageStats() {
-    const { data } = await supabase.from('member_logs').select('package_type').not('package_type', 'is', null);
+    const { data } = await supabase
+      .from('member_current_status')
+      .select('package_type')
+      .not('package_type', 'is', null);
     
     const counts = {};
-    (data || []).forEach(log => {
-      const label = `Gói ${log.package_type} tháng`;
+    (data || []).forEach(m => {
+      const label = `Gói ${m.package_type} tháng`;
       counts[label] = (counts[label] || 0) + 1;
     });
 

@@ -20,17 +20,17 @@ export default function Sidebar({ isOpen, onClose }) {
   const baseItems = [
     { key: 'dashboard', path: '/dashboard', label: 'Báo Cáo Chung' },
     { key: 'members', path: '/members', label: 'Quản Lý Hội Viên' },
-    { key: 'inventory', path: '/inventory', label: 'Quản Lý Nước' },
+    { key: 'inventory', path: '/inventory', label: 'Quản Lý Nước và Tập Ngày' },
     { key: 'shifts', path: '/shifts', label: 'Ca Làm & Bàn Giao' },
   ];
 
   const menuItems = profile?.role === 'admin'
     ? [
-        ...baseItems, 
-        { key: 'statistics', path: '/statistics', label: 'Thống Kê Chi Tiết' },
-        { key: 'staff', path: '/staff', label: 'Nhân Viên & Lương' },
-        { key: 'logs', path: '/logs', label: 'Nhật Ký Hoạt Động' }
-      ]
+      ...baseItems,
+      { key: 'statistics', path: '/statistics', label: 'Thống Kê Chi Tiết' },
+      { key: 'staff', path: '/staff', label: 'Nhân Viên & Lương' },
+      { key: 'logs', path: '/logs', label: 'Nhật Ký Hoạt Động' }
+    ]
     : baseItems.filter((item) => item.key !== 'dashboard');
 
   return (
@@ -66,7 +66,7 @@ export default function Sidebar({ isOpen, onClose }) {
         <div className="user-box">
           <p>{activeStaff ? 'Đang trực' : 'Đang đăng nhập'}</p>
           <strong>
-            {activeStaff 
+            {activeStaff
               ? `${activeStaff.full_name} — ${activeStaff.staff_type === 'CT' ? 'Chính thức' : 'Thử việc'}`
               : `${profile?.role === 'admin' ? 'Quản trị' : 'Nhân viên'} — ${profile?.full_name || 'User'}`
             }

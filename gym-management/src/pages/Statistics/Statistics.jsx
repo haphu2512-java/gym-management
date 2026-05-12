@@ -21,16 +21,17 @@ export default function Statistics() {
         let startDate = null;
         let endDate = null;
         const now = new Date();
+        const baseDate = new Date(now); // Create a copy to avoid mutation
 
         if (dateRange === 'today') {
-          startDate = new Date(now.setHours(0, 0, 0, 0)).toISOString();
+          startDate = new Date(baseDate.setHours(0, 0, 0, 0)).toISOString();
         } else if (dateRange === 'week') {
-          const first = now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1); // Monday
-          startDate = new Date(now.setDate(first));
+          const first = baseDate.getDate() - baseDate.getDay() + (baseDate.getDay() === 0 ? -6 : 1); 
+          startDate = new Date(baseDate.setDate(first));
           startDate.setHours(0, 0, 0, 0);
           startDate = startDate.toISOString();
         } else if (dateRange === 'month') {
-          startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+          startDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1).toISOString();
         } else if (dateRange === 'custom') {
           startDate = new Date(customStartDate);
           startDate.setHours(0, 0, 0, 0);
@@ -206,12 +207,17 @@ export default function Statistics() {
               width: '150px', 
               height: '150px', 
               borderRadius: '50%', 
-              background: packageStats.length > 0 
-                ? `conic-gradient(${packageStats.map((p, i) => {
-                    const prevPercent = packageStats.slice(0, i).reduce((s, x) => s + (x.count / totalMembers) * 100, 0);
-                    const currPercent = prevPercent + (p.count / totalMembers) * 100;
-                    return `${p.color} ${prevPercent}% ${currPercent}%`;
-                  }).join(', ')})`
+              background: totalMembers > 0 
+                ? (() => {
+                    let cumulative = 0;
+                    const segments = packageStats.map(p => {
+                      const start = cumulative;
+                      const end = start + (p.count / totalMembers) * 100;
+                      cumulative = end;
+                      return `${p.color} ${start}% ${end}%`;
+                    });
+                    return `conic-gradient(${segments.join(', ')})`;
+                  })()
                 : '#f1f5f9', 
               position: 'relative' 
             }}>
