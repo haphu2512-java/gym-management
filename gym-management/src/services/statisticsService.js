@@ -75,5 +75,44 @@ export const statisticsService = {
       memberRevenue,
       totalRevenue: waterRevenue + memberRevenue
     };
+  },
+
+  async getDailyRevenue(filters = {}) {
+    const { data: sales } = await supabase.from('sales_logs').select('total_price, sold_at').gte('sold_at', filters.startDate || '2000-01-01');
+    const { data: payments } = await supabase.from('payment_logs').select('amount, created_at').eq('is_verified', true).gte('created_at', filters.startDate || '2000-01-01');
+
+    const daily = {};
+
+    (sales || []).forEach(s => {
+      const day = new Date(s.sold_at).toLocaleDateString('vi-VN', { weekday: 'short' });
+      if (!daily[day]) daily[day] = { day, member: 0, water: 0 };
+      daily[day].water += Number(s.total_price);
+    });
+
+    (payments || []).forEach(p => {
+      const day = new Date(p.created_at).toLocaleDateString('vi-VN', { weekday: 'short' });
+      if (!daily[day]) daily[day] = { day, member: 0, water: 0 };
+      daily[day].member += Number(p.amount);
+    });
+
+    const order = ['Th 2', 'Th 3', 'Th 4', 'Th 5', 'Th 6', 'Th 7', 'CN'];
+    return order.map(d => daily[d] || { day: d, member: 0, water: 0 });
+  },
+
+  async getPackageStats() {
+    const { data } = await supabase.from('member_logs').select('package_type').not('package_type', 'is', null);
+    
+    const counts = {};
+    (data || []).forEach(log => {
+      const label = `Gói ${log.package_type} tháng`;
+      counts[label] = (counts[label] || 0) + 1;
+    });
+
+    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+    return Object.entries(counts).map(([label, count], idx) => ({
+      label,
+      count,
+      color: colors[idx % colors.length]
+    })).sort((a, b) => b.count - a.count);
   }
 };

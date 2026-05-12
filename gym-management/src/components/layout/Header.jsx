@@ -57,7 +57,12 @@ export default function Header({ onMenuToggle }) {
 
       <div className="desktop-title-row">
         <div>
-          <h2>{title}</h2>
+          <h2>
+            <button className="desktop-toggle" onClick={onMenuToggle} title="Bật/Ẩn Sidebar">
+              <LayoutDashboard size={24} />
+            </button>
+            {title}
+          </h2>
           <p>{getGreeting()} Hôm nay là ngày {formatDate(new Date())}</p>
         </div>
         <div className="system-status" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>

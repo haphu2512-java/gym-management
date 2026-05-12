@@ -2,37 +2,14 @@ import { useState, useMemo, useEffect } from 'react';
 import { BarChart3, PieChart, TrendingUp, Users, Droplets, Calendar, Download, User } from 'lucide-react';
 import { statisticsService } from '../../services/statisticsService';
 
-// --- MOCK DATA (Fallback) ---
-const REVENUE_DATA = [
-  { day: 'Thứ 2', member: 1200000, water: 350000 },
-  { day: 'Thứ 3', member: 900000, water: 280000 },
-  { day: 'Thứ 4', member: 1500000, water: 420000 },
-  { day: 'Thứ 5', member: 1100000, water: 310000 },
-  { day: 'Thứ 6', member: 2100000, water: 550000 },
-  { day: 'Thứ 7', member: 2500000, water: 720000 },
-  { day: 'Chủ nhật', member: 1800000, water: 480000 },
-];
-
-const PACKAGE_DATA = [
-  { label: 'Gói 1 tháng', count: 45, color: '#3b82f6' },
-  { label: 'Gói 3 tháng', count: 28, color: '#10b981' },
-  { label: 'Gói 6 tháng', count: 15, color: '#f59e0b' },
-  { label: 'Gói 12 tháng', count: 12, color: '#ef4444' },
-];
-
-const TOP_PRODUCTS = [
-  { name: 'Nước suối Aquafina', quantity: 145, revenue: 1450000 },
-  { name: 'Sting dâu', quantity: 82, revenue: 1230000 },
-  { name: 'Nước khoáng Vĩnh Hảo', quantity: 64, revenue: 640000 },
-  { name: 'Bò húc', quantity: 48, revenue: 960000 },
-];
-
 export default function Statistics() {
   const [dateRange, setDateRange] = useState('week');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [waterStatsByStaff, setWaterStatsByStaff] = useState({});
   const [overallStats, setOverallStats] = useState({ waterRevenue: 0, memberRevenue: 0, totalRevenue: 0 });
+  const [dailyRevenue, setDailyRevenue] = useState([]);
+  const [packageStats, setPackageStats] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -64,13 +41,17 @@ export default function Statistics() {
           endDate = endDate.toISOString();
         }
 
-        const [waterStats, overall] = await Promise.all([
+        const [waterStats, overall, daily, pkg] = await Promise.all([
           statisticsService.getWaterStatsByShiftAndStaff({ startDate, endDate }),
-          statisticsService.getOverallStats({ startDate, endDate })
+          statisticsService.getOverallStats({ startDate, endDate }),
+          statisticsService.getDailyRevenue({ startDate, endDate }),
+          statisticsService.getPackageStats()
         ]);
 
         setWaterStatsByStaff(waterStats);
         setOverallStats(overall);
+        setDailyRevenue(daily);
+        setPackageStats(pkg);
       } catch (error) {
         console.error("Error fetching statistics:", error);
       } finally {
@@ -82,20 +63,19 @@ export default function Statistics() {
   }, [dateRange, customStartDate, customEndDate]);
 
   const totals = useMemo(() => {
-    // If we have real data, use it, otherwise fallback to mock for visuals
-    if (overallStats.totalRevenue > 0) {
-      return {
-        memberTotal: overallStats.memberRevenue,
-        waterTotal: overallStats.waterRevenue,
-        combined: overallStats.totalRevenue
-      };
-    }
-    const memberTotal = REVENUE_DATA.reduce((acc, curr) => acc + curr.member, 0);
-    const waterTotal = REVENUE_DATA.reduce((acc, curr) => acc + curr.water, 0);
-    return { memberTotal, waterTotal, combined: memberTotal + waterTotal };
+    return {
+      memberTotal: overallStats.memberRevenue,
+      waterTotal: overallStats.waterRevenue,
+      combined: overallStats.totalRevenue
+    };
   }, [overallStats]);
 
-  const maxRevenue = Math.max(...REVENUE_DATA.map(d => d.member + d.water));
+  const maxRevenue = useMemo(() => {
+    const vals = dailyRevenue.map(d => d.member + d.water);
+    return vals.length > 0 ? Math.max(...vals, 100000) : 100000;
+  }, [dailyRevenue]);
+
+  const totalMembers = useMemo(() => packageStats.reduce((s, p) => s + p.count, 0), [packageStats]);
 
   return (
     <div className="modern-stack">
@@ -187,20 +167,20 @@ export default function Statistics() {
             </div>
           </div>
           <div style={{ height: '240px', display: 'flex', alignItems: 'flex-end', gap: '12px', paddingBottom: '30px', position: 'relative' }}>
-            {REVENUE_DATA.map((data, idx) => {
+            {dailyRevenue.map((data, idx) => {
               const total = data.member + data.water;
               const height = (total / maxRevenue) * 100;
-              const memberHeight = (data.member / total) * 100;
-
+              const memberHeight = total > 0 ? (data.member / total) * 100 : 0;
+              
               return (
                 <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                  <div
-                    className="chart-bar-group"
-                    style={{
-                      width: '100%',
-                      height: `${height}%`,
-                      background: '#93c5fd',
-                      borderRadius: '4px 4px 0 0',
+                  <div 
+                    className="chart-bar-group" 
+                    style={{ 
+                      width: '100%', 
+                      height: `${Math.max(height, 2)}%`, 
+                      background: '#93c5fd', 
+                      borderRadius: '4px 4px 0 0', 
                       position: 'relative',
                       display: 'flex',
                       flexDirection: 'column-reverse',
@@ -214,6 +194,7 @@ export default function Statistics() {
                 </div>
               );
             })}
+            {dailyRevenue.length === 0 && <div className="muted-text" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>Chưa có dữ liệu doanh thu</div>}
           </div>
         </div>
 
@@ -221,13 +202,25 @@ export default function Statistics() {
         <div className="modern-card">
           <h4 className="modern-title"><PieChart size={18} /> Cơ cấu gói tập đăng ký</h4>
           <div style={{ display: 'flex', alignItems: 'center', gap: '30px', marginTop: '20px' }}>
-            <div style={{ width: '150px', height: '150px', borderRadius: '50%', background: 'conic-gradient(#3b82f6 0% 45%, #10b981 45% 73%, #f59e0b 73% 88%, #ef4444 88% 100%)', position: 'relative' }}>
-              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '80px', height: '80px', background: '#fff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#1e293b' }}>
-                100 HV
+            <div style={{ 
+              width: '150px', 
+              height: '150px', 
+              borderRadius: '50%', 
+              background: packageStats.length > 0 
+                ? `conic-gradient(${packageStats.map((p, i) => {
+                    const prevPercent = packageStats.slice(0, i).reduce((s, x) => s + (x.count / totalMembers) * 100, 0);
+                    const currPercent = prevPercent + (p.count / totalMembers) * 100;
+                    return `${p.color} ${prevPercent}% ${currPercent}%`;
+                  }).join(', ')})`
+                : '#f1f5f9', 
+              position: 'relative' 
+            }}>
+              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '80px', height: '80px', background: '#fff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#1e293b', fontSize: '14px', textAlign: 'center' }}>
+                {totalMembers} HV
               </div>
             </div>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {PACKAGE_DATA.map((item, idx) => (
+              {packageStats.map((item, idx) => (
                 <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <div style={{ width: '12px', height: '12px', background: item.color, borderRadius: '3px' }}></div>
@@ -236,6 +229,7 @@ export default function Statistics() {
                   <span style={{ fontSize: '13px', fontWeight: 'bold' }}>{item.count} HV</span>
                 </div>
               ))}
+              {packageStats.length === 0 && <p className="muted-text">Chưa có dữ liệu gói tập</p>}
             </div>
           </div>
         </div>
@@ -310,40 +304,7 @@ export default function Statistics() {
         </div>
       </div>
 
-      {/* Top Products */}
-      {/* <div className="modern-card">
-        <h4 className="modern-title"><Droplets size={18} /> Top sản phẩm bán chạy nhất</h4>
-        <div className="modern-table-wrap" style={{ marginTop: '10px' }}>
-          <table className="modern-table">
-            <thead>
-              <tr>
-                <th>Sản phẩm</th>
-                <th>Số lượng đã bán</th>
-                <th>Doanh thu</th>
-                <th style={{ width: '200px' }}>Tỷ trọng</th>
-              </tr>
-            </thead>
-            <tbody>
-              {TOP_PRODUCTS.map((p, idx) => {
-                const maxQty = TOP_PRODUCTS[0].quantity;
-                const width = (p.quantity / maxQty) * 100;
-                return (
-                  <tr key={idx}>
-                    <td><p className="cell-main">{p.name}</p></td>
-                    <td><p className="cell-main">{p.quantity} chai</p></td>
-                    <td><p className="cell-main">{p.revenue.toLocaleString('vi-VN')}đ</p></td>
-                    <td>
-                      <div style={{ width: '100%', height: '8px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
-                        <div style={{ width: `${width}%`, height: '100%', background: '#3b82f6' }}></div>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div> */}
+
     </div>
   );
 }

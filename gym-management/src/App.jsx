@@ -48,10 +48,10 @@ function App() {
           path="/*"
           element={
             <ProtectedRoute>
-              <div className="modern-shell">
-                <Sidebar isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)} />
-                <div className="modern-main">
-                  <Header onMenuToggle={() => setSidebarOpen((prev) => !prev)} />
+            <div className={`modern-shell ${!isSidebarOpen ? 'sidebar-closed' : ''}`}>
+              <Sidebar isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)} />
+              <div className="modern-main">
+                <Header onMenuToggle={() => setSidebarOpen((prev) => !prev)} isSidebarOpen={isSidebarOpen} />
                   <div className="modern-content">
                     <Routes>
                       <Route
