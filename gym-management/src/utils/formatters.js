@@ -7,18 +7,34 @@ export const formatCurrency = (value) => {
   }).format(value);
 };
 
-// Format date to DD/MM/YYYY
+// Format date to DD-MM-YYYY
 export const formatDate = (date) => {
   if (!date) return '';
   const d = new Date(date);
-  return d.toLocaleDateString('vi-VN');
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
 };
 
-// Format date and time to DD/MM/YYYY HH:MM
+// Format date and time to DD-MM-YYYY HH:mm
 export const formatDateTime = (date) => {
   if (!date) return '';
   const d = new Date(date);
-  return d.toLocaleString('vi-VN');
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  return `${day}-${month}-${year} ${hours}:${minutes}`;
+};
+
+// Get local ISO date string (YYYY-MM-DD) without UTC shift
+export const getLocalISODate = (date = new Date()) => {
+  const d = new Date(date);
+  const offset = d.getTimezoneOffset();
+  const localDate = new Date(d.getTime() - (offset * 60 * 1000));
+  return localDate.toISOString().split('T')[0];
 };
 
 // Format time to HH:MM

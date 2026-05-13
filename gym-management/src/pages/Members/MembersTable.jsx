@@ -1,0 +1,155 @@
+import { Eye, Trash2, RefreshCcw, PauseCircle, Plus } from 'lucide-react';
+import { formatDate } from '../../utils/formatters';
+
+function getStatus(member) {
+  if (member.suspended_at) return 'Suspended';
+  const today = new Date();
+  const target = new Date(member.end_date);
+  return target >= new Date(today.toDateString()) ? 'Active' : 'Expired';
+}
+
+export default function MembersTable({
+  members,
+  loading,
+  filtered,
+  activeTab,
+  profile,
+  onEditMember,
+  onRenewMember,
+  onSuspendMember,
+  onReactivateMember,
+  onDeleteMember
+}) {
+  return (
+    <div className="modern-table-wrap">
+      <table className="modern-table">
+        <thead>
+          <tr>
+            <th>Ngày gia hạn</th>
+            <th>Mã hội viên</th>
+            <th>Ngày hết hạn</th>
+            <th>Trạng thái</th>
+            {activeTab === 'suspended' && <th>Ngày bảo lưu</th>}
+            <th>Ghi chú</th>
+            <th>Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          {!loading && filtered.length === 0 && (
+            <tr>
+              <td colSpan={6} className="table-empty-cell">Không có dữ liệu</td>
+            </tr>
+          )}
+          {filtered.map((m) => {
+            const status = getStatus(m);
+            return (
+              <tr key={m.id}>
+                <td>
+                  <p className="cell-main">{formatDate(m.start_date) || 'N/A'}</p>
+                </td>
+                <td>
+                  <p className="cell-main">{m.member_code}</p>
+                  <p className="cell-sub">{m.full_name}</p>
+                </td>
+                <td>
+                  <p className="cell-main">{formatDate(m.end_date) || 'N/A'}</p>
+                  <p className="cell-sub">
+                    {m.membership_category ? `(${m.membership_category.toUpperCase()}) ` : ''}
+                    {m.package_type ? `${m.package_type} tháng` : 'Chưa có gói'} - {Number(m.fee || 0).toLocaleString()}đ
+                  </p>
+                </td>
+                <td>
+                  <span
+                    className={`status-badge ${status === 'Active' ? 'active' : status === 'Suspended' ? 'suspended' : 'expired'}`}
+                    style={status === 'Suspended' ? { background: '#fef3c7', color: '#92400e' } : {}}
+                  >
+                    {status === 'Active' ? 'Đang tập' : status === 'Suspended' ? 'Bảo lưu' : 'Hết hạn'}
+                  </span>
+                  {m.payment_method === 'CK' && !m.is_payment_verified && (
+                    <span className="pay-badge" style={{ background: '#fef08a', color: '#854d0e', marginLeft: '4px' }}>Chờ duyệt</span>
+                  )}
+                </td>
+                {activeTab === 'suspended' && (
+                  <td>
+                    <p className="cell-main">{formatDate(m.suspended_at)}</p>
+                    <p className="cell-sub">Còn {m.remaining_days} ngày</p>
+                  </td>
+                )}
+                <td style={{ maxWidth: '150px' }}>
+                  <div
+                    style={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      fontSize: '12px',
+                      color: '#64748b'
+                    }}
+                    title={m.note}
+                  >
+                    {m.note || '-'}
+                  </div>
+                </td>
+                <td>
+                  <div className="table-actions" style={{ gap: '8px' }}>
+                    <button
+                      type="button"
+                      className="ghost-btn-sm"
+                      onClick={() => onEditMember(m)}
+                      title="Xem chi tiết & Sửa"
+                      style={{ padding: '6px', color: '#2563eb' }}
+                    >
+                      <Eye size={18} />
+                    </button>
+                    {status !== 'Suspended' && (
+                      <button
+                        type="button"
+                        className="ghost-btn-sm"
+                        onClick={() => onRenewMember(m)}
+                        title="Gia hạn gói tập"
+                        style={{ padding: '6px', color: '#10b981' }}
+                      >
+                        <RefreshCcw size={18} />
+                      </button>
+                    )}
+                    {status === 'Suspended' ? (
+                      <button
+                        type="button"
+                        className="ghost-btn-sm"
+                        onClick={() => onReactivateMember(m)}
+                        title="Kích hoạt lại"
+                        style={{ padding: '6px', color: '#8b5cf6' }}
+                      >
+                        <Plus size={18} />
+                      </button>
+                    ) : status === 'Active' && (
+                      <button
+                        type="button"
+                        className="ghost-btn-sm"
+                        onClick={() => onSuspendMember(m)}
+                        title="Bảo lưu gói tập"
+                        style={{ padding: '6px', color: '#f59e0b' }}
+                      >
+                        <PauseCircle size={18} />
+                      </button>
+                    )}
+                    {profile?.role === 'admin' && (
+                      <button
+                        type="button"
+                        className="ghost-btn-sm"
+                        style={{ color: '#dc2626', padding: '6px' }}
+                        onClick={() => onDeleteMember(m)}
+                        title="Xóa hội viên"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}

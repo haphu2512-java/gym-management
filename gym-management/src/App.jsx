@@ -13,8 +13,12 @@ import Inventory from './pages/Inventory/Inventory';
 import Shifts from './pages/Shifts/Shifts';
 import Staff from './pages/Staff/Staff';
 import Logs from './pages/Logs/Logs';
+import Statistics from './pages/Statistics/Statistics';
+import ToastContainer from './components/common/ToastContainer';
+import ConfirmDialog from './components/common/ConfirmDialog';
 
 import { useAuthStore } from './store/useAuthStore';
+import supabase from './config/supabase';
 
 function App() {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
@@ -22,11 +26,25 @@ function App() {
   const profile = useAuthStore((state) => state.profile);
 
   useEffect(() => {
+    // 1. Khởi tạo auth lần đầu (đọc từ localStorage)
     initializeAuth();
+
+    // 2. Lắng nghe thay đổi (ví dụ: đăng xuất từ tab khác)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        useAuthStore.getState().clearLocalState();
+      } else if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+        initializeAuth();
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, [initializeAuth]);
 
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <ToastContainer />
+      <ConfirmDialog />
       <Routes>
         <Route path="/login" element={<Login />} />
 
@@ -34,10 +52,10 @@ function App() {
           path="/*"
           element={
             <ProtectedRoute>
-              <div className="modern-shell">
-                <Sidebar isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)} />
-                <div className="modern-main">
-                  <Header onMenuToggle={() => setSidebarOpen((prev) => !prev)} />
+            <div className={`modern-shell ${!isSidebarOpen ? 'sidebar-closed' : ''}`}>
+              <Sidebar isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)} />
+              <div className="modern-main">
+                <Header onMenuToggle={() => setSidebarOpen((prev) => !prev)} isSidebarOpen={isSidebarOpen} />
                   <div className="modern-content">
                     <Routes>
                       <Route
@@ -64,6 +82,14 @@ function App() {
                         element={
                           <ProtectedRoute allowedRoles={['admin']}>
                             <Logs />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/statistics"
+                        element={
+                          <ProtectedRoute allowedRoles={['admin']}>
+                            <Statistics />
                           </ProtectedRoute>
                         }
                       />
