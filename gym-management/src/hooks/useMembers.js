@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { memberService } from '../services/memberService';
 
 export function useMembers() {
@@ -25,7 +25,7 @@ export function useMembers() {
   const addMember = async (member) => {
     try {
       const newMember = await memberService.createMember(member);
-      setMembers((prev) => [newMember, ...prev]);
+      await fetchMembers(); // Refresh from view to ensure all calculated fields are present
       return newMember;
     } catch (err) {
       setError(err.message);
@@ -36,7 +36,7 @@ export function useMembers() {
   const updateMember = async (id, updates) => {
     try {
       const updated = await memberService.updateMember(id, updates);
-      setMembers((prev) => prev.map((m) => (m.id === id ? updated : m)));
+      await fetchMembers(); // Refresh from view
       return updated;
     } catch (err) {
       setError(err.message);
@@ -47,12 +47,32 @@ export function useMembers() {
   const deleteMember = async (id) => {
     try {
       await memberService.deleteMember(id);
-      setMembers((prev) => prev.filter((m) => m.id !== id));
+      await fetchMembers(); // Refresh from view
     } catch (err) {
       setError(err.message);
       throw err;
     }
   };
 
-  return { members, loading, error, fetchMembers, addMember, updateMember, deleteMember };
+  const suspendMember = async (id, staffId) => {
+    try {
+      await memberService.suspendMember(id, staffId);
+      await fetchMembers();
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  };
+
+  const reactivateMember = async (id, staffId) => {
+    try {
+      await memberService.reactivateMember(id, staffId);
+      await fetchMembers();
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  };
+
+  return { members, loading, error, fetchMembers, addMember, updateMember, deleteMember, suspendMember, reactivateMember };
 }

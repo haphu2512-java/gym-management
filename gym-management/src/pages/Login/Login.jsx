@@ -1,6 +1,7 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/useAuthStore';
+import logo from '../../assets/logo.png';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -24,6 +25,9 @@ export default function Login() {
   return (
     <div className="login-modern">
       <div className="login-card-modern">
+        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+          <img src={logo} alt="Logo" style={{ width: '120px', height: 'auto', borderRadius: '16px' }} />
+        </div>
         <h1>GymMax Power Center</h1>
         <p>Đăng nhập vào hệ thống quản lý phòng tập</p>
 

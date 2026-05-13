@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Clock, Droplets, LayoutDashboard, LogOut, Users, WalletCards, ScrollText } from 'lucide-react';
+import { Clock, Droplets, LayoutDashboard, LogOut, Users, WalletCards, ScrollText, TrendingUp } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
+import logo from '../../assets/logo.png';
 
 const icons = {
   dashboard: LayoutDashboard,
@@ -9,30 +10,33 @@ const icons = {
   shifts: Clock,
   staff: WalletCards,
   logs: ScrollText,
+  statistics: TrendingUp,
 };
 
 export default function Sidebar({ isOpen, onClose }) {
   const location = useLocation();
-  const { user, profile, logout } = useAuthStore();
+  const { user, profile, activeStaff, logout } = useAuthStore();
 
   const baseItems = [
     { key: 'dashboard', path: '/dashboard', label: 'Báo Cáo Chung' },
     { key: 'members', path: '/members', label: 'Quản Lý Hội Viên' },
-    { key: 'inventory', path: '/inventory', label: 'Quản Lý Nước' },
+    { key: 'inventory', path: '/inventory', label: 'Quản Lý Nước và Tập Ngày' },
     { key: 'shifts', path: '/shifts', label: 'Ca Làm & Bàn Giao' },
   ];
 
   const menuItems = profile?.role === 'admin'
     ? [
-        ...baseItems, 
-        { key: 'staff', path: '/staff', label: 'Nhân Viên & Lương' },
-        { key: 'logs', path: '/logs', label: 'Nhật Ký Hoạt Động' }
-      ]
+      ...baseItems,
+      { key: 'statistics', path: '/statistics', label: 'Thống Kê Chi Tiết' },
+      { key: 'staff', path: '/staff', label: 'Nhân Viên & Lương' },
+      { key: 'logs', path: '/logs', label: 'Nhật Ký Hoạt Động' }
+    ]
     : baseItems.filter((item) => item.key !== 'dashboard');
 
   return (
     <aside className={`modern-sidebar ${isOpen ? 'open' : ''}`}>
       <div className="sidebar-brand">
+        <img src={logo} alt="Max Power Gym" style={{ width: '80px', height: 'auto', marginBottom: '12px', display: 'block', borderRadius: '12px' }} />
         <h1>MAX POWER GYM</h1>
         <p>Management System</p>
       </div>
@@ -46,7 +50,9 @@ export default function Sidebar({ isOpen, onClose }) {
             <Link
               key={item.path}
               to={item.path}
-              onClick={onClose}
+              onClick={() => {
+                if (window.innerWidth < 768) onClose();
+              }}
               className={`side-nav-item ${active ? 'active' : ''}`}
             >
               <Icon size={18} />
@@ -58,8 +64,13 @@ export default function Sidebar({ isOpen, onClose }) {
 
       <div className="sidebar-footer">
         <div className="user-box">
-          <p>Đang đăng nhập</p>
-          <strong>{profile?.role || 'staff'} - {profile?.full_name || user?.email || 'User'}</strong>
+          <p>{activeStaff ? 'Đang trực' : 'Đang đăng nhập'}</p>
+          <strong>
+            {activeStaff
+              ? `${activeStaff.full_name} — ${activeStaff.staff_type === 'CT' ? 'Chính thức' : 'Thử việc'}`
+              : `${profile?.role === 'admin' ? 'Quản trị' : 'Nhân viên'} — ${profile?.full_name || 'User'}`
+            }
+          </strong>
         </div>
         <button type="button" className="logout-btn-modern" onClick={logout}>
           <LogOut size={18} /> Đăng xuất
