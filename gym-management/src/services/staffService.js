@@ -65,11 +65,13 @@ export const staffService = {
     return data || [];
   },
 
-  updateSalaryRate: async (id, rate) => {
+  upsertSalaryRate: async (shiftName, staffType, rate) => {
     const { data, error } = await supabase
       .from('salary_configs')
-      .update({ rate_per_shift: rate, updated_at: new Date().toISOString() })
-      .eq('id', id)
+      .upsert(
+        { shift_name: shiftName, staff_type: staffType, rate_per_shift: rate },
+        { onConflict: 'shift_name, staff_type' }
+      )
       .select()
       .single();
     if (error) throw error;
