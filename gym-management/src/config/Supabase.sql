@@ -219,31 +219,64 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- C. Bảo lưu hội viên
-CREATE OR REPLACE FUNCTION suspend_member(p_member_id UUID, p_staff_id UUID, p_suspended_at DATE DEFAULT CURRENT_DATE, p_created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW())
+CREATE OR REPLACE FUNCTION suspend_member(
+  p_member_id UUID, 
+  p_staff_id UUID, 
+  p_shift_id UUID,
+  p_suspended_at DATE DEFAULT CURRENT_DATE, 
+  p_created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+)
 RETURNS JSON AS $$
-DECLARE v_remaining_days INT; v_end_date DATE;
+DECLARE v_remaining_days INT; v_end_date DATE; v_admin_id UUID;
 BEGIN
+  -- Kiểm tra ca có tồn tại và đang mở không
+  IF NOT EXISTS (SELECT 1 FROM shifts WHERE id = p_shift_id AND status = 'open') THEN
+    RAISE EXCEPTION 'Ca làm việc không tồn tại hoặc đã đóng.';
+  END IF;
+
+  SELECT opened_by INTO v_admin_id FROM shifts WHERE id = p_shift_id;
+
   SELECT (end_date - p_suspended_at) INTO v_remaining_days FROM member_current_status WHERE id = p_member_id;
   IF v_remaining_days < 13 THEN RAISE EXCEPTION 'Không đủ điều kiện (tối thiểu 13 ngày)'; END IF;
+  
   UPDATE members SET suspended_at = p_suspended_at, remaining_days = v_remaining_days WHERE id = p_member_id;
-  INSERT INTO member_logs (member_id, staff_member_id, action, note, created_at)
-  VALUES (p_member_id, p_staff_id, 'SUSPEND', 'Bảo lưu (còn ' || v_remaining_days || ' ngày)', p_created_at);
-  INSERT INTO staff_logs (staff_member_id, action, target_item, details, created_at)
-  VALUES (p_staff_id, 'Bảo lưu hội viên', (SELECT full_name FROM members WHERE id = p_member_id), json_build_object('days', v_remaining_days), p_created_at);
+  
+  INSERT INTO member_logs (member_id, staff_id, staff_member_id, action, note, created_at)
+  VALUES (p_member_id, v_admin_id, p_staff_id, 'SUSPEND', 'Bảo lưu (còn ' || v_remaining_days || ' ngày)', p_created_at);
+  
+  INSERT INTO staff_logs (staff_id, staff_member_id, action, target_item, details, created_at)
+  VALUES (v_admin_id, p_staff_id, 'Bảo lưu hội viên', (SELECT full_name FROM members WHERE id = p_member_id), json_build_object('days', v_remaining_days, 'shift_id', p_shift_id), p_created_at);
+  
   RETURN json_build_object('success', true, 'days', v_remaining_days);
 END;
 $$ LANGUAGE plpgsql;
 
 -- D. Kích hoạt lại
-CREATE OR REPLACE FUNCTION reactivate_member(p_member_id UUID, p_staff_id UUID, p_reactivated_at DATE DEFAULT CURRENT_DATE, p_created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW())
+CREATE OR REPLACE FUNCTION reactivate_member(
+  p_member_id UUID, 
+  p_staff_id UUID, 
+  p_shift_id UUID,
+  p_reactivated_at DATE DEFAULT CURRENT_DATE, 
+  p_created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+)
 RETURNS JSON AS $$
-DECLARE v_days INT; v_new_end DATE;
+DECLARE v_days INT; v_new_end DATE; v_admin_id UUID;
 BEGIN
+  -- Kiểm tra ca có tồn tại và đang mở không
+  IF NOT EXISTS (SELECT 1 FROM shifts WHERE id = p_shift_id AND status = 'open') THEN
+    RAISE EXCEPTION 'Ca làm việc không tồn tại hoặc đã đóng.';
+  END IF;
+
+  SELECT opened_by INTO v_admin_id FROM shifts WHERE id = p_shift_id;
+
   SELECT remaining_days INTO v_days FROM members WHERE id = p_member_id;
   v_new_end := p_reactivated_at + (v_days || ' days')::INTERVAL;
+  
   UPDATE members SET suspended_at = NULL, remaining_days = 0 WHERE id = p_member_id;
-  INSERT INTO member_logs (member_id, staff_member_id, action, package_type, start_date, end_date, note, created_at)
-  VALUES (p_member_id, p_staff_id, 'REACTIVATE', 0, p_reactivated_at, v_new_end, 'Kích hoạt lại sau bảo lưu', p_created_at);
+  
+  INSERT INTO member_logs (member_id, staff_id, staff_member_id, action, package_type, start_date, end_date, note, created_at)
+  VALUES (p_member_id, v_admin_id, p_staff_id, 'REACTIVATE', 0, p_reactivated_at, v_new_end, 'Kích hoạt lại sau bảo lưu', p_created_at);
+  
   RETURN json_build_object('success', true, 'new_end', v_new_end);
 END;
 $$ LANGUAGE plpgsql;

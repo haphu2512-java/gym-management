@@ -222,10 +222,11 @@ export const memberService = {
     }
   },
 
-  async suspendMember(id, staffId) {
+  async suspendMember(id, staffId, shiftId) {
     const { data, error } = await supabase.rpc('suspend_member', {
       p_member_id: id,
-      p_staff_id: staffId
+      p_staff_id: staffId,
+      p_shift_id: shiftId
     });
 
     if (error) throw new Error('Bảo lưu thất bại: ' + error.message);
@@ -233,10 +234,11 @@ export const memberService = {
     return data;
   },
 
-  async reactivateMember(id, staffId) {
+  async reactivateMember(id, staffId, shiftId) {
     const { data, error } = await supabase.rpc('reactivate_member', {
       p_member_id: id,
-      p_staff_id: staffId
+      p_staff_id: staffId,
+      p_shift_id: shiftId
     });
 
     if (error) throw new Error('Kích hoạt lại thất bại: ' + error.message);

@@ -382,10 +382,18 @@ export default function Members() {
   // Xác nhận bảo lưu
   const handleSuspendConfirm = async () => {
     if (!suspendingMember) return;
+    setError('');
+
+    if (!activeShift?.id) {
+      setError("Vui lòng mở ca trước khi thực hiện bảo lưu.");
+      return;
+    }
+
     try {
-      await suspendMember(suspendingMember.id, activeStaff?.id || user?.id);
+      await suspendMember(suspendingMember.id, activeStaff?.id || user?.id, activeShift.id);
       setShowSuspendModal(false);
       setSuspendingMember(null);
+      addToast("Đã bảo lưu hội viên thành công!");
     } catch (err) {
       setError("Lỗi bảo lưu: " + err.message);
     }
@@ -393,12 +401,17 @@ export default function Members() {
 
   // Kích hoạt lại hội viên
   const handleReactivate = async (member) => {
+    if (!activeShift?.id) {
+      addToast("Vui lòng mở ca trước khi kích hoạt lại hội viên.", "error");
+      return;
+    }
+
     showConfirm({
       title: 'Kích hoạt lại hội viên',
       message: `Kích hoạt lại cho hội viên ${member.full_name}? Ngày hết hạn mới sẽ được cộng thêm ${member.remaining_days} ngày kể từ hôm nay.`,
       onConfirm: async () => {
         try {
-          await reactivateMember(member.id, activeStaff?.id || user?.id);
+          await reactivateMember(member.id, activeStaff?.id || user?.id, activeShift.id);
           addToast("Đã kích hoạt lại hội viên thành công!");
         } catch (err) {
           setError("Lỗi kích hoạt lại: " + err.message);
