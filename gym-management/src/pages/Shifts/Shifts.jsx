@@ -8,6 +8,7 @@ import { productService } from '../../services/productService';
 import { expenseService } from '../../services/expenseService';
 import { staffLogService } from '../../services/staffLogService';
 import { formatDateTime } from '../../utils/formatters';
+import { deviceSecurity } from '../../utils/deviceSecurity';
 
 export default function Shifts() {
   const { user, profile, activeStaff, setActiveStaff } = useAuthStore();
@@ -17,6 +18,8 @@ export default function Shifts() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('shift');
+  const [isTrusted, setIsTrusted] = useState(deviceSecurity.isDeviceTrusted());
+  const [deviceSecret, setDeviceSecret] = useState('');
   const [suggestedEndingCash, setSuggestedEndingCash] = useState(0);
   const [expenses, setExpenses] = useState([]);
   const [totalExpense, setTotalExpense] = useState(0);
@@ -151,6 +154,10 @@ export default function Shifts() {
   const handleAddExpense = async (e) => {
     e.preventDefault();
     setError('');
+    if (!isTrusted) {
+      setError('Thiết bị này chưa được tin cậy. Vui lòng kích hoạt thiết bị để thực hiện.');
+      return;
+    }
     if (!activeShift?.id) {
       setError('Vui long mo ca truoc khi ghi nhan chi.');
       return;
@@ -192,6 +199,11 @@ export default function Shifts() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (!isTrusted) {
+      setError('Thiết bị này chưa được tin cậy. Vui lòng kích hoạt thiết bị để thực hiện.');
+      return;
+    }
 
     try {
       if (activeShift) {
@@ -248,7 +260,38 @@ export default function Shifts() {
             </button>
           </div>
           <h3 className="modern-title flex-row"><Clock size={18} /> Bàn giao ca trực</h3>
-          {activeTab === 'shift' && (
+          
+          {!isTrusted ? (
+            <div className="modern-card" style={{ background: '#fff7ed', border: '1px solid #ffedd5', padding: '20px', textAlign: 'center' }}>
+              <p style={{ color: '#9a3412', fontWeight: '600', marginBottom: '12px' }}>
+                ⚠️ Thiết bị này chưa được kích hoạt để thực hiện các thao tác quan trọng.
+              </p>
+              <div className="modern-form">
+                <input 
+                  type="password" 
+                  placeholder="Nhập mã bí mật Admin..." 
+                  value={deviceSecret}
+                  onChange={(e) => setDeviceSecret(e.target.value)}
+                  style={{ marginBottom: '12px' }}
+                />
+                <button 
+                  className="primary-btn" 
+                  onClick={() => {
+                    if (deviceSecurity.trustThisDevice(deviceSecret)) {
+                      setIsTrusted(true);
+                      setError('');
+                    } else {
+                      setError('Mã bí mật không chính xác!');
+                    }
+                  }}
+                >
+                  Kích hoạt thiết bị này
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {activeTab === 'shift' && (
             <form className="modern-form" onSubmit={handleSubmit}>
               {/* Dropdown chọn nhân viên trực */}
               <label className="field-label">Nhân viên trực</label>
@@ -420,7 +463,9 @@ export default function Shifts() {
               </div>
             </div>
           )}
-        </div>
+        </>
+      )}
+    </div>
 
         <div className="modern-card notes-panel">
           <h3 className="modern-title flex-row" style={{ color: '#92400e' }}>📜 Nhật ký bàn giao</h3>

@@ -1,5 +1,5 @@
 {
-  "name": "gym-management",
+  "name": "max-power-gym",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -19,6 +19,8 @@
     "react-dom": "^19.2.5",
     "react-router-dom": "^6.30.3",
     "tailwindcss": "^4.2.4",
+    "uuid": "^14.0.0",
+    "xlsx": "^0.18.5",
     "zustand": "^4.5.7"
   },
   "devDependencies": {
