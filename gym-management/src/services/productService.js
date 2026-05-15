@@ -76,6 +76,23 @@ export const productService = {
     return data.reduce((sum, item) => sum + Number(item.total_price || 0), 0);
   },
 
+  async getTotalDrinkRevenue(filters = {}) {
+    let query = supabase
+      .from('sales_logs')
+      .select('total_price');
+
+    if (filters.startDate) {
+      query = query.gte('sold_at', filters.startDate);
+    }
+    if (filters.endDate) {
+      query = query.lte('sold_at', filters.endDate);
+    }
+
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    return data.reduce((sum, item) => sum + Number(item.total_price || 0), 0);
+  },
+
   async getFilteredSalesLogs(filters = {}) {
     let query = supabase
       .from('sales_logs')

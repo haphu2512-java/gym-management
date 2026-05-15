@@ -30,24 +30,21 @@ export default function Dashboard() {
         const startOfMonthObj = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
         const startOfMonth = startOfMonthObj.toISOString();
         
-        const [data, recent, totalMemberRev, allProducts] = await Promise.all([
+        const [data, recent, totalMemberRev, allProducts, totalDrinkRev] = await Promise.all([
           memberService.getAllMembers(),
           memberService.getRecentMembers(5),
           paymentService.getTotalMemberRevenue({ startDate: startOfMonth }),
-          productService.getAllProducts()
+          productService.getAllProducts(),
+          productService.getTotalDrinkRevenue({ startDate: startOfMonth })
         ]);
         setMembers(data);
         setRecentMembers(recent);
         setMembershipRevenue(totalMemberRev);
         setProducts(allProducts);
+        setDrinkRevenue(totalDrinkRev);
 
-        // Lấy doanh thu nước ca hiện tại
         const { shift } = await shiftService.validateShiftForLogin();
         setActiveShift(shift);
-        if (shift) {
-          const rev = await productService.getDrinkRevenueForShift(shift.id);
-          setDrinkRevenue(rev);
-        }
       } finally {
         setLoading(false);
       }
@@ -148,12 +145,12 @@ export default function Dashboard() {
           </div>
           <div>
             <p className="stat-label-modern">
-              Doanh thu nước{activeShift ? ` – ${activeShift.shift_name}` : ''}
+              Doanh thu nước (Tháng này)
             </p>
             <p className="stat-value-modern" style={{ fontSize: '20px', color: '#059669' }}>
               {drinkRevenue.toLocaleString('vi-VN')}đ
             </p>
-            <p className="cell-sub">{activeShift ? 'Ca đang mở' : 'Chưa có ca nào đang mở'}</p>
+            <p className="cell-sub">(Đã xác nhận)</p>
           </div>
         </div>
       </div>
