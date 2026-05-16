@@ -5,6 +5,7 @@ import { staffService } from '../../services/staffService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { paymentService } from '../../services/paymentService';
 import { productService } from '../../services/productService';
+import { additionalService } from '../../services/additionalService';
 import { expenseService } from '../../services/expenseService';
 import { staffLogService } from '../../services/staffLogService';
 import { formatDateTime } from '../../utils/formatters';
@@ -114,6 +115,9 @@ export default function Shifts() {
       const payments = await paymentService.getPaymentsByShift(shift.id, 'TM', true);
       const totalMemberCash = payments.reduce((sum, p) => sum + Number(p.amount), 0);
 
+      // Lấy doanh thu dịch vụ (TM)
+      const totalServiceCash = await additionalService.getServiceRevenueForShift(shift.id, 'TM');
+
       // Lấy doanh thu nước bằng Tiền mặt (TM) cho ca này
       const totalDrinkCash = await productService.getDrinkRevenueForShift(shift.id, 'TM');
 
@@ -121,8 +125,8 @@ export default function Shifts() {
       const shiftExpense = await expenseService.getTotalByShift(shift.id);
       setTotalExpense(shiftExpense);
 
-      // Công thức: Tiền kết ca = Tiền đầu ca + TM hội viên + TM nước - Chi
-      return (Number(shift.starting_cash) || 0) + totalMemberCash + totalDrinkCash - shiftExpense;
+      // Công thức: Tiền kết ca = Tiền đầu ca + TM hội viên + TM dịch vụ + TM nước - Chi
+      return (Number(shift.starting_cash) || 0) + totalMemberCash + totalServiceCash + totalDrinkCash - shiftExpense;
     } catch (error) {
       console.error('Error calculating handover cash:', error);
       return 0;
@@ -357,7 +361,7 @@ export default function Shifts() {
                     />
                     {suggestedEndingCash > 0 && (
                       <small className="field-hint">
-                        Dự kiến: {suggestedEndingCash.toLocaleString('vi-VN')}đ (Tiền đầu ca + TM hội viên + TM nước - chi)
+                        Dự kiến: {suggestedEndingCash.toLocaleString('vi-VN')}đ (Tiền đầu ca + TM hội viên/dịch vụ + TM nước - chi)
                       </small>
                     )}
 
@@ -555,6 +559,7 @@ export default function Shifts() {
                       {Number(
                         (selectedShiftSummary.shift?.starting_cash || 0) +
                         selectedShiftSummary.payments.filter(p => p.payment_method === 'TM').reduce((s, p) => s + p.amount, 0) +
+                        selectedShiftSummary.serviceSales.filter(s => s.payment_method === 'TM').reduce((s, p) => s + p.total_price, 0) +
                         selectedShiftSummary.sales.filter(s => s.payment_method === 'TM').reduce((s, p) => s + p.total_price, 0) -
                         selectedShiftSummary.expenses.reduce((s, e) => s + e.amount, 0)
                       ).toLocaleString()}đ
@@ -589,6 +594,33 @@ export default function Shifts() {
                           <td>{p.members?.member_code} - {p.members?.full_name}</td>
                           <td>{Number(p.amount).toLocaleString()}đ</td>
                           <td>{p.payment_method}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style={{ marginTop: '16px' }}>
+                  <h4 style={{ marginBottom: '8px', borderBottom: '1px solid #eee', paddingBottom: '4px' }}>Bán Dịch vụ ({selectedShiftSummary.serviceSales?.length || 0})</h4>
+                  <table className="modern-table" style={{ fontSize: '13px' }}>
+                    <thead>
+                      <tr>
+                        <th>Dịch vụ</th>
+                        <th>SL</th>
+                        <th>Tổng</th>
+                        <th>HTTT</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(!selectedShiftSummary.serviceSales || selectedShiftSummary.serviceSales.length === 0) && (
+                        <tr><td colSpan={4} className="table-empty-cell">Không có phát sinh</td></tr>
+                      )}
+                      {selectedShiftSummary.serviceSales?.map(s => (
+                        <tr key={s.id}>
+                          <td>{s.services?.name}</td>
+                          <td>{s.quantity}</td>
+                          <td>{Number(s.total_price).toLocaleString()}đ</td>
+                          <td>{s.payment_method}</td>
                         </tr>
                       ))}
                     </tbody>

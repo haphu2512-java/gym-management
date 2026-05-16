@@ -1,13 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Plus, Minus, Trash2, ShoppingCart, Settings } from 'lucide-react';
-import { productService } from '../../services/productService';
+import { additionalService } from '../../services/additionalService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { staffLogService } from '../../services/staffLogService';
 import { shiftService } from '../../services/shiftService';
 import { useToast, ToastContainer } from '../../components/ui/Toast';
 import { formatDateTime } from '../../utils/formatters';
 
-export default function Inventory() {
+export default function ServiceTab() {
   const { user, profile, activeStaff } = useAuthStore();
   const { showError, showSuccess, toasts } = useToast();
   const [products, setProducts] = useState([]);
@@ -16,12 +16,12 @@ export default function Inventory() {
   const [showModal, setShowModal] = useState(false);
   const [viewMode, setViewMode] = useState('sales'); // 'sales' or 'admin'
   const [editingProduct, setEditingProduct] = useState(null);
-  const [form, setForm] = useState({ name: '', price: '', stock_quantity: '', restock_quantity: '0', note: '' });
+  const [form, setForm] = useState({ name: '', price: '', note: '' });
 
   // Quantities for sales
   const [sellQuantities, setSellQuantities] = useState({});
 
-  // Doanh thu nước của ca hiện tại
+  // Doanh thu dịch vụ của ca hiện tại
   const [drinkRevenue, setDrinkRevenue] = useState(0);
   const [activeShift, setActiveShift] = useState(null);
 
@@ -41,7 +41,7 @@ export default function Inventory() {
         const { shift } = await shiftService.validateShiftForLogin();
         setActiveShift(shift);
         if (shift) {
-          const rev = await productService.getDrinkRevenueForShift(shift.id);
+          const rev = await additionalService.getServiceRevenueForShift(shift.id);
           setDrinkRevenue(rev);
         }
       } catch (e) {
@@ -55,7 +55,7 @@ export default function Inventory() {
     setLoading(true);
     setError('');
     try {
-      const data = await productService.getAllProducts();
+      const data = await additionalService.getAllServices();
       setProducts(data);
       // Initialize quantities to 1
       const qtys = {};
@@ -75,7 +75,7 @@ export default function Inventory() {
   useEffect(() => {
     if (viewMode === 'stats') {
       setLoading(true);
-      productService.getFilteredSalesLogs({ 
+      additionalService.getFilteredServiceLogs({ 
         date: statsDate, 
         shiftName: statsShiftName,
         paymentMethod: statsPaymentMethod
@@ -96,7 +96,7 @@ export default function Inventory() {
 
   const handleOpenCreate = () => {
     setEditingProduct(null);
-    setForm({ name: '', price: '', stock_quantity: '', restock_quantity: '0', note: '' });
+    setForm({ name: '', price: '', note: '' });
     setShowModal(true);
   };
 
@@ -105,8 +105,6 @@ export default function Inventory() {
     setForm({
       name: product.name,
       price: String(product.price),
-      stock_quantity: String(product.stock_quantity),
-      restock_quantity: '0',
       note: product.note || ''
     });
     setShowModal(true);
@@ -119,35 +117,34 @@ export default function Inventory() {
       const payload = {
         name: form.name,
         price: Number(form.price || 0),
-        stock_quantity: Number(form.stock_quantity || 0) + Number(form.restock_quantity || 0),
         note: form.note,
       };
 
       if (editingProduct) {
-        await productService.updateProduct(editingProduct.id, payload);
+        await additionalService.updateService(editingProduct.id, payload);
         await staffLogService.logAction({
           staffId: activeStaff?.id || user?.id,
-          action: 'Nhập/Sửa kho',
+          action: 'Cập nhật dịch vụ',
           targetItem: editingProduct.name,
-          details: { before: editingProduct.stock_quantity, after: payload.stock_quantity },
-          note: 'Admin cập nhật sản phẩm',
+          details: { before: editingProduct.price, after: payload.price },
+          note: 'Admin cập nhật dịch vụ',
         });
       } else {
-        await productService.addProduct(payload);
+        await additionalService.addService(payload);
         await staffLogService.logAction({
           staffId: activeStaff?.id || user?.id,
-          action: 'Thêm sản phẩm',
+          action: 'Thêm dịch vụ',
           targetItem: payload.name,
-          details: { quantity: payload.stock_quantity },
-          note: 'Admin thêm sản phẩm mới',
+          details: { price: payload.price },
+          note: 'Admin thêm dịch vụ mới',
         });
       }
 
       setShowModal(false);
       setEditingProduct(null);
-      setForm({ name: '', price: '', stock_quantity: '', restock_quantity: '0', note: '' });
+      setForm({ name: '', price: '', note: '' });
       await loadProducts();
-      showSuccess('Cập nhật kho thành công!');
+      showSuccess('Cập nhật thành công!');
     } catch (err) {
       setError(err.message);
     }
@@ -167,7 +164,7 @@ export default function Inventory() {
     }
 
     try {
-      await productService.sellProduct(
+      await additionalService.sellService(
         product, 
         qty, 
         activeShift.id, 
@@ -179,23 +176,18 @@ export default function Inventory() {
       await staffLogService.logAction({
         staffId: user?.id,
         staffMemberId: activeStaff?.id,
-        action: 'Bán nước/hàng hóa',
+        action: 'Bán dịch vụ',
         targetItem: product.name,
         details: { qty, total: Number(product.price || 0) * qty, method },
-        note: 'Nhân viên bán hàng từ kho nước',
+        note: 'Nhân viên bán dịch vụ (Tập ngày, PT...)',
       });
-
-      // Update local state
-      setProducts((prev) => prev.map((item) =>
-        (item.id === product.id ? { ...item, stock_quantity: item.stock_quantity - qty } : item)
-      ));
 
       // Reset quantity to 1
       setSellQuantities(prev => ({ ...prev, [product.id]: 1 }));
 
-      // Cập nhật doanh thu nước real-time
+      // Cập nhật doanh thu dịch vụ real-time
       if (shiftId) {
-        const rev = await productService.getDrinkRevenueForShift(shiftId);
+        const rev = await additionalService.getServiceRevenueForShift(shiftId);
         setDrinkRevenue(rev);
       }
 
@@ -211,7 +203,7 @@ export default function Inventory() {
     if (!deletingProduct) return;
     setError('');
     try {
-      await productService.deleteProduct(deletingProduct.id);
+      await additionalService.deleteService(deletingProduct.id);
       await staffLogService.logAction({
         staffId: activeStaff?.id || user?.id,
         action: 'Xóa sản phẩm',
@@ -232,7 +224,7 @@ export default function Inventory() {
     <div className="modern-stack">
       <div className="modern-toolbar" style={{ flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h3 className="modern-title">Kho nước &amp; bán hàng</h3>
+          <h3 className="modern-title">Dịch vụ bổ sung</h3>
           <p className="muted-text">Bấm chọn số lượng và nhấn Bán hàng.</p>
         </div>
         
@@ -251,7 +243,7 @@ export default function Inventory() {
             gap: '8px'
           }}>
             <ShoppingCart size={16} />
-            DT Nước: {drinkRevenue.toLocaleString('vi-VN')}đ
+            DT Dịch vụ: {drinkRevenue.toLocaleString('vi-VN')}đ
           </div>
 
           <div className="tab-group" style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '8px' }}>
@@ -282,7 +274,7 @@ export default function Inventory() {
 
           {profile?.role === 'admin' && (
             <button type="button" className="primary-btn" onClick={handleOpenCreate}>
-              <Plus size={16} /> Thêm sản phẩm
+              <Plus size={16} /> Thêm dịch vụ
             </button>
           )}
         </div>
@@ -296,11 +288,12 @@ export default function Inventory() {
         <div className="pos-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px', marginTop: '8px' }}>
           {products.map((item) => {
             const qty = sellQuantities[item.id] || 1;
-            const isOutOfStock = Number(item.stock_quantity || 0) <= 0;
-            const isLowStock = Number(item.stock_quantity || 0) < 10;
+            const isService = item.product_type === 'service';
+            const isOutOfStock = !isService && Number(item.stock_quantity || 0) <= 0;
+            const isLowStock = !isService && Number(item.stock_quantity || 0) < 10;
 
             return (
-              <div key={item.id} className="pos-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', transition: 'all 0.2s', opacity: isOutOfStock ? 0.7 : 1 }}>
+              <div key={item.id} className="pos-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', transition: 'all 0.2s', opacity: 1 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                   <div style={{ width: '40px', height: '40px', background: '#f8fafc', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 'bold', color: '#64748b' }}>
                     {item.name.charAt(0).toUpperCase()}
@@ -310,10 +303,10 @@ export default function Inventory() {
                     padding: '2px 8px', 
                     borderRadius: '99px', 
                     fontWeight: 'bold',
-                    background: isOutOfStock ? '#fee2e2' : (isLowStock ? '#fef9c3' : '#f0fdf4'),
-                    color: isOutOfStock ? '#dc2626' : (isLowStock ? '#854d0e' : '#16a34a')
+                    background: '#e0e7ff',
+                    color: '#4f46e5'
                   }}>
-                    Kho: {item.stock_quantity}
+                    Dịch vụ
                   </span>
                 </div>
 
@@ -326,17 +319,15 @@ export default function Inventory() {
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '4px', borderRadius: '10px', marginTop: 'auto' }}>
                   <button 
-                    onClick={() => handleQtyChange(item.id, -1, item.stock_quantity)}
+                    onClick={() => handleQtyChange(item.id, -1, 999)}
                     style={{ width: '32px', height: '32px', border: 'none', background: '#fff', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
-                    disabled={isOutOfStock}
                   >
                     <Minus size={14} />
                   </button>
                   <span style={{ fontWeight: 'bold', fontSize: '14px' }}>{qty}</span>
                   <button 
-                    onClick={() => handleQtyChange(item.id, 1, item.stock_quantity)}
+                    onClick={() => handleQtyChange(item.id, 1, 999)}
                     style={{ width: '32px', height: '32px', border: 'none', background: '#fff', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
-                    disabled={isOutOfStock || qty >= item.stock_quantity}
                   >
                     <Plus size={14} />
                   </button>
@@ -346,7 +337,6 @@ export default function Inventory() {
                   className="primary-btn" 
                   style={{ width: '100%', borderRadius: '10px', padding: '10px' }}
                   onClick={() => setSellingItem(item)}
-                  disabled={isOutOfStock}
                 >
                   Bán hàng
                 </button>
@@ -401,7 +391,7 @@ export default function Inventory() {
                   <th>Sản phẩm</th>
                   <th>Số lượng</th>
                   <th>Tổng tiền</th>
-                  <th>Phương thức</th>
+                  <th>Thanh toán</th>
                   <th>Nhân viên</th>
                 </tr>
               </thead>
@@ -417,7 +407,7 @@ export default function Inventory() {
                       <p className="cell-main">{formatDateTime(log.sold_at)}</p>
                       {log.shifts?.shift_name && <p className="cell-sub">{log.shifts.shift_name}</p>}
                     </td>
-                    <td><p className="cell-main">{log.products?.name || 'N/A'}</p></td>
+                    <td><p className="cell-main">{log.services?.name || 'N/A'}</p></td>
                     <td>{log.quantity}</td>
                     <td><p className="cell-main">{Number(log.total_price || 0).toLocaleString('vi-VN')}đ</p></td>
                     <td>
@@ -442,9 +432,9 @@ export default function Inventory() {
           <table className="modern-table">
             <thead>
               <tr>
-                <th>Sản phẩm</th>
+                <th>Dịch vụ</th>
                 <th>Giá bán</th>
-                <th>Tồn kho</th>
+                <th>Loại</th>
                 <th>Thao tác</th>
               </tr>
             </thead>
@@ -464,9 +454,7 @@ export default function Inventory() {
                     <p className="cell-main">{Number(item.price || 0).toLocaleString('vi-VN')}đ</p>
                   </td>
                   <td>
-                    <span className={`stock-badge ${Number(item.stock_quantity || 0) < 10 ? 'low' : 'ok'}`}>
-                      {item.stock_quantity}
-                    </span>
+                    <span className="stock-badge ok" style={{ background: '#e0e7ff', color: '#4f46e5' }}>Dịch vụ</span>
                   </td>
                   <td>
                     <div className="table-actions">
@@ -498,7 +486,7 @@ export default function Inventory() {
       {showModal && (
         <div className="modal-backdrop" onClick={() => setShowModal(false)}>
           <div className="modal-panel" onClick={(e) => e.stopPropagation()}>
-            <h3>{editingProduct ? 'Cập nhật / Nhập hàng' : 'Thêm sản phẩm nước'}</h3>
+            <h3>{editingProduct ? 'Cập nhật dịch vụ' : 'Thêm dịch vụ'}</h3>
             <form className="modern-form" onSubmit={handleAddOrUpdate}>
               <div style={{ marginBottom: '12px' }}>
                 <label className="cell-sub" style={{ display: 'block', marginBottom: '4px' }}>Tên sản phẩm</label>
@@ -510,7 +498,7 @@ export default function Inventory() {
                 />
               </div>
 
-              <div className="form-grid-2">
+              <div className="form-grid-2" style={{ marginBottom: '12px' }}>
                 <div>
                   <label className="cell-sub" style={{ display: 'block', marginBottom: '4px' }}>Giá bán (VNĐ)</label>
                   <input
@@ -521,34 +509,7 @@ export default function Inventory() {
                     required
                   />
                 </div>
-                <div>
-                  <label className="cell-sub" style={{ display: 'block', marginBottom: '4px' }}>Tồn kho hiện tại</label>
-                  <input
-                    type="number"
-                    value={form.stock_quantity}
-                    onChange={(e) => setForm({ ...form, stock_quantity: e.target.value })}
-                    placeholder="Số lượng"
-                    required
-                    disabled={editingProduct !== null}
-                  />
-                </div>
               </div>
-
-              {editingProduct && (
-                <div style={{ marginTop: '12px', padding: '12px', background: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-                  <label className="cell-sub" style={{ display: 'block', marginBottom: '4px', color: '#166534', fontWeight: 'bold' }}>Nhập thêm hàng (+)</label>
-                  <input
-                    type="number"
-                    value={form.restock_quantity}
-                    onChange={(e) => setForm({ ...form, restock_quantity: e.target.value })}
-                    placeholder="Số lượng nhập thêm"
-                    style={{ borderColor: '#16a34a' }}
-                  />
-                  <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#15803d' }}>
-                    Tổng kho sau khi lưu: <strong>{Number(form.stock_quantity) + Number(form.restock_quantity || 0)}</strong>
-                  </p>
-                </div>
-              )}
 
               <div style={{ marginTop: '12px' }}>
                 <label className="cell-sub" style={{ display: 'block', marginBottom: '4px' }}>Ghi chú</label>

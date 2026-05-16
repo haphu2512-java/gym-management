@@ -45,6 +45,14 @@ CREATE TABLE IF NOT EXISTS products (
   deleted_at TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS services (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL,
+  price NUMERIC NOT NULL,
+  note TEXT,
+  deleted_at TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS shifts (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   shift_name TEXT NOT NULL,
@@ -92,6 +100,18 @@ CREATE TABLE IF NOT EXISTS sales_logs (
   shift_id UUID REFERENCES shifts(id) ON DELETE SET NULL,
   sold_by UUID REFERENCES profiles(id), -- Tài khoản đăng nhập
   sold_by_member UUID REFERENCES staff_members(id), -- Nhân viên trực thực tế
+  quantity INT NOT NULL,
+  total_price NUMERIC NOT NULL,
+  payment_method TEXT DEFAULT 'TM',
+  sold_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS service_sales (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  service_id UUID REFERENCES services(id),
+  shift_id UUID REFERENCES shifts(id) ON DELETE SET NULL,
+  sold_by UUID REFERENCES profiles(id),
+  sold_by_member UUID REFERENCES staff_members(id),
   quantity INT NOT NULL,
   total_price NUMERIC NOT NULL,
   payment_method TEXT DEFAULT 'TM',
@@ -214,6 +234,17 @@ BEGIN
   UPDATE products SET stock_quantity = stock_quantity - p_quantity WHERE id = p_product_id;
   INSERT INTO sales_logs (product_id, shift_id, sold_by, sold_by_member, quantity, total_price, payment_method, sold_at)
   VALUES (p_product_id, p_shift_id, p_auth_id, p_staff_id, p_quantity, p_total_price, p_payment_method, p_sold_at) RETURNING id INTO v_sale_id;
+  RETURN json_build_object('success', true, 'sale_id', v_sale_id);
+END;
+$$ LANGUAGE plpgsql;
+
+-- C. Bán Dịch Vụ (Tập ngày, Gói PT...) (Atomic)
+CREATE OR REPLACE FUNCTION sell_service_transaction(p_service_id UUID, p_shift_id UUID, p_auth_id UUID, p_staff_id UUID, p_quantity INT, p_total_price NUMERIC, p_payment_method TEXT, p_sold_at TIMESTAMP WITH TIME ZONE)
+RETURNS JSON AS $$
+DECLARE v_sale_id UUID;
+BEGIN
+  INSERT INTO service_sales (service_id, shift_id, sold_by, sold_by_member, quantity, total_price, payment_method, sold_at)
+  VALUES (p_service_id, p_shift_id, p_auth_id, p_staff_id, p_quantity, p_total_price, p_payment_method, p_sold_at) RETURNING id INTO v_sale_id;
   RETURN json_build_object('success', true, 'sale_id', v_sale_id);
 END;
 $$ LANGUAGE plpgsql;
@@ -382,6 +413,8 @@ ALTER TABLE member_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE weekly_schedules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE salary_configs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE salary_adjustments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE services ENABLE ROW LEVEL SECURITY;
+ALTER TABLE service_sales ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow all authenticated" ON profiles FOR SELECT TO authenticated USING (true);
 CREATE POLICY "View staff_members" ON staff_members FOR SELECT TO authenticated USING (true);
@@ -401,6 +434,8 @@ CREATE POLICY "Full access m_logs" ON member_logs FOR ALL TO authenticated USING
 CREATE POLICY "Full access schedule" ON weekly_schedules FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Full access salary_cfg" ON salary_configs FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Full access salary_adj" ON salary_adjustments FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Full access services" ON services FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Full access service_sales" ON service_sales FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
 -- ============================================================
 -- 9. AUTH TRIGGERS (Tự động tạo Profile khi có User mới)

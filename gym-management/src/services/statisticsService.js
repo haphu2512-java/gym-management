@@ -55,20 +55,28 @@ export const statisticsService = {
     let salesQuery = supabase.from('sales_logs').select('total_price, sold_at');
     // Revenue from payment_logs
     let paymentQuery = supabase.from('payment_logs').select('amount, created_at').eq('is_verified', true);
+    // Revenue from service_sales
+    let serviceQuery = supabase.from('service_sales').select('total_price, sold_at');
 
     if (filters.startDate) {
       salesQuery = salesQuery.gte('sold_at', filters.startDate);
       paymentQuery = paymentQuery.gte('created_at', filters.startDate);
+      serviceQuery = serviceQuery.gte('sold_at', filters.startDate);
     }
     if (filters.endDate) {
       salesQuery = salesQuery.lte('sold_at', filters.endDate);
       paymentQuery = paymentQuery.lte('created_at', filters.endDate);
+      serviceQuery = serviceQuery.lte('sold_at', filters.endDate);
     }
 
-    const [salesRes, paymentRes] = await Promise.all([salesQuery, paymentQuery]);
+    const [salesRes, paymentRes, serviceRes] = await Promise.all([salesQuery, paymentQuery, serviceQuery]);
 
     const waterRevenue = (salesRes.data || []).reduce((sum, item) => sum + Number(item.total_price || 0), 0);
-    const memberRevenue = (paymentRes.data || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const memberRevenueBase = (paymentRes.data || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const serviceRevenue = (serviceRes.data || []).reduce((sum, item) => sum + Number(item.total_price || 0), 0);
+    
+    // Gộp doanh thu dịch vụ vào doanh thu hội viên
+    const memberRevenue = memberRevenueBase + serviceRevenue;
 
     return {
       waterRevenue,
@@ -80,19 +88,23 @@ export const statisticsService = {
   async getDailyRevenue(filters = {}) {
     let salesQuery = supabase.from('sales_logs').select('total_price, sold_at');
     let paymentQuery = supabase.from('payment_logs').select('amount, created_at').eq('is_verified', true);
+    let serviceQuery = supabase.from('service_sales').select('total_price, sold_at');
 
     if (filters.startDate) {
       salesQuery = salesQuery.gte('sold_at', filters.startDate);
       paymentQuery = paymentQuery.gte('created_at', filters.startDate);
+      serviceQuery = serviceQuery.gte('sold_at', filters.startDate);
     }
     if (filters.endDate) {
       salesQuery = salesQuery.lte('sold_at', filters.endDate);
       paymentQuery = paymentQuery.lte('created_at', filters.endDate);
+      serviceQuery = serviceQuery.lte('sold_at', filters.endDate);
     }
 
-    const [salesRes, paymentRes] = await Promise.all([salesQuery, paymentQuery]);
+    const [salesRes, paymentRes, serviceRes] = await Promise.all([salesQuery, paymentQuery, serviceQuery]);
     const sales = salesRes.data || [];
     const payments = paymentRes.data || [];
+    const services = serviceRes.data || [];
 
     const dayLabels = ['CN', 'Th 2', 'Th 3', 'Th 4', 'Th 5', 'Th 6', 'Th 7'];
     const daily = {};
@@ -115,6 +127,16 @@ export const statisticsService = {
       const day = dayLabels[dayIndex];
       if (!daily[day]) daily[day] = { day, member: 0, water: 0 };
       daily[day].member += Number(p.amount || 0);
+    });
+
+    services.forEach(s => {
+      const date = s.sold_at ? new Date(s.sold_at) : null;
+      if (!date || isNaN(date.getTime())) return;
+
+      const dayIndex = date.getDay();
+      const day = dayLabels[dayIndex];
+      if (!daily[day]) daily[day] = { day, member: 0, water: 0 };
+      daily[day].member += Number(s.total_price || 0);
     });
 
     const order = ['Th 2', 'Th 3', 'Th 4', 'Th 5', 'Th 6', 'Th 7', 'CN'];

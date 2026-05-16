@@ -14,7 +14,7 @@ import MemberFormModal from './MemberFormModal';
 import RenewModal from './RenewModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import SuspendModal from './SuspendModal';
-
+import ServiceTab from './ServiceTab';
 
 const PRICING_TIERS = {
   normal: { 1: 350000, 3: 795000, 6: 1440000 },
@@ -293,10 +293,19 @@ export default function Members() {
         });
       } else {
         if (payload.package_type < 1 || payload.package_type > 36) {
-          setError('Goi tap tu 1 den 36 thang.');
+          setError('Gói tập từ 1 đến 36 tháng.');
           return;
         }
         await addMember(payload);
+        
+        await staffLogService.logAction({
+          staffId: user?.id,
+          staffMemberId: activeStaff?.id,
+          action: 'Thêm hội viên mới',
+          targetItem: payload.full_name,
+          details: { member_code: payload.member_code, package: payload.package_type },
+          note: 'Admin/Staff tạo hội viên mới',
+        });
       }
 
       setShowModal(false);
@@ -348,6 +357,19 @@ export default function Members() {
         shiftId: activeShift.id,
       });
 
+      await staffLogService.logAction({
+        staffId: user?.id,
+        staffMemberId: activeStaff?.id,
+        action: 'Gia hạn hội viên',
+        targetItem: renewingMember.full_name,
+        details: { 
+          member_id: renewingMember.id, 
+          package: packageType, 
+          fee: Number(renewForm.fee || 0) 
+        },
+        note: 'Admin/Staff thực hiện gia hạn học phí',
+      });
+
       // Làm mới danh sách để cập nhật ngày hết hạn mới
       await fetchMembers();
 
@@ -391,6 +413,16 @@ export default function Members() {
 
     try {
       await suspendMember(suspendingMember.id, activeStaff?.id || user?.id, activeShift.id);
+      
+      await staffLogService.logAction({
+        staffId: user?.id,
+        staffMemberId: activeStaff?.id,
+        action: 'Bảo lưu hội viên',
+        targetItem: suspendingMember.full_name,
+        details: { member_id: suspendingMember.id },
+        note: 'Admin/Staff thực hiện bảo lưu (tạm dừng)',
+      });
+
       setShowSuspendModal(false);
       setSuspendingMember(null);
       addToast("Đã bảo lưu hội viên thành công!");
@@ -412,6 +444,16 @@ export default function Members() {
       onConfirm: async () => {
         try {
           await reactivateMember(member.id, activeStaff?.id || user?.id, activeShift.id);
+          
+          await staffLogService.logAction({
+            staffId: user?.id,
+            staffMemberId: activeStaff?.id,
+            action: 'Kích hoạt lại hội viên',
+            targetItem: member.full_name,
+            details: { member_id: member.id },
+            note: 'Admin/Staff kích hoạt lại từ trạng thái bảo lưu',
+          });
+
           addToast("Đã kích hoạt lại hội viên thành công!");
         } catch (err) {
           setError("Lỗi kích hoạt lại: " + err.message);
@@ -439,18 +481,22 @@ export default function Members() {
 
       {error && <div className="modern-error">{error}</div>}
 
-      <MembersTable
-        members={members}
-        loading={loading}
-        filtered={filtered}
-        activeTab={activeTab}
-        profile={profile}
-        onEditMember={openEditModal}
-        onRenewMember={openRenewModal}
-        onSuspendMember={openSuspendModal}
-        onReactivateMember={handleReactivate}
-        onDeleteMember={setDeletingMember}
-      />
+      {activeTab === 'services' ? (
+        <ServiceTab />
+      ) : (
+        <MembersTable
+          members={members}
+          loading={loading}
+          filtered={filtered}
+          activeTab={activeTab}
+          profile={profile}
+          onEditMember={openEditModal}
+          onRenewMember={openRenewModal}
+          onSuspendMember={openSuspendModal}
+          onReactivateMember={handleReactivate}
+          onDeleteMember={setDeletingMember}
+        />
+      )}
 
       {showModal && (
         <MemberFormModal
