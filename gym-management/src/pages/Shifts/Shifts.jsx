@@ -219,9 +219,23 @@ export default function Shifts() {
     try {
       if (editingNote) {
         await shiftNoteService.updateNote(editingNote.id, noteForm);
+        await staffLogService.logAction({
+          staffId: user?.id,
+          staffMemberId: activeStaff?.id,
+          action: 'Sửa ghi chú chung',
+          targetItem: 'Sổ nhật ký',
+          note: `Nội dung mới: ${noteForm.substring(0, 50)}${noteForm.length > 50 ? '...' : ''}`
+        });
         setEditingNote(null);
       } else {
         await shiftNoteService.addNote(noteForm, activeStaff.id);
+        await staffLogService.logAction({
+          staffId: user?.id,
+          staffMemberId: activeStaff?.id,
+          action: 'Thêm ghi chú chung',
+          targetItem: 'Sổ nhật ký',
+          note: noteForm.substring(0, 100)
+        });
       }
       setNoteForm('');
       const notes = await shiftNoteService.getAllNotes();
@@ -235,6 +249,12 @@ export default function Shifts() {
     if (!window.confirm('Bạn có chắc muốn xóa ghi chú này?')) return;
     try {
       await shiftNoteService.deleteNote(id);
+      await staffLogService.logAction({
+        staffId: user?.id,
+        staffMemberId: activeStaff?.id,
+        action: 'Xóa ghi chú chung',
+        targetItem: 'Sổ nhật ký'
+      });
       const notes = await shiftNoteService.getAllNotes();
       setSharedNotes(notes);
     } catch (err) {

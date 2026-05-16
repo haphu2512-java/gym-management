@@ -20,7 +20,7 @@ export default function Sidebar({ isOpen, onClose }) {
   const baseItems = [
     { key: 'dashboard', path: '/dashboard', label: 'Báo Cáo Chung' },
     { key: 'members', path: '/members', label: 'Quản Lý Hội Viên' },
-    { key: 'inventory', path: '/inventory', label: 'Quản Lý Nước và Tập Ngày' },
+    { key: 'inventory', path: '/inventory', label: 'Quản Lý Nước' },
     { key: 'shifts', path: '/shifts', label: 'Ca Làm & Bàn Giao' },
   ];
 
