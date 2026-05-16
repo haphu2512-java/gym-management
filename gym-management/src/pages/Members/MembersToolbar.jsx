@@ -1,4 +1,4 @@
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, FileSpreadsheet } from 'lucide-react';
 
 export default function MembersToolbar({
   activeTab,
@@ -10,6 +10,7 @@ export default function MembersToolbar({
   filterDate,
   setFilterDate,
   onAddMember,
+  onExportExcel,
   profile
 }) {
   return (
@@ -91,6 +92,17 @@ export default function MembersToolbar({
               <option value="all">Tất cả</option>
               <option value="pending_ck">Chờ duyệt CK</option>
             </select>
+          )}
+          {profile?.role === 'admin' && (
+            <button
+              type="button"
+              className="ghost-btn"
+              onClick={onExportExcel}
+              title="Xuất danh sách hội viên ra Excel"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#16a34a', border: '1px solid #16a34a' }}
+            >
+              <FileSpreadsheet size={16} /> Xuất Excel
+            </button>
           )}
           <button type="button" className="primary-btn" onClick={onAddMember}>
             <Plus size={16} /> Thêm hội viên

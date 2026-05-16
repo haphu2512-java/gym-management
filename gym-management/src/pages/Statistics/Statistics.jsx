@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { PieChart, TrendingUp, Users, Droplets, Calendar, Download, User } from 'lucide-react';
 import { statisticsService } from '../../services/statisticsService';
+import { exportRevenueToExcel } from '../../utils/excelExport';
 
 export default function Statistics() {
   const [dateRange, setDateRange] = useState('week');
@@ -158,7 +159,16 @@ export default function Statistics() {
             <option value="custom">Tùy chọn</option>
             <option value="all">Tất cả</option>
           </select>
-          <button className="primary-btn">
+          <button
+            className="primary-btn"
+            onClick={() => exportRevenueToExcel({
+              overallStats,
+              detailedStats,
+              packageStats,
+              dateRange
+            })}
+            title="Xuất báo cáo ra file Excel"
+          >
             <Download size={16} /> Xuất báo cáo
           </button>
         </div>

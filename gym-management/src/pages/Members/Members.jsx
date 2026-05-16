@@ -8,6 +8,7 @@ import supabase from '../../config/supabase';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useUIStore } from '../../store/useUIStore';
 import { getLocalISODate, addMonths } from '../../utils/formatters';
+import { exportMembersToExcel } from '../../utils/excelExport';
 import MembersToolbar from './MembersToolbar';
 import MembersTable from './MembersTable';
 import MemberFormModal from './MemberFormModal';
@@ -467,6 +468,11 @@ export default function Members() {
   };
 
 
+  // Xuất danh sách hội viên ra Excel (Admin only)
+  const handleExportExcel = () => {
+    exportMembersToExcel(filtered);
+  };
+
   return (
     <div className="modern-stack">
       <MembersToolbar
@@ -479,6 +485,7 @@ export default function Members() {
         filterDate={filterDate}
         setFilterDate={setFilterDate}
         onAddMember={openCreateModal}
+        onExportExcel={handleExportExcel}
         profile={profile}
       />
 
