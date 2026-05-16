@@ -36,6 +36,7 @@ const initialForm = {
   fingerprint_status: false,
   note: '',
   start_date: new Date().toISOString().slice(0, 10),
+  end_date: '',
 };
 
 export default function Members() {
@@ -159,7 +160,7 @@ export default function Members() {
       await memberService.deleteMember(deletingMember.id);
 
       await staffLogService.logAction({
-        staffId: effectiveStaffId,
+        staffId: user?.id,
         staffMemberId: activeStaff?.id,
         action: 'Xoa hoi vien',
         targetItem: deletingMember.full_name,
@@ -194,6 +195,7 @@ export default function Members() {
       payment_method: member.payment_method || 'TM',
       fingerprint_status: member.fingerprint_status === true || member.fingerprint_status === 'true',
       note: member.note || '',
+      end_date: member.end_date ? new Date(member.end_date).toISOString().slice(0, 10) : '',
     });
     setError('');
     setShowModal(true);
@@ -271,6 +273,7 @@ export default function Members() {
           full_name: form.full_name,
           fingerprint_status: form.fingerprint_status,
           note: form.note,
+          end_date: form.end_date,
         };
         const updated = await updateMember(editingMember.id, updatePayload);
 

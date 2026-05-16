@@ -6,8 +6,8 @@ export const staffLogService = {
   async logAction({ staffId, staffMemberId, action, targetItem = '', details = null, note = '', created_at = null }) {
     if (!staffId && !staffMemberId) return;
     const payload = {
-      staff_id: staffId,
-      staff_member_id: staffMemberId,
+      staff_id: staffId || null,
+      staff_member_id: staffMemberId || null,
       action,
       target_item: targetItem,
       details,

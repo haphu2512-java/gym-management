@@ -41,12 +41,26 @@ export const memberService = {
     return data || [];
   },
 
-  async getRecentMembers(limit = 5) {
-    const { data, error } = await supabase
+  async getRecentMembers(limit = 5, filters = {}) {
+    let query = supabase
       .from(VIEW_NAME)
       .select('*')
-      .order('last_active_at', { ascending: false, nullsFirst: false })
-      .limit(limit);
+      .order('last_active_at', { ascending: false, nullsFirst: false });
+
+    if (filters.date) {
+      const startOfDay = new Date(filters.date);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(filters.date);
+      endOfDay.setHours(23, 59, 59, 999);
+      query = query.gte('last_active_at', startOfDay.toISOString())
+                   .lte('last_active_at', endOfDay.toISOString());
+    }
+
+    if (limit) {
+      query = query.limit(limit);
+    }
+
+    const { data, error } = await query;
     if (error) throw new Error(error.message);
     return data || [];
   },
