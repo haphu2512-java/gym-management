@@ -8,6 +8,7 @@ import { productService } from '../../services/productService';
 import { additionalService } from '../../services/additionalService';
 import { expenseService } from '../../services/expenseService';
 import { staffLogService } from '../../services/staffLogService';
+import { shiftNoteService } from '../../services/shiftNoteService';
 import { formatDateTime } from '../../utils/formatters';
 import { deviceSecurity } from '../../utils/deviceSecurity';
 
@@ -23,6 +24,9 @@ export default function Shifts() {
   const [deviceSecret, setDeviceSecret] = useState('');
   const [suggestedEndingCash, setSuggestedEndingCash] = useState(0);
   const [expenses, setExpenses] = useState([]);
+  const [sharedNotes, setSharedNotes] = useState([]);
+  const [editingNote, setEditingNote] = useState(null);
+  const [noteForm, setNoteForm] = useState('');
   const [totalExpense, setTotalExpense] = useState(0);
   const [expenseForm, setExpenseForm] = useState(() => {
     const saved = localStorage.getItem('gym_expense_form');
@@ -65,8 +69,12 @@ export default function Shifts() {
     setLoading(true);
     setError('');
     try {
-      const data = await shiftService.getLatestShifts();
-      setShifts(data);
+      const [shiftsData, notesData] = await Promise.all([
+        shiftService.getLatestShifts(),
+        shiftNoteService.getAllNotes()
+      ]);
+      setShifts(shiftsData);
+      setSharedNotes(notesData);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -200,6 +208,40 @@ export default function Shifts() {
     }
   };
 
+  const handleAddSharedNote = async (e) => {
+    e.preventDefault();
+    if (!noteForm.trim()) return;
+    if (!activeStaff) {
+      setError('Vui lòng chọn nhân viên trước khi viết ghi chú.');
+      return;
+    }
+    
+    try {
+      if (editingNote) {
+        await shiftNoteService.updateNote(editingNote.id, noteForm);
+        setEditingNote(null);
+      } else {
+        await shiftNoteService.addNote(noteForm, activeStaff.id);
+      }
+      setNoteForm('');
+      const notes = await shiftNoteService.getAllNotes();
+      setSharedNotes(notes);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleDeleteSharedNote = async (id) => {
+    if (!window.confirm('Bạn có chắc muốn xóa ghi chú này?')) return;
+    try {
+      await shiftNoteService.deleteNote(id);
+      const notes = await shiftNoteService.getAllNotes();
+      setSharedNotes(notes);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -262,8 +304,11 @@ export default function Shifts() {
             <button type="button" className={activeTab === 'expense' ? 'primary-btn' : 'ghost-btn'} onClick={() => setActiveTab('expense')}>
               Chi
             </button>
+            <button type="button" className={activeTab === 'notes' ? 'primary-btn' : 'ghost-btn'} onClick={() => setActiveTab('notes')}>
+              Ghi chú chung
+            </button>
           </div>
-          <h3 className="modern-title flex-row"><Clock size={18} /> Bàn giao ca trực</h3>
+          <h3 className="modern-title flex-row"><Clock size={18} /> {activeTab === 'notes' ? 'Sổ nhật ký chung' : 'Bàn giao ca trực'}</h3>
 
           {!isTrusted ? (
             <div className="modern-card" style={{ background: '#fff7ed', border: '1px solid #ffedd5', padding: '20px', textAlign: 'center' }}>
@@ -464,6 +509,63 @@ export default function Shifts() {
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                </div>
+              )}
+              {activeTab === 'notes' && (
+                <div className="modern-stack">
+                  <form className="modern-form" onSubmit={handleAddSharedNote}>
+                    <label className="field-label">{editingNote ? 'Sửa ghi chú' : 'Thêm ghi chú mới'}</label>
+                    <textarea 
+                      rows={4}
+                      value={noteForm}
+                      onChange={(e) => setNoteForm(e.target.value)}
+                      placeholder="Nhập nội dung ghi chú cho các ca sau..."
+                      required
+                    />
+                    <div className="flex-row" style={{ gap: '8px', marginTop: '8px' }}>
+                      <button type="submit" className="primary-btn">
+                        {editingNote ? 'Cập nhật' : 'Gửi ghi chú'}
+                      </button>
+                      {editingNote && (
+                        <button type="button" className="ghost-btn" onClick={() => {
+                          setEditingNote(null);
+                          setNoteForm('');
+                        }}>Hủy</button>
+                      )}
+                    </div>
+                  </form>
+
+                  <div className="modern-stack" style={{ marginTop: '20px', gap: '12px' }}>
+                    {sharedNotes.length === 0 && <p className="muted-text">Chưa có ghi chú nào.</p>}
+                    {sharedNotes.map(note => (
+                      <div key={note.id} className="modern-card" style={{ padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                        <div className="flex-row" style={{ justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <span style={{ fontSize: '13px', fontWeight: '600', color: '#1e40af' }}>
+                            👤 {note.staff_members?.full_name || 'Hệ thống'}
+                          </span>
+                          <span className="muted-text" style={{ fontSize: '12px' }}>
+                            {formatDateTime(note.created_at)}
+                          </span>
+                        </div>
+                        <p style={{ margin: 0, fontSize: '14px', whiteSpace: 'pre-wrap' }}>{note.content}</p>
+                        <div className="flex-row" style={{ gap: '12px', marginTop: '12px', justifyContent: 'flex-end' }}>
+                          <button 
+                            className="link-btn" 
+                            style={{ fontSize: '12px', color: '#2563eb' }}
+                            onClick={() => {
+                              setEditingNote(note);
+                              setNoteForm(note.content);
+                            }}
+                          >Sửa</button>
+                          <button 
+                            className="link-btn" 
+                            style={{ fontSize: '12px', color: '#dc2626' }}
+                            onClick={() => handleDeleteSharedNote(note.id)}
+                          >Xóa</button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}

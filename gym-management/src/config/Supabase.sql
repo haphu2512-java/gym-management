@@ -80,6 +80,14 @@ CREATE TABLE IF NOT EXISTS shift_expenses (
   created_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS shift_notes (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  content TEXT NOT NULL,
+  created_by_member UUID REFERENCES staff_members(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  deleted_at TIMESTAMP
+);
+
 -- ============================================================
 -- 4. LOGS & TRANSACTIONS
 -- ============================================================
@@ -415,6 +423,7 @@ ALTER TABLE salary_configs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE salary_adjustments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE services ENABLE ROW LEVEL SECURITY;
 ALTER TABLE service_sales ENABLE ROW LEVEL SECURITY;
+ALTER TABLE shift_notes ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow all authenticated" ON profiles FOR SELECT TO authenticated USING (true);
 CREATE POLICY "View staff_members" ON staff_members FOR SELECT TO authenticated USING (true);
@@ -436,6 +445,7 @@ CREATE POLICY "Full access salary_cfg" ON salary_configs FOR ALL TO authenticate
 CREATE POLICY "Full access salary_adj" ON salary_adjustments FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Full access services" ON services FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Full access service_sales" ON service_sales FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Full access shift_notes" ON shift_notes FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
 -- ============================================================
 -- 9. AUTH TRIGGERS (Tự động tạo Profile khi có User mới)
@@ -477,6 +487,8 @@ GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO authenticated, service
 
 -- Cấp quyền SELECT cho anon (để có thể thực hiện một số kiểm tra trước khi đăng nhập nếu cần)
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
+GRANT SELECT ON TABLE shift_notes TO anon;
+GRANT ALL PRIVILEGES ON TABLE shift_notes TO authenticated, service_role;
 
 -- Đảm bảo các bảng tạo mới trong tương lai cũng được cấp quyền tự động
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO authenticated, service_role;

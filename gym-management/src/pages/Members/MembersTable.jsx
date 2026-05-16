@@ -1,4 +1,5 @@
-import { Eye, Trash2, RefreshCcw, PauseCircle, Plus } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Eye, Trash2, RefreshCcw, PauseCircle, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatDate } from '../../utils/formatters';
 
 function getStatus(member) {
@@ -20,8 +21,18 @@ export default function MembersTable({
   onReactivateMember,
   onDeleteMember
 }) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filtered.length]);
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
   return (
-    <div className="modern-table-wrap">
+    <div className="modern-table-wrap" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <table className="modern-table">
         <thead>
           <tr>
@@ -35,12 +46,12 @@ export default function MembersTable({
           </tr>
         </thead>
         <tbody>
-          {!loading && filtered.length === 0 && (
+          {!loading && paginated.length === 0 && (
             <tr>
-              <td colSpan={6} className="table-empty-cell">Không có dữ liệu</td>
+              <td colSpan={7} className="table-empty-cell">Không có dữ liệu</td>
             </tr>
           )}
-          {filtered.map((m) => {
+          {paginated.map((m) => {
             const status = getStatus(m);
             return (
               <tr key={m.id}>
@@ -150,6 +161,35 @@ export default function MembersTable({
           })}
         </tbody>
       </table>
+
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', marginTop: 'auto' }}>
+          <span className="muted-text" style={{ fontSize: '13px' }}>
+            Hiển thị {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filtered.length)} / {filtered.length} hội viên
+          </span>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button 
+              className="ghost-btn" 
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              style={{ padding: '6px 12px' }}
+            >
+              <ChevronLeft size={16} /> Trước
+            </button>
+            <span style={{ padding: '6px 12px', fontSize: '14px', fontWeight: '500' }}>
+              Trang {currentPage} / {totalPages}
+            </span>
+            <button 
+              className="ghost-btn" 
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              style={{ padding: '6px 12px' }}
+            >
+              Sau <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
