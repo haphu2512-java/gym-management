@@ -8,6 +8,9 @@ Dựa trên kết quả rà soát từ `GymReview.md` và các nâng cấp Datab
 - [x] Chặn bán nước khi chưa mở ca làm việc.
 - [x] Di chuyển toàn bộ dữ liệu Lương & Lịch xếp ca từ `localStorage` lên Supabase.
 - [x] Cập nhật Dashboard sử dụng `payment_logs` để tính doanh thu học viên chính xác.
+- [x] **Cảnh báo hết hạn**: Dashboard hiển thị widget nhắc nhở HV hết hạn trong 7 ngày.
+- [x] **Lọc báo cáo**: Trang Thống Kê hỗ trợ lọc đa khoảng thời gian (Hôm nay, Tuần, Tháng, Tùy chọn).
+- [x] **Fix Bug**: Sửa lỗi hiển thị "Gói 0 tháng" sau khi kích hoạt lại (Reactivate) hội viên bảo lưu.
 
 ---
 
@@ -18,12 +21,10 @@ Dựa trên kết quả rà soát từ `GymReview.md` và các nâng cấp Datab
 - [ ] **Chống xung đột ca**: Cập nhật `shiftService.validateShiftForLogin` để xử lý trường hợp có nhiều ca `open` (hiển thị danh sách ca hoặc bắt buộc đóng ca cũ).
 
 ### 2. Quản lý Hội viên (Members)
-- [ ] **Cảnh báo hết hạn**: Đánh dấu màu (ví dụ: Vàng/Đỏ) cho các hội viên còn dưới 7 ngày hạn tập trong danh sách.
 - [ ] **Tính năng Check-in**: Tạo một ô tìm kiếm nhanh (Scan/Search) ở Dashboard hoặc trang Hội viên để xác nhận khách vào tập, hiển thị trạng thái "Còn hạn" to/rõ.
 
 ### 3. Báo cáo & Dashboard
 - [ ] **Doanh thu hôm nay**: Thêm widget hiển thị riêng doanh thu thu được trong ngày hiện tại (Nước + Học viên).
-- [ ] **Lọc báo cáo**: Cho phép Dashboard hiển thị dữ liệu theo khoảng thời gian (Tuần này, Tháng này).
 
 ---
 
@@ -31,7 +32,7 @@ Dựa trên kết quả rà soát từ `GymReview.md` và các nâng cấp Datab
 
 ### 4. Tài chính & Chứng từ
 - [ ] **In biên lai**: Hỗ trợ in biên lai (PDF/Máy in nhiệt) khi học viên đóng tiền học phí.
-- [ ] **Xuất Excel**: Cho phép Admin xuất danh sách hội viên và báo cáo doanh thu ra file Excel.
+- [x] **Xuất Excel**: Admin xuất danh sách HV (theo filter hiện tại) và báo cáo doanh thu 4 sheets ra file Excel.
 
 ### 5. Thông báo & Trải nghiệm
 - [ ] **Thông báo Real-time**: Hiển thị thông báo ngay khi có giao dịch Chuyển khoản (CK) cần duyệt mà không cần F5 trang.

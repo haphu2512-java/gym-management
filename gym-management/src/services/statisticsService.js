@@ -1,50 +1,55 @@
 import supabase from '../config/supabase';
 
 export const statisticsService = {
-  async getWaterStatsByShiftAndStaff(filters = {}) {
-    let query = supabase
+  async getDetailedStats(filters = {}) {
+    let salesQuery = supabase
       .from('sales_logs')
-      .select(`
-        quantity,
-        total_price,
-        sold_at,
-        products (name),
-        profiles:sold_by (full_name),
-        staff_members:sold_by_member (full_name),
-        shifts (shift_name)
-      `);
+      .select('quantity, total_price, sold_at, products(name), shifts(shift_name), staff_members:sold_by_member(full_name)');
+      
+    let paymentQuery = supabase
+      .from('payment_logs')
+      .select('amount, payment_type, created_at, shifts(shift_name), staff_members:staff_member_id(full_name)')
+      .eq('is_verified', true)
+      .in('payment_type', ['new', 'renew']);
 
     if (filters.startDate) {
-      query = query.gte('sold_at', filters.startDate);
+      salesQuery = salesQuery.gte('sold_at', filters.startDate);
+      paymentQuery = paymentQuery.gte('created_at', filters.startDate);
     }
     if (filters.endDate) {
-      query = query.lte('sold_at', filters.endDate);
+      salesQuery = salesQuery.lte('sold_at', filters.endDate);
+      paymentQuery = paymentQuery.lte('created_at', filters.endDate);
     }
 
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
+    const [salesRes, paymentRes] = await Promise.all([salesQuery, paymentQuery]);
 
-    // Group by Staff -> Shift -> Product
-    const grouped = {};
+    const sales = salesRes.data || [];
+    const payments = paymentRes.data || [];
 
-    (data || []).forEach(log => {
-      const staffName = log.staff_members?.full_name || log.profiles?.full_name || 'Hệ thống';
-      const shiftName = log.shifts?.shift_name || 'N/A';
-      const productName = log.products?.name || 'Sản phẩm lạ';
+    const waterSales = sales.map(s => {
+      const dateObj = new Date(s.sold_at);
+      return {
+        date: dateObj.toLocaleDateString('vi-VN'),
+        shift: s.shifts?.shift_name || 'Không có ca',
+        staff: s.staff_members?.full_name || 'Không rõ',
+        product: s.products?.name || 'Sản phẩm',
+        quantity: s.quantity || 0,
+        revenue: Number(s.total_price || 0)
+      };
+    }).filter(s => s.revenue > 0 || s.quantity > 0);
 
-      if (!grouped[staffName]) {
-        grouped[staffName] = {};
-      }
-      if (!grouped[staffName][shiftName]) {
-        grouped[staffName][shiftName] = {};
-      }
-      if (!grouped[staffName][shiftName][productName]) {
-        grouped[staffName][shiftName][productName] = 0;
-      }
-      grouped[staffName][shiftName][productName] += log.quantity;
-    });
+    const memberships = payments.map(p => {
+      const dateObj = new Date(p.created_at);
+      return {
+        date: dateObj.toLocaleDateString('vi-VN'),
+        shift: p.shifts?.shift_name || 'Không có ca',
+        staff: p.staff_members?.full_name || 'Không rõ',
+        type: p.payment_type,
+        revenue: Number(p.amount || 0)
+      };
+    }).filter(p => p.revenue > 0);
 
-    return grouped;
+    return { waterSales, memberships };
   },
 
   async getOverallStats(filters = {}) {
@@ -55,70 +60,34 @@ export const statisticsService = {
     let salesQuery = supabase.from('sales_logs').select('total_price, sold_at');
     // Revenue from payment_logs
     let paymentQuery = supabase.from('payment_logs').select('amount, created_at').eq('is_verified', true);
+    // Revenue from service_sales
+    let serviceQuery = supabase.from('service_sales').select('total_price, sold_at');
 
     if (filters.startDate) {
       salesQuery = salesQuery.gte('sold_at', filters.startDate);
       paymentQuery = paymentQuery.gte('created_at', filters.startDate);
+      serviceQuery = serviceQuery.gte('sold_at', filters.startDate);
     }
     if (filters.endDate) {
       salesQuery = salesQuery.lte('sold_at', filters.endDate);
       paymentQuery = paymentQuery.lte('created_at', filters.endDate);
+      serviceQuery = serviceQuery.lte('sold_at', filters.endDate);
     }
 
-    const [salesRes, paymentRes] = await Promise.all([salesQuery, paymentQuery]);
+    const [salesRes, paymentRes, serviceRes] = await Promise.all([salesQuery, paymentQuery, serviceQuery]);
 
     const waterRevenue = (salesRes.data || []).reduce((sum, item) => sum + Number(item.total_price || 0), 0);
-    const memberRevenue = (paymentRes.data || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const memberRevenueBase = (paymentRes.data || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const serviceRevenue = (serviceRes.data || []).reduce((sum, item) => sum + Number(item.total_price || 0), 0);
+    
+    // Gộp doanh thu dịch vụ vào doanh thu hội viên
+    const memberRevenue = memberRevenueBase + serviceRevenue;
 
     return {
       waterRevenue,
       memberRevenue,
       totalRevenue: waterRevenue + memberRevenue
     };
-  },
-
-  async getDailyRevenue(filters = {}) {
-    let salesQuery = supabase.from('sales_logs').select('total_price, sold_at');
-    let paymentQuery = supabase.from('payment_logs').select('amount, created_at').eq('is_verified', true);
-
-    if (filters.startDate) {
-      salesQuery = salesQuery.gte('sold_at', filters.startDate);
-      paymentQuery = paymentQuery.gte('created_at', filters.startDate);
-    }
-    if (filters.endDate) {
-      salesQuery = salesQuery.lte('sold_at', filters.endDate);
-      paymentQuery = paymentQuery.lte('created_at', filters.endDate);
-    }
-
-    const [salesRes, paymentRes] = await Promise.all([salesQuery, paymentQuery]);
-    const sales = salesRes.data || [];
-    const payments = paymentRes.data || [];
-
-    const dayLabels = ['CN', 'Th 2', 'Th 3', 'Th 4', 'Th 5', 'Th 6', 'Th 7'];
-    const daily = {};
-
-    sales.forEach(s => {
-      const date = s.sold_at ? new Date(s.sold_at) : null;
-      if (!date || isNaN(date.getTime())) return;
-      
-      const dayIndex = date.getDay();
-      const day = dayLabels[dayIndex];
-      if (!daily[day]) daily[day] = { day, member: 0, water: 0 };
-      daily[day].water += Number(s.total_price || 0);
-    });
-
-    payments.forEach(p => {
-      const date = p.created_at ? new Date(p.created_at) : null;
-      if (!date || isNaN(date.getTime())) return;
-
-      const dayIndex = date.getDay();
-      const day = dayLabels[dayIndex];
-      if (!daily[day]) daily[day] = { day, member: 0, water: 0 };
-      daily[day].member += Number(p.amount || 0);
-    });
-
-    const order = ['Th 2', 'Th 3', 'Th 4', 'Th 5', 'Th 6', 'Th 7', 'CN'];
-    return order.map(d => daily[d] || { day: d, member: 0, water: 0 });
   },
 
   async getPackageStats() {

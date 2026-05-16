@@ -4,6 +4,7 @@ import { memberService } from '../../services/memberService';
 import { productService } from '../../services/productService';
 import { shiftService } from '../../services/shiftService';
 import { paymentService } from '../../services/paymentService';
+import { additionalService } from '../../services/additionalService';
 import { formatDate } from '../../utils/formatters';
 
 function getMemberStatus(endDate) {
@@ -21,6 +22,8 @@ export default function Dashboard() {
   const [drinkRevenue, setDrinkRevenue] = useState(0);
   const [membershipRevenue, setMembershipRevenue] = useState(0);
   const [activeShift, setActiveShift] = useState(null);
+  const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
+  const [loadingRecent, setLoadingRecent] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -30,24 +33,19 @@ export default function Dashboard() {
         const startOfMonthObj = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
         const startOfMonth = startOfMonthObj.toISOString();
         
-        const [data, recent, totalMemberRev, allProducts] = await Promise.all([
+        const [data, totalMemberRev, allProducts, totalDrinkRev] = await Promise.all([
           memberService.getAllMembers(),
-          memberService.getRecentMembers(5),
           paymentService.getTotalMemberRevenue({ startDate: startOfMonth }),
-          productService.getAllProducts()
+          productService.getAllProducts(),
+          productService.getTotalDrinkRevenue({ startDate: startOfMonth })
         ]);
         setMembers(data);
-        setRecentMembers(recent);
         setMembershipRevenue(totalMemberRev);
         setProducts(allProducts);
+        setDrinkRevenue(totalDrinkRev);
 
-        // Lấy doanh thu nước ca hiện tại
         const { shift } = await shiftService.validateShiftForLogin();
         setActiveShift(shift);
-        if (shift) {
-          const rev = await productService.getDrinkRevenueForShift(shift.id);
-          setDrinkRevenue(rev);
-        }
       } finally {
         setLoading(false);
       }
@@ -55,6 +53,45 @@ export default function Dashboard() {
 
     load();
   }, []);
+
+  useEffect(() => {
+    const loadRecent = async () => {
+      setLoadingRecent(true);
+      try {
+        const [membersRes, servicesRes] = await Promise.all([
+          memberService.getRecentMembers(20, filterDate ? { date: filterDate } : {}),
+          additionalService.getFilteredServiceLogs(filterDate ? { date: filterDate } : { limit: 20 })
+        ]);
+
+        const mappedServices = (servicesRes || []).map(s => ({
+          id: `svc-${s.id}`,
+          last_active_at: s.sold_at,
+          full_name: s.services?.name || 'Dịch vụ lẻ',
+          package_type: '',
+          end_date: '',
+          fee: s.total_price,
+          member_code: '',
+          note: `Số lượng: ${s.quantity}`,
+          payment_method: s.payment_method,
+          is_payment_verified: true,
+        }));
+
+        const combined = [...(membersRes || []), ...mappedServices].sort((a, b) => {
+          const dateA = new Date(a.last_active_at || a.created_at || 0);
+          const dateB = new Date(b.last_active_at || b.created_at || 0);
+          return dateB - dateA;
+        });
+
+        // If no filter, limit to 20 total to match UI space
+        setRecentMembers(filterDate ? combined : combined.slice(0, 20));
+      } catch (err) {
+        console.error("Error loading recent data", err);
+      } finally {
+        setLoadingRecent(false);
+      }
+    };
+    loadRecent();
+  }, [filterDate]);
 
   const stats = useMemo(() => {
     const activeCount = members.filter((m) => getMemberStatus(m.end_date) === 'Active').length;
@@ -148,42 +185,78 @@ export default function Dashboard() {
           </div>
           <div>
             <p className="stat-label-modern">
-              Doanh thu nước{activeShift ? ` – ${activeShift.shift_name}` : ''}
+              Doanh thu nước (Tháng này)
             </p>
             <p className="stat-value-modern" style={{ fontSize: '20px', color: '#059669' }}>
               {drinkRevenue.toLocaleString('vi-VN')}đ
             </p>
-            <p className="cell-sub">{activeShift ? 'Ca đang mở' : 'Chưa có ca nào đang mở'}</p>
+            <p className="cell-sub">(Đã xác nhận)</p>
           </div>
         </div>
       </div>
 
       {/* Hội viên đăng ký gần đây */}
       <div className="modern-card">
-        <h3 className="modern-title">Hội viên đăng ký / gia hạn gần đây</h3>
-        <div className="modern-list">
-          {recentMembers.length === 0 && <p className="muted-text">Chưa có dữ liệu hội viên.</p>}
-          {recentMembers.map((m) => (
-            <div key={m.id} className="modern-list-item">
-              <div className="member-avatar">{(m.full_name || 'U').charAt(0).toUpperCase()}</div>
-              <div className="flex-1">
-                <p className="member-name">{m.full_name}</p>
-                <p className="member-meta">
-                  Gói {m.package_type} tháng – {m.payment_method === 'TM' ? 'Tiền mặt' : 'Chuyển khoản'}
-                  {m.payment_method === 'CK' && !m.is_payment_verified && (
-                    <span style={{
-                      marginLeft: '6px', background: '#fef08a', color: '#854d0e',
-                      borderRadius: '999px', padding: '2px 7px', fontSize: '11px', fontWeight: '800'
-                    }}>Chờ duyệt</span>
-                  )}
-                </p>
-                <p className="member-meta" style={{ fontSize: '11px', color: '#64748b' }}>
-                  Hết hạn: {formatDate(m.end_date)}
-                </p>
-              </div>
-              <p className="member-fee">+{Number(m.fee || 0).toLocaleString('vi-VN')}đ</p>
-            </div>
-          ))}
+        <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 className="modern-title" style={{ margin: 0 }}>Hội viên & Khách lẻ đăng ký / gia hạn</h3>
+          <input 
+            type="date" 
+            className="modern-input" 
+            style={{ width: 'auto', padding: '6px 12px', fontSize: '13px' }}
+            value={filterDate}
+            onChange={(e) => setFilterDate(e.target.value)}
+            title="Lọc theo ngày đăng ký/gia hạn"
+          />
+        </div>
+        <div className="modern-table-wrap" style={{ marginTop: '16px' }}>
+          {loadingRecent ? (
+            <p className="muted-text" style={{ padding: '20px' }}>Đang tải dữ liệu...</p>
+          ) : recentMembers.length === 0 ? (
+            <p className="muted-text" style={{ padding: '20px' }}>Chưa có dữ liệu hội viên.</p>
+          ) : (
+            <table className="modern-table">
+              <thead>
+                <tr>
+                  <th>Ngày</th>
+                  <th>Tên</th>
+                  <th>Gói</th>
+                  <th>Hết hạn</th>
+                  <th>Số tiền</th>
+                  <th>Mã HV</th>
+                  <th>Ghi chú</th>
+                  <th>Thanh toán</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentMembers.map((m) => (
+                  <tr key={m.id}>
+                    <td>{formatDate(m.last_active_at || m.created_at)}</td>
+                    <td style={{ fontWeight: '500' }}>{m.full_name}</td>
+                    <td>{m.package_type ? `${m.package_type} tháng` : ''}</td>
+                    <td>{formatDate(m.end_date)}</td>
+                    <td style={{ fontWeight: '600', color: '#16a34a' }}>
+                      {Number(m.fee || 0).toLocaleString('vi-VN')}đ
+                    </td>
+                    <td>{m.member_code}</td>
+                    <td style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={m.note}>
+                      {m.note}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>{m.payment_method}</span>
+                        {m.payment_method === 'CK' && !m.is_payment_verified && (
+                          <span style={{
+                            background: '#fef08a', color: '#854d0e',
+                            borderRadius: '4px', padding: '2px 6px', fontSize: '10px', fontWeight: 'bold'
+                          }}>Chờ duyệt</span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>

@@ -1,16 +1,20 @@
 import { useState, useMemo, useEffect } from 'react';
-import { BarChart3, PieChart, TrendingUp, Users, Droplets, Calendar, Download, User } from 'lucide-react';
+import { PieChart, TrendingUp, Users, Droplets, Calendar, Download, User } from 'lucide-react';
 import { statisticsService } from '../../services/statisticsService';
+import { exportRevenueToExcel } from '../../utils/excelExport';
 
 export default function Statistics() {
   const [dateRange, setDateRange] = useState('week');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
-  const [waterStatsByStaff, setWaterStatsByStaff] = useState({});
+  const [detailedStats, setDetailedStats] = useState({ waterSales: [], memberships: [] });
   const [overallStats, setOverallStats] = useState({ waterRevenue: 0, memberRevenue: 0, totalRevenue: 0 });
-  const [dailyRevenue, setDailyRevenue] = useState([]);
   const [packageStats, setPackageStats] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Pivot States
+  const [pivotSubject, setPivotSubject] = useState('water'); // 'water' or 'membership'
+  const [pivotBy, setPivotBy] = useState('date'); // 'date' | 'shift' | 'staff'
 
   useEffect(() => {
     const fetchData = async () => {
@@ -25,13 +29,25 @@ export default function Statistics() {
 
         if (dateRange === 'today') {
           startDate = new Date(baseDate.setHours(0, 0, 0, 0)).toISOString();
+          endDate = new Date();
+          endDate.setHours(23, 59, 59, 999);
+          endDate = endDate.toISOString();
         } else if (dateRange === 'week') {
-          const first = baseDate.getDate() - baseDate.getDay() + (baseDate.getDay() === 0 ? -6 : 1); 
-          startDate = new Date(baseDate.setDate(first));
-          startDate.setHours(0, 0, 0, 0);
-          startDate = startDate.toISOString();
+          const todayForWeek = new Date(now);
+          const dayOfWeek = todayForWeek.getDay();
+          const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+          const monday = new Date(todayForWeek);
+          monday.setDate(todayForWeek.getDate() + diffToMonday);
+          monday.setHours(0, 0, 0, 0);
+          startDate = monday.toISOString();
+          endDate = new Date();
+          endDate.setHours(23, 59, 59, 999);
+          endDate = endDate.toISOString();
         } else if (dateRange === 'month') {
-          startDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1).toISOString();
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+          endDate = new Date();
+          endDate.setHours(23, 59, 59, 999);
+          endDate = endDate.toISOString();
         } else if (dateRange === 'custom') {
           startDate = new Date(customStartDate);
           startDate.setHours(0, 0, 0, 0);
@@ -42,16 +58,14 @@ export default function Statistics() {
           endDate = endDate.toISOString();
         }
 
-        const [waterStats, overall, daily, pkg] = await Promise.all([
-          statisticsService.getWaterStatsByShiftAndStaff({ startDate, endDate }),
+        const [detailed, overall, pkg] = await Promise.all([
+          statisticsService.getDetailedStats({ startDate, endDate }),
           statisticsService.getOverallStats({ startDate, endDate }),
-          statisticsService.getDailyRevenue({ startDate, endDate }),
           statisticsService.getPackageStats()
         ]);
 
-        setWaterStatsByStaff(waterStats);
+        setDetailedStats(detailed);
         setOverallStats(overall);
-        setDailyRevenue(daily);
         setPackageStats(pkg);
       } catch (error) {
         console.error("Error fetching statistics:", error);
@@ -71,12 +85,40 @@ export default function Statistics() {
     };
   }, [overallStats]);
 
-  const maxRevenue = useMemo(() => {
-    const vals = dailyRevenue.map(d => d.member + d.water);
-    return vals.length > 0 ? Math.max(...vals, 100000) : 100000;
-  }, [dailyRevenue]);
-
   const totalMembers = useMemo(() => packageStats.reduce((s, p) => s + p.count, 0), [packageStats]);
+
+  const pivotData = useMemo(() => {
+    const data = [];
+    const grouped = {};
+
+    if (pivotSubject === 'water') {
+      detailedStats.waterSales.forEach(item => {
+        const key = item[pivotBy];
+        if (!grouped[key]) grouped[key] = { key, quantity: 0, revenue: 0, products: {} };
+        grouped[key].quantity += item.quantity;
+        grouped[key].revenue += item.revenue;
+        grouped[key].products[item.product] = (grouped[key].products[item.product] || 0) + item.quantity;
+      });
+      for (const k in grouped) data.push(grouped[k]);
+    } else {
+      detailedStats.memberships.forEach(item => {
+        const key = item[pivotBy];
+        if (!grouped[key]) grouped[key] = { key, revenue: 0, newCount: 0, renewCount: 0 };
+        grouped[key].revenue += item.revenue;
+        if (item.type === 'new') grouped[key].newCount += 1;
+        if (item.type === 'renew') grouped[key].renewCount += 1;
+      });
+      for (const k in grouped) data.push(grouped[k]);
+    }
+
+    // Sort: if date, sort descending. Otherwise sort alphabetically
+    return data.sort((a, b) => {
+      if (pivotBy === 'date') {
+        return new Date(b.key.split('/').reverse().join('-')) - new Date(a.key.split('/').reverse().join('-'));
+      }
+      return a.key.localeCompare(b.key);
+    });
+  }, [detailedStats, pivotSubject, pivotBy]);
 
   return (
     <div className="modern-stack">
@@ -117,7 +159,16 @@ export default function Statistics() {
             <option value="custom">Tùy chọn</option>
             <option value="all">Tất cả</option>
           </select>
-          <button className="primary-btn">
+          <button
+            className="primary-btn"
+            onClick={() => exportRevenueToExcel({
+              overallStats,
+              detailedStats,
+              packageStats,
+              dateRange
+            })}
+            title="Xuất báo cáo ra file Excel"
+          >
             <Download size={16} /> Xuất báo cáo
           </button>
         </div>
@@ -154,51 +205,6 @@ export default function Statistics() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px' }}>
-        {/* Doanh thu theo ngày (Bar Chart) */}
-        <div className="modern-card">
-          <div className="flex-row" style={{ justifyContent: 'space-between', marginBottom: '20px' }}>
-            <h4 className="modern-title" style={{ margin: 0 }}><BarChart3 size={18} /> Biểu đồ doanh thu tuần</h4>
-            <div style={{ display: 'flex', gap: '12px', fontSize: '12px' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <div style={{ width: '10px', height: '10px', background: '#3b82f6', borderRadius: '2px' }}></div> Học phí
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <div style={{ width: '10px', height: '10px', background: '#93c5fd', borderRadius: '2px' }}></div> Nước
-              </span>
-            </div>
-          </div>
-          <div style={{ height: '240px', display: 'flex', alignItems: 'flex-end', gap: '12px', paddingBottom: '30px', position: 'relative' }}>
-            {dailyRevenue.map((data, idx) => {
-              const total = data.member + data.water;
-              const height = (total / maxRevenue) * 100;
-              const memberHeight = total > 0 ? (data.member / total) * 100 : 0;
-              
-              return (
-                <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                  <div 
-                    className="chart-bar-group" 
-                    style={{ 
-                      width: '100%', 
-                      height: `${Math.max(height, 2)}%`, 
-                      background: '#93c5fd', 
-                      borderRadius: '4px 4px 0 0', 
-                      position: 'relative',
-                      display: 'flex',
-                      flexDirection: 'column-reverse',
-                      overflow: 'hidden'
-                    }}
-                    title={`${data.day}: ${(data.member + data.water).toLocaleString()}đ`}
-                  >
-                    <div style={{ height: `${memberHeight}%`, background: '#3b82f6' }}></div>
-                  </div>
-                  <span style={{ fontSize: '11px', color: '#64748b', whiteSpace: 'nowrap' }}>{data.day}</span>
-                </div>
-              );
-            })}
-            {dailyRevenue.length === 0 && <div className="muted-text" style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>Chưa có dữ liệu doanh thu</div>}
-          </div>
-        </div>
-
         {/* Cơ cấu gói tập (Pie Chart style) */}
         <div className="modern-card">
           <h4 className="modern-title"><PieChart size={18} /> Cơ cấu gói tập đăng ký</h4>
@@ -241,66 +247,80 @@ export default function Statistics() {
         </div>
       </div>
 
-      {/* Water Stats by Shift & Staff */}
+      {/* Pivot Statistics Section */}
       <div className="modern-card">
-        <h4 className="modern-title"><User size={18} /> Thống kê nước theo ca & nhân viên</h4>
-        <div className="modern-table-wrap" style={{ marginTop: '10px' }}>
+        <div className="flex-row" style={{ justifyContent: 'space-between', marginBottom: '20px' }}>
+          <h4 className="modern-title"><Calendar size={18} /> Phân tích dữ liệu đa chiều (Pivot)</h4>
+          <div className="flex-row" style={{ gap: '12px' }}>
+            <select className="ghost-btn" value={pivotSubject} onChange={(e) => setPivotSubject(e.target.value)}>
+              <option value="water">Đối tượng: Nước</option>
+              <option value="membership">Đối tượng: Hội viên</option>
+            </select>
+            <select className="ghost-btn" value={pivotBy} onChange={(e) => setPivotBy(e.target.value)}>
+              <option value="date">Nhóm theo: Ngày</option>
+              <option value="shift">Nhóm theo: Ca làm</option>
+              <option value="staff">Nhóm theo: Nhân viên</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="modern-table-wrap">
           <table className="modern-table">
             <thead>
               <tr>
-                <th>Nhân viên</th>
-                <th>Chi tiết bán hàng (Ca | Số lượng | Tên nước)</th>
+                <th>{pivotBy === 'date' ? 'Ngày' : pivotBy === 'shift' ? 'Ca làm' : 'Nhân viên'}</th>
+                {pivotSubject === 'water' ? (
+                  <>
+                    <th>Tổng doanh thu</th>
+                    <th>Tổng số lượng</th>
+                    <th>Chi tiết sản phẩm</th>
+                  </>
+                ) : (
+                  <>
+                    <th>Tổng doanh thu</th>
+                    <th>Đăng ký mới</th>
+                    <th>Gia hạn</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
-              {Object.entries(waterStatsByStaff).map(([staffName, shifts], idx) => (
+              {pivotData.map((row, idx) => (
                 <tr key={idx}>
-                  <td style={{ verticalAlign: 'top', width: '200px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
-                        <User size={16} />
-                      </div>
-                      <p className="cell-main">{staffName}</p>
-                    </div>
-                  </td>
-                  <td>
-                    {Object.entries(shifts).map(([shiftName, products], sIdx) => (
-                      <div key={sIdx} style={{ marginBottom: '12px' }}>
-                        {Object.entries(products).map(([prodName, qty], pIdx) => (
-                          <div key={pIdx} style={{
-                            display: 'inline-block',
-                            background: '#f8fafc',
-                            border: '1px solid #e2e8f0',
-                            borderRadius: '6px',
-                            padding: '4px 10px',
-                            marginRight: '8px',
-                            marginBottom: '6px',
-                            fontSize: '13px',
-                            color: '#334155'
-                          }}>
-                            <span style={{ fontWeight: '600', color: '#3b82f6' }}>{shiftName}</span>
-                            <span style={{ margin: '0 6px', color: '#cbd5e1' }}>|</span>
-                            <span style={{ fontWeight: '600' }}>{qty}</span>
-                            <span style={{ margin: '0 6px', color: '#cbd5e1' }}>|</span>
-                            <span>{prodName}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ))}
-                    {Object.keys(shifts).length === 0 && <p className="muted-text">Không có dữ liệu</p>}
-                  </td>
+                  <td style={{ fontWeight: '600', color: '#1e293b' }}>{row.key}</td>
+                  <td style={{ color: '#059669', fontWeight: 'bold' }}>{row.revenue.toLocaleString('vi-VN')}đ</td>
+                  
+                  {pivotSubject === 'water' ? (
+                    <>
+                      <td style={{ fontWeight: '500' }}>{row.quantity}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          {Object.entries(row.products).map(([prod, qty]) => (
+                            <span key={prod} style={{ background: '#f1f5f9', padding: '2px 8px', borderRadius: '4px', fontSize: '12px' }}>
+                              {prod}: <b>{qty}</b>
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td>{row.newCount > 0 ? <span style={{ color: '#2563eb', fontWeight: 'bold' }}>{row.newCount} thẻ</span> : '-'}</td>
+                      <td>{row.renewCount > 0 ? <span style={{ color: '#ea580c', fontWeight: 'bold' }}>{row.renewCount} lượt</span> : '-'}</td>
+                    </>
+                  )}
                 </tr>
               ))}
-              {Object.keys(waterStatsByStaff).length === 0 && !loading && (
+              {pivotData.length === 0 && !loading && (
                 <tr>
-                  <td colSpan="2" style={{ textAlign: 'center', padding: '40px' }} className="muted-text">
-                    Không có dữ liệu bán hàng trong khoảng thời gian này.
+                  <td colSpan="4" style={{ textAlign: 'center', padding: '40px' }} className="muted-text">
+                    Không có dữ liệu trong khoảng thời gian này.
                   </td>
                 </tr>
               )}
               {loading && (
                 <tr>
-                  <td colSpan="2" style={{ textAlign: 'center', padding: '40px' }} className="muted-text">
+                  <td colSpan="4" style={{ textAlign: 'center', padding: '40px' }} className="muted-text">
                     Đang tải dữ liệu...
                   </td>
                 </tr>

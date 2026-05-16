@@ -8,13 +8,14 @@ import supabase from '../../config/supabase';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useUIStore } from '../../store/useUIStore';
 import { getLocalISODate, addMonths } from '../../utils/formatters';
+import { exportMembersToExcel } from '../../utils/excelExport';
 import MembersToolbar from './MembersToolbar';
 import MembersTable from './MembersTable';
 import MemberFormModal from './MemberFormModal';
 import RenewModal from './RenewModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import SuspendModal from './SuspendModal';
-
+import ServiceTab from './ServiceTab';
 
 const PRICING_TIERS = {
   normal: { 1: 350000, 3: 795000, 6: 1440000 },
@@ -36,6 +37,7 @@ const initialForm = {
   fingerprint_status: false,
   note: '',
   start_date: new Date().toISOString().slice(0, 10),
+  end_date: '',
 };
 
 export default function Members() {
@@ -159,7 +161,7 @@ export default function Members() {
       await memberService.deleteMember(deletingMember.id);
 
       await staffLogService.logAction({
-        staffId: effectiveStaffId,
+        staffId: user?.id,
         staffMemberId: activeStaff?.id,
         action: 'Xoa hoi vien',
         targetItem: deletingMember.full_name,
@@ -194,6 +196,7 @@ export default function Members() {
       payment_method: member.payment_method || 'TM',
       fingerprint_status: member.fingerprint_status === true || member.fingerprint_status === 'true',
       note: member.note || '',
+      end_date: member.end_date ? new Date(member.end_date).toISOString().slice(0, 10) : '',
     });
     setError('');
     setShowModal(true);
@@ -271,6 +274,7 @@ export default function Members() {
           full_name: form.full_name,
           fingerprint_status: form.fingerprint_status,
           note: form.note,
+          end_date: form.end_date,
         };
         const updated = await updateMember(editingMember.id, updatePayload);
 
@@ -293,10 +297,19 @@ export default function Members() {
         });
       } else {
         if (payload.package_type < 1 || payload.package_type > 36) {
-          setError('Goi tap tu 1 den 36 thang.');
+          setError('Gói tập từ 1 đến 36 tháng.');
           return;
         }
         await addMember(payload);
+        
+        await staffLogService.logAction({
+          staffId: user?.id,
+          staffMemberId: activeStaff?.id,
+          action: 'Thêm hội viên mới',
+          targetItem: payload.full_name,
+          details: { member_code: payload.member_code, package: payload.package_type },
+          note: 'Admin/Staff tạo hội viên mới',
+        });
       }
 
       setShowModal(false);
@@ -348,6 +361,19 @@ export default function Members() {
         shiftId: activeShift.id,
       });
 
+      await staffLogService.logAction({
+        staffId: user?.id,
+        staffMemberId: activeStaff?.id,
+        action: 'Gia hạn hội viên',
+        targetItem: renewingMember.full_name,
+        details: { 
+          member_id: renewingMember.id, 
+          package: packageType, 
+          fee: Number(renewForm.fee || 0) 
+        },
+        note: 'Admin/Staff thực hiện gia hạn học phí',
+      });
+
       // Làm mới danh sách để cập nhật ngày hết hạn mới
       await fetchMembers();
 
@@ -382,10 +408,28 @@ export default function Members() {
   // Xác nhận bảo lưu
   const handleSuspendConfirm = async () => {
     if (!suspendingMember) return;
+    setError('');
+
+    if (!activeShift?.id) {
+      setError("Vui lòng mở ca trước khi thực hiện bảo lưu.");
+      return;
+    }
+
     try {
-      await suspendMember(suspendingMember.id, activeStaff?.id || user?.id);
+      await suspendMember(suspendingMember.id, activeStaff?.id || user?.id, activeShift.id);
+      
+      await staffLogService.logAction({
+        staffId: user?.id,
+        staffMemberId: activeStaff?.id,
+        action: 'Bảo lưu hội viên',
+        targetItem: suspendingMember.full_name,
+        details: { member_id: suspendingMember.id },
+        note: 'Admin/Staff thực hiện bảo lưu (tạm dừng)',
+      });
+
       setShowSuspendModal(false);
       setSuspendingMember(null);
+      addToast("Đã bảo lưu hội viên thành công!");
     } catch (err) {
       setError("Lỗi bảo lưu: " + err.message);
     }
@@ -393,12 +437,27 @@ export default function Members() {
 
   // Kích hoạt lại hội viên
   const handleReactivate = async (member) => {
+    if (!activeShift?.id) {
+      addToast("Vui lòng mở ca trước khi kích hoạt lại hội viên.", "error");
+      return;
+    }
+
     showConfirm({
       title: 'Kích hoạt lại hội viên',
       message: `Kích hoạt lại cho hội viên ${member.full_name}? Ngày hết hạn mới sẽ được cộng thêm ${member.remaining_days} ngày kể từ hôm nay.`,
       onConfirm: async () => {
         try {
-          await reactivateMember(member.id, activeStaff?.id || user?.id);
+          await reactivateMember(member.id, activeStaff?.id || user?.id, activeShift.id);
+          
+          await staffLogService.logAction({
+            staffId: user?.id,
+            staffMemberId: activeStaff?.id,
+            action: 'Kích hoạt lại hội viên',
+            targetItem: member.full_name,
+            details: { member_id: member.id },
+            note: 'Admin/Staff kích hoạt lại từ trạng thái bảo lưu',
+          });
+
           addToast("Đã kích hoạt lại hội viên thành công!");
         } catch (err) {
           setError("Lỗi kích hoạt lại: " + err.message);
@@ -408,6 +467,11 @@ export default function Members() {
     });
   };
 
+
+  // Xuất danh sách hội viên ra Excel (Admin only)
+  const handleExportExcel = () => {
+    exportMembersToExcel(filtered);
+  };
 
   return (
     <div className="modern-stack">
@@ -421,23 +485,28 @@ export default function Members() {
         filterDate={filterDate}
         setFilterDate={setFilterDate}
         onAddMember={openCreateModal}
+        onExportExcel={handleExportExcel}
         profile={profile}
       />
 
       {error && <div className="modern-error">{error}</div>}
 
-      <MembersTable
-        members={members}
-        loading={loading}
-        filtered={filtered}
-        activeTab={activeTab}
-        profile={profile}
-        onEditMember={openEditModal}
-        onRenewMember={openRenewModal}
-        onSuspendMember={openSuspendModal}
-        onReactivateMember={handleReactivate}
-        onDeleteMember={setDeletingMember}
-      />
+      {activeTab === 'services' ? (
+        <ServiceTab />
+      ) : (
+        <MembersTable
+          members={members}
+          loading={loading}
+          filtered={filtered}
+          activeTab={activeTab}
+          profile={profile}
+          onEditMember={openEditModal}
+          onRenewMember={openRenewModal}
+          onSuspendMember={openSuspendModal}
+          onReactivateMember={handleReactivate}
+          onDeleteMember={setDeletingMember}
+        />
+      )}
 
       {showModal && (
         <MemberFormModal

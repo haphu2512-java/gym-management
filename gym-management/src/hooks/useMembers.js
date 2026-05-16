@@ -54,9 +54,9 @@ export function useMembers() {
     }
   };
 
-  const suspendMember = async (id, staffId) => {
+  const suspendMember = async (id, staffId, shiftId) => {
     try {
-      await memberService.suspendMember(id, staffId);
+      await memberService.suspendMember(id, staffId, shiftId);
       await fetchMembers();
     } catch (err) {
       setError(err.message);
@@ -64,9 +64,9 @@ export function useMembers() {
     }
   };
 
-  const reactivateMember = async (id, staffId) => {
+  const reactivateMember = async (id, staffId, shiftId) => {
     try {
-      await memberService.reactivateMember(id, staffId);
+      await memberService.reactivateMember(id, staffId, shiftId);
       await fetchMembers();
     } catch (err) {
       setError(err.message);

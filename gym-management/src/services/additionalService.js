@@ -1,12 +1,11 @@
 import supabase from '../config/supabase';
-import { staffLogService } from './staffLogService';
 
-const PRODUCT_TABLE = 'products';
+const SERVICE_TABLE = 'services';
 
-export const productService = {
-  async getAllProducts() {
+export const additionalService = {
+  async getAllServices() {
     const { data, error } = await supabase
-      .from(PRODUCT_TABLE)
+      .from(SERVICE_TABLE)
       .select('*')
       .is('deleted_at', null)
       .order('name');
@@ -14,15 +13,15 @@ export const productService = {
     return data || [];
   },
 
-  async addProduct(payload) {
-    const { data, error } = await supabase.from(PRODUCT_TABLE).insert([payload]).select().single();
+  async addService(payload) {
+    const { data, error } = await supabase.from(SERVICE_TABLE).insert([payload]).select().single();
     if (error) throw new Error(error.message);
     return data;
   },
 
-  async updateProduct(id, payload) {
+  async updateService(id, payload) {
     const { data, error } = await supabase
-      .from(PRODUCT_TABLE)
+      .from(SERVICE_TABLE)
       .update(payload)
       .eq('id', id)
       .select()
@@ -31,39 +30,37 @@ export const productService = {
     return data;
   },
 
-  async sellProduct(product, quantity, shiftId, authId, staffId, paymentMethod = 'TM') {
+  async sellService(service, quantity, shiftId, authId, staffId, paymentMethod = 'TM') {
     const qty = Number(quantity || 1);
-    // Use atomic transaction function
-    const { data, error } = await supabase.rpc('sell_bottle_transaction', {
-      p_product_id: product.id,
+    const { data, error } = await supabase.rpc('sell_service_transaction', {
+      p_service_id: service.id,
       p_shift_id: shiftId,
       p_auth_id: authId,
       p_staff_id: staffId,
       p_quantity: qty,
-      p_total_price: Number(product.price || 0) * qty,
+      p_total_price: Number(service.price || 0) * qty,
       p_payment_method: paymentMethod,
       p_sold_at: new Date().toISOString()
     });
 
-    if (error) throw new Error('Bán hàng thất bại: ' + error.message);
-    if (data?.success === false) throw new Error(data.error || 'Bán hàng thất bại');
+    if (error) throw new Error('Bán dịch vụ thất bại: ' + error.message);
+    if (data?.success === false) throw new Error(data.error || 'Bán dịch vụ thất bại');
 
     return data;
   },
 
-  async deleteProduct(id) {
-    // Use soft delete instead of hard delete
+  async deleteService(id) {
     const { error } = await supabase
-      .from(PRODUCT_TABLE)
+      .from(SERVICE_TABLE)
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', id);
     if (error) throw new Error(error.message);
   },
 
-  async getDrinkRevenueForShift(shiftId, paymentMethod = null) {
+  async getServiceRevenueForShift(shiftId, paymentMethod = null) {
     if (!shiftId) return 0;
     let query = supabase
-      .from('sales_logs')
+      .from('service_sales')
       .select('total_price')
       .eq('shift_id', shiftId);
     
@@ -76,29 +73,12 @@ export const productService = {
     return data.reduce((sum, item) => sum + Number(item.total_price || 0), 0);
   },
 
-  async getTotalDrinkRevenue(filters = {}) {
+  async getFilteredServiceLogs(filters = {}) {
     let query = supabase
-      .from('sales_logs')
-      .select('total_price');
-
-    if (filters.startDate) {
-      query = query.gte('sold_at', filters.startDate);
-    }
-    if (filters.endDate) {
-      query = query.lte('sold_at', filters.endDate);
-    }
-
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
-    return data.reduce((sum, item) => sum + Number(item.total_price || 0), 0);
-  },
-
-  async getFilteredSalesLogs(filters = {}) {
-    let query = supabase
-      .from('sales_logs')
+      .from('service_sales')
       .select(`
         *,
-        products (name),
+        services (name),
         profiles:sold_by (full_name),
         staff_members:sold_by_member (full_name),
         shifts!inner (shift_name)
@@ -129,4 +109,3 @@ export const productService = {
     return data || [];
   },
 };
-

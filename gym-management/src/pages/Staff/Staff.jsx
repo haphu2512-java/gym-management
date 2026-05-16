@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { staffService } from '../../services/staffService';
+import { staffLogService } from '../../services/staffLogService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useUIStore } from '../../store/useUIStore';
 import { formatDate } from '../../utils/formatters';
@@ -96,6 +97,14 @@ export default function Staff() {
         });
       }
       setSchedule(prev => ({ ...prev, [`${shift}-${day}`]: staffId }));
+
+      await staffLogService.logAction({
+        staffId: profile?.id,
+        action: 'Xếp lịch làm việc',
+        targetItem: `${shift} - ${day}`,
+        details: { staff_id: staffId, week_start: weekStart },
+        note: staffId ? 'Admin gán nhân viên vào ca' : 'Admin xóa nhân viên khỏi ca',
+      });
     } catch (e) {
       addToast("Lỗi cập nhật lịch: " + e.message, "error");
     }
@@ -111,6 +120,14 @@ export default function Staff() {
         }
         return [...prev, updated];
       });
+
+      await staffLogService.logAction({
+        staffId: profile?.id,
+        action: 'Cập nhật đơn giá lương',
+        targetItem: `${shiftName} (${staffType})`,
+        details: { rate: val },
+        note: 'Admin thay đổi cấu hình lương theo ca',
+      });
     } catch (e) {
       addToast("Lỗi cập nhật đơn giá: " + e.message, "error");
     }
@@ -120,6 +137,14 @@ export default function Staff() {
     try {
       await staffService.updateStaffProfile(staffId, { staff_type: val });
       setStaffs(prev => prev.map(s => s.id === staffId ? { ...s, staff_type: val } : s));
+
+      await staffLogService.logAction({
+        staffId: profile?.id,
+        action: 'Cập nhật loại nhân viên',
+        targetItem: staffs.find(s => s.id === staffId)?.full_name || staffId,
+        details: { type: val },
+        note: 'Admin thay đổi loại nhân viên (Chính thức/Thử việc)',
+      });
     } catch (e) {
       addToast("Lỗi cập nhật loại nhân viên: " + e.message, "error");
     }
@@ -130,6 +155,15 @@ export default function Staff() {
     if (!newStaffName.trim()) return;
     try {
       await staffService.addStaffMember({ full_name: newStaffName, staff_type: 'CT' });
+      
+      await staffLogService.logAction({
+        staffId: profile?.id,
+        action: 'Thêm nhân viên mới',
+        targetItem: newStaffName,
+        details: { name: newStaffName },
+        note: 'Admin thêm nhân viên mới vào danh sách',
+      });
+
       setNewStaffName('');
       setShowAddForm(false);
       loadData();
@@ -146,6 +180,15 @@ export default function Staff() {
       onConfirm: async () => {
         try {
           await staffService.deleteStaffMember(id);
+          
+          await staffLogService.logAction({
+            staffId: profile?.id,
+            action: 'Xóa nhân viên',
+            targetItem: name,
+            details: { staff_id: id },
+            note: 'Admin thực hiện xóa nhân viên (soft delete)',
+          });
+
           loadData();
           addToast("Đã xóa nhân viên thành công!");
         } catch (e) {
@@ -175,6 +218,14 @@ export default function Staff() {
         penalty: field === 'penalty' ? numericVal : (currentAdj.penalty || 0),
         reason: field === 'others' ? String(val) : (currentAdj.reason || ''),
         created_by: profile.id
+      });
+
+      await staffLogService.logAction({
+        staffId: profile?.id,
+        action: 'Điều chỉnh lương',
+        targetItem: staffs.find(s => s.id === staffId)?.full_name || staffId,
+        details: { field, value: val, week: weekStart },
+        note: 'Admin nhập hoa hồng, phạt hoặc phụ cấp khác',
       });
     } catch (e) {
       console.error("Lỗi cập nhật phụ cấp:", e.message);
@@ -250,6 +301,15 @@ export default function Staff() {
               onConfirm: async () => {
                 try {
                   await staffService.deleteWeeklySchedule(weekStart);
+                  
+                  await staffLogService.logAction({
+                    staffId: profile?.id,
+                    action: 'Xóa sạch lịch tuần',
+                    targetItem: `Tuần: ${weekStart}`,
+                    details: { week: weekStart },
+                    note: 'Admin thực hiện xóa toàn bộ lịch trực của tuần được chọn',
+                  });
+
                   setSchedule({});
                   addToast("Đã xóa lịch tuần thành công!");
                 } catch (e) {

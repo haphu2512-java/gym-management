@@ -207,7 +207,17 @@ export const shiftService = {
       .eq('shift_id', shiftId);
     if (salesError) throw new Error(salesError.message);
 
-    // 4. Expenses
+    // 4. Service Sales (Dịch vụ)
+    const { data: serviceSales, error: serviceSalesError } = await supabase
+      .from('service_sales')
+      .select(`
+        *,
+        services (name)
+      `)
+      .eq('shift_id', shiftId);
+    if (serviceSalesError) throw new Error(serviceSalesError.message);
+
+    // 5. Expenses
     const { data: expenses, error: expenseError } = await supabase
       .from('shift_expenses')
       .select('*')
@@ -218,6 +228,7 @@ export const shiftService = {
       shift,
       payments: payments || [],
       sales: sales || [],
+      serviceSales: serviceSales || [],
       expenses: expenses || []
     };
   },

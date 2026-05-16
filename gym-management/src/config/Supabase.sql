@@ -45,6 +45,14 @@ CREATE TABLE IF NOT EXISTS products (
   deleted_at TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS services (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL,
+  price NUMERIC NOT NULL,
+  note TEXT,
+  deleted_at TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS shifts (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   shift_name TEXT NOT NULL,
@@ -72,6 +80,14 @@ CREATE TABLE IF NOT EXISTS shift_expenses (
   created_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS shift_notes (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  content TEXT NOT NULL,
+  created_by_member UUID REFERENCES staff_members(id),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  deleted_at TIMESTAMP
+);
+
 -- ============================================================
 -- 4. LOGS & TRANSACTIONS
 -- ============================================================
@@ -92,6 +108,18 @@ CREATE TABLE IF NOT EXISTS sales_logs (
   shift_id UUID REFERENCES shifts(id) ON DELETE SET NULL,
   sold_by UUID REFERENCES profiles(id), -- Tài khoản đăng nhập
   sold_by_member UUID REFERENCES staff_members(id), -- Nhân viên trực thực tế
+  quantity INT NOT NULL,
+  total_price NUMERIC NOT NULL,
+  payment_method TEXT DEFAULT 'TM',
+  sold_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS service_sales (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  service_id UUID REFERENCES services(id),
+  shift_id UUID REFERENCES shifts(id) ON DELETE SET NULL,
+  sold_by UUID REFERENCES profiles(id),
+  sold_by_member UUID REFERENCES staff_members(id),
   quantity INT NOT NULL,
   total_price NUMERIC NOT NULL,
   payment_method TEXT DEFAULT 'TM',
@@ -218,32 +246,76 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- C. Bảo lưu hội viên
-CREATE OR REPLACE FUNCTION suspend_member(p_member_id UUID, p_staff_id UUID, p_suspended_at DATE DEFAULT CURRENT_DATE, p_created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW())
+-- C. Bán Dịch Vụ (Tập ngày, Gói PT...) (Atomic)
+CREATE OR REPLACE FUNCTION sell_service_transaction(p_service_id UUID, p_shift_id UUID, p_auth_id UUID, p_staff_id UUID, p_quantity INT, p_total_price NUMERIC, p_payment_method TEXT, p_sold_at TIMESTAMP WITH TIME ZONE)
 RETURNS JSON AS $$
-DECLARE v_remaining_days INT; v_end_date DATE;
+DECLARE v_sale_id UUID;
 BEGIN
+  INSERT INTO service_sales (service_id, shift_id, sold_by, sold_by_member, quantity, total_price, payment_method, sold_at)
+  VALUES (p_service_id, p_shift_id, p_auth_id, p_staff_id, p_quantity, p_total_price, p_payment_method, p_sold_at) RETURNING id INTO v_sale_id;
+  RETURN json_build_object('success', true, 'sale_id', v_sale_id);
+END;
+$$ LANGUAGE plpgsql;
+
+-- C. Bảo lưu hội viên
+CREATE OR REPLACE FUNCTION suspend_member(
+  p_member_id UUID, 
+  p_staff_id UUID, 
+  p_shift_id UUID,
+  p_suspended_at DATE DEFAULT CURRENT_DATE, 
+  p_created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+)
+RETURNS JSON AS $$
+DECLARE v_remaining_days INT; v_end_date DATE; v_admin_id UUID;
+BEGIN
+  -- Kiểm tra ca có tồn tại và đang mở không
+  IF NOT EXISTS (SELECT 1 FROM shifts WHERE id = p_shift_id AND status = 'open') THEN
+    RAISE EXCEPTION 'Ca làm việc không tồn tại hoặc đã đóng.';
+  END IF;
+
+  SELECT opened_by INTO v_admin_id FROM shifts WHERE id = p_shift_id;
+
   SELECT (end_date - p_suspended_at) INTO v_remaining_days FROM member_current_status WHERE id = p_member_id;
   IF v_remaining_days < 13 THEN RAISE EXCEPTION 'Không đủ điều kiện (tối thiểu 13 ngày)'; END IF;
+  
   UPDATE members SET suspended_at = p_suspended_at, remaining_days = v_remaining_days WHERE id = p_member_id;
-  INSERT INTO member_logs (member_id, staff_member_id, action, note, created_at)
-  VALUES (p_member_id, p_staff_id, 'SUSPEND', 'Bảo lưu (còn ' || v_remaining_days || ' ngày)', p_created_at);
-  INSERT INTO staff_logs (staff_member_id, action, target_item, details, created_at)
-  VALUES (p_staff_id, 'Bảo lưu hội viên', (SELECT full_name FROM members WHERE id = p_member_id), json_build_object('days', v_remaining_days), p_created_at);
+  
+  INSERT INTO member_logs (member_id, staff_id, staff_member_id, action, note, created_at)
+  VALUES (p_member_id, v_admin_id, p_staff_id, 'SUSPEND', 'Bảo lưu (còn ' || v_remaining_days || ' ngày)', p_created_at);
+  
+  INSERT INTO staff_logs (staff_id, staff_member_id, action, target_item, details, created_at)
+  VALUES (v_admin_id, p_staff_id, 'Bảo lưu hội viên', (SELECT full_name FROM members WHERE id = p_member_id), json_build_object('days', v_remaining_days, 'shift_id', p_shift_id), p_created_at);
+  
   RETURN json_build_object('success', true, 'days', v_remaining_days);
 END;
 $$ LANGUAGE plpgsql;
 
 -- D. Kích hoạt lại
-CREATE OR REPLACE FUNCTION reactivate_member(p_member_id UUID, p_staff_id UUID, p_reactivated_at DATE DEFAULT CURRENT_DATE, p_created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW())
+CREATE OR REPLACE FUNCTION reactivate_member(
+  p_member_id UUID, 
+  p_staff_id UUID, 
+  p_shift_id UUID,
+  p_reactivated_at DATE DEFAULT CURRENT_DATE, 
+  p_created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+)
 RETURNS JSON AS $$
-DECLARE v_days INT; v_new_end DATE;
+DECLARE v_days INT; v_new_end DATE; v_admin_id UUID;
 BEGIN
+  -- Kiểm tra ca có tồn tại và đang mở không
+  IF NOT EXISTS (SELECT 1 FROM shifts WHERE id = p_shift_id AND status = 'open') THEN
+    RAISE EXCEPTION 'Ca làm việc không tồn tại hoặc đã đóng.';
+  END IF;
+
+  SELECT opened_by INTO v_admin_id FROM shifts WHERE id = p_shift_id;
+
   SELECT remaining_days INTO v_days FROM members WHERE id = p_member_id;
   v_new_end := p_reactivated_at + (v_days || ' days')::INTERVAL;
+  
   UPDATE members SET suspended_at = NULL, remaining_days = 0 WHERE id = p_member_id;
-  INSERT INTO member_logs (member_id, staff_member_id, action, package_type, start_date, end_date, note, created_at)
-  VALUES (p_member_id, p_staff_id, 'REACTIVATE', 0, p_reactivated_at, v_new_end, 'Kích hoạt lại sau bảo lưu', p_created_at);
+  
+  INSERT INTO member_logs (member_id, staff_id, staff_member_id, action, package_type, start_date, end_date, note, created_at)
+  VALUES (p_member_id, v_admin_id, p_staff_id, 'REACTIVATE', NULL, p_reactivated_at, v_new_end, 'Kích hoạt lại sau bảo lưu', p_created_at);
+  
   RETURN json_build_object('success', true, 'new_end', v_new_end);
 END;
 $$ LANGUAGE plpgsql;
@@ -349,6 +421,9 @@ ALTER TABLE member_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE weekly_schedules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE salary_configs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE salary_adjustments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE services ENABLE ROW LEVEL SECURITY;
+ALTER TABLE service_sales ENABLE ROW LEVEL SECURITY;
+ALTER TABLE shift_notes ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow all authenticated" ON profiles FOR SELECT TO authenticated USING (true);
 CREATE POLICY "View staff_members" ON staff_members FOR SELECT TO authenticated USING (true);
@@ -368,6 +443,9 @@ CREATE POLICY "Full access m_logs" ON member_logs FOR ALL TO authenticated USING
 CREATE POLICY "Full access schedule" ON weekly_schedules FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Full access salary_cfg" ON salary_configs FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Full access salary_adj" ON salary_adjustments FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Full access services" ON services FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Full access service_sales" ON service_sales FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Full access shift_notes" ON shift_notes FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
 -- ============================================================
 -- 9. AUTH TRIGGERS (Tự động tạo Profile khi có User mới)
@@ -409,6 +487,8 @@ GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO authenticated, service
 
 -- Cấp quyền SELECT cho anon (để có thể thực hiện một số kiểm tra trước khi đăng nhập nếu cần)
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
+GRANT SELECT ON TABLE shift_notes TO anon;
+GRANT ALL PRIVILEGES ON TABLE shift_notes TO authenticated, service_role;
 
 -- Đảm bảo các bảng tạo mới trong tương lai cũng được cấp quyền tự động
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO authenticated, service_role;

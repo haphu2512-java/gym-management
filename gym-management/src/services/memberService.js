@@ -41,12 +41,26 @@ export const memberService = {
     return data || [];
   },
 
-  async getRecentMembers(limit = 5) {
-    const { data, error } = await supabase
+  async getRecentMembers(limit = 5, filters = {}) {
+    let query = supabase
       .from(VIEW_NAME)
       .select('*')
-      .order('last_active_at', { ascending: false, nullsFirst: false })
-      .limit(limit);
+      .order('last_active_at', { ascending: false, nullsFirst: false });
+
+    if (filters.date) {
+      const startOfDay = new Date(filters.date);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(filters.date);
+      endOfDay.setHours(23, 59, 59, 999);
+      query = query.gte('last_active_at', startOfDay.toISOString())
+                   .lte('last_active_at', endOfDay.toISOString());
+    }
+
+    if (limit) {
+      query = query.limit(limit);
+    }
+
+    const { data, error } = await query;
     if (error) throw new Error(error.message);
     return data || [];
   },
@@ -222,10 +236,11 @@ export const memberService = {
     }
   },
 
-  async suspendMember(id, staffId) {
+  async suspendMember(id, staffId, shiftId) {
     const { data, error } = await supabase.rpc('suspend_member', {
       p_member_id: id,
-      p_staff_id: staffId
+      p_staff_id: staffId,
+      p_shift_id: shiftId
     });
 
     if (error) throw new Error('Bảo lưu thất bại: ' + error.message);
@@ -233,10 +248,11 @@ export const memberService = {
     return data;
   },
 
-  async reactivateMember(id, staffId) {
+  async reactivateMember(id, staffId, shiftId) {
     const { data, error } = await supabase.rpc('reactivate_member', {
       p_member_id: id,
-      p_staff_id: staffId
+      p_staff_id: staffId,
+      p_shift_id: shiftId
     });
 
     if (error) throw new Error('Kích hoạt lại thất bại: ' + error.message);

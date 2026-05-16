@@ -153,6 +153,17 @@ export default function MemberFormModal({
                 </label>
               </div>
 
+              {editingMember && (
+                <div style={{ marginTop: '12px' }}>
+                  <label className="cell-sub">Ngày hết hạn</label>
+                  <input
+                    type="date"
+                    value={form.end_date}
+                    onChange={(e) => onFormChange('end_date', e.target.value)}
+                  />
+                </div>
+              )}
+
               <div style={{ marginTop: '8px' }}>
                 <label className="cell-sub">Ghi chú</label>
                 <textarea
