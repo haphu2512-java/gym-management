@@ -28,13 +28,25 @@ export default function Statistics() {
 
         if (dateRange === 'today') {
           startDate = new Date(baseDate.setHours(0, 0, 0, 0)).toISOString();
+          endDate = new Date();
+          endDate.setHours(23, 59, 59, 999);
+          endDate = endDate.toISOString();
         } else if (dateRange === 'week') {
-          const first = baseDate.getDate() - baseDate.getDay() + (baseDate.getDay() === 0 ? -6 : 1); 
-          startDate = new Date(baseDate.setDate(first));
-          startDate.setHours(0, 0, 0, 0);
-          startDate = startDate.toISOString();
+          const todayForWeek = new Date(now);
+          const dayOfWeek = todayForWeek.getDay();
+          const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+          const monday = new Date(todayForWeek);
+          monday.setDate(todayForWeek.getDate() + diffToMonday);
+          monday.setHours(0, 0, 0, 0);
+          startDate = monday.toISOString();
+          endDate = new Date();
+          endDate.setHours(23, 59, 59, 999);
+          endDate = endDate.toISOString();
         } else if (dateRange === 'month') {
-          startDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1).toISOString();
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+          endDate = new Date();
+          endDate.setHours(23, 59, 59, 999);
+          endDate = endDate.toISOString();
         } else if (dateRange === 'custom') {
           startDate = new Date(customStartDate);
           startDate.setHours(0, 0, 0, 0);

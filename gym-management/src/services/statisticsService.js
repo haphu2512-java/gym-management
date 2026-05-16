@@ -30,8 +30,8 @@ export const statisticsService = {
       const dateObj = new Date(s.sold_at);
       return {
         date: dateObj.toLocaleDateString('vi-VN'),
-        shift: s.shifts?.shift_name || 'N/A',
-        staff: s.staff_members?.full_name || 'Hệ thống',
+        shift: s.shifts?.shift_name || 'Không có ca',
+        staff: s.staff_members?.full_name || 'Không rõ',
         product: s.products?.name || 'Sản phẩm',
         quantity: s.quantity || 0,
         revenue: Number(s.total_price || 0)
@@ -42,9 +42,9 @@ export const statisticsService = {
       const dateObj = new Date(p.created_at);
       return {
         date: dateObj.toLocaleDateString('vi-VN'),
-        shift: p.shifts?.shift_name || 'N/A',
-        staff: p.staff_members?.full_name || 'Hệ thống',
-        type: p.payment_type, // 'new' or 'renew'
+        shift: p.shifts?.shift_name || 'Không có ca',
+        staff: p.staff_members?.full_name || 'Không rõ',
+        type: p.payment_type,
         revenue: Number(p.amount || 0)
       };
     }).filter(p => p.revenue > 0);

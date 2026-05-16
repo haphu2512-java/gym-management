@@ -314,7 +314,7 @@ BEGIN
   UPDATE members SET suspended_at = NULL, remaining_days = 0 WHERE id = p_member_id;
   
   INSERT INTO member_logs (member_id, staff_id, staff_member_id, action, package_type, start_date, end_date, note, created_at)
-  VALUES (p_member_id, v_admin_id, p_staff_id, 'REACTIVATE', 0, p_reactivated_at, v_new_end, 'Kích hoạt lại sau bảo lưu', p_created_at);
+  VALUES (p_member_id, v_admin_id, p_staff_id, 'REACTIVATE', NULL, p_reactivated_at, v_new_end, 'Kích hoạt lại sau bảo lưu', p_created_at);
   
   RETURN json_build_object('success', true, 'new_end', v_new_end);
 END;
