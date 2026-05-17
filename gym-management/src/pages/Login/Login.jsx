@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/useAuthStore';
 import logo from '../../assets/logo.png';
+import ChangePasswordModal from '../../components/auth/ChangePasswordModal';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -9,6 +10,7 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -58,7 +60,23 @@ export default function Login() {
             {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
           </button>
         </form>
+
+        <div style={{ marginTop: '24px', textAlign: 'center' }}>
+          <button 
+            type="button" 
+            className="link-btn" 
+            onClick={() => setShowPasswordModal(true)}
+            style={{ fontSize: '14px', color: '#64748b', fontWeight: '500' }}
+          >
+            Thay đổi mật khẩu?
+          </button>
+        </div>
       </div>
+
+      <ChangePasswordModal 
+        isOpen={showPasswordModal} 
+        onClose={() => setShowPasswordModal(false)} 
+      />
     </div>
   );
 }

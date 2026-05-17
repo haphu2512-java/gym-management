@@ -1,4 +1,4 @@
-﻿import supabase from '../config/supabase';
+import supabase from '../config/supabase';
 
 export const authService = {
   async login(email, password) {
@@ -38,5 +38,11 @@ export const authService = {
   async resetPassword(email) {
     const { error } = await supabase.auth.resetPasswordForEmail(email);
     if (error) throw error;
+  },
+
+  async updatePassword(newPassword) {
+    const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+    return data;
   },
 };
