@@ -429,7 +429,7 @@ export default function Shifts() {
                   <div style={{ background: 'linear-gradient(135deg, #fef2f2, #fee2e2)', borderRadius: '16px', padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid #fecaca', boxShadow: '0 4px 12px rgba(220, 38, 38, 0.05)' }}>
                     <div>
                       <p style={{ margin: 0, color: '#991b1b', fontSize: '14px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tổng chi ca hiện tại</p>
-                      <h3 style={{ margin: '4px 0 0', fontSize: '28px', fontWeight: '900', color: '#7f1d1d' }}>
+                      <h3 style={{ margin: '4px 0 0', fontSize: '28px', fontWeight: '700', color: '#7f1d1d' }}>
                         {Number(totalExpense || 0).toLocaleString('vi-VN')}<span style={{ fontSize: '18px', marginLeft: '2px' }}>đ</span>
                       </h3>
                     </div>
@@ -440,7 +440,7 @@ export default function Shifts() {
 
                   {/* Add Expense Form */}
                   <form className="modern-form" onSubmit={handleAddExpense} style={{ background: '#ffffff', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
-                    <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: '800', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: '600', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <Plus size={16} /> Ghi nhận khoản chi mới
                     </h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -487,10 +487,10 @@ export default function Shifts() {
                             <Banknote size={18} />
                           </div>
                           <div className="flex-1">
-                            <p style={{ margin: 0, fontWeight: '800', color: '#0f172a', fontSize: '14px' }}>{item.reason || 'Không có lý do'}</p>
+                            <p style={{ margin: 0, fontWeight: '600', color: '#0f172a', fontSize: '14px' }}>{item.reason || 'Không có lý do'}</p>
                             <p style={{ margin: '2px 0 0', color: '#64748b', fontSize: '12px' }}>{formatDateTime(item.created_at)}</p>
                           </div>
-                          <div style={{ fontWeight: '900', color: '#dc2626', fontSize: '15px' }}>
+                          <div style={{ fontWeight: '700', color: '#dc2626', fontSize: '15px' }}>
                             -{Number(item.amount || 0).toLocaleString('vi-VN')}đ
                           </div>
                         </div>
