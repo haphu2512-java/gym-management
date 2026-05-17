@@ -70,7 +70,7 @@ export default function MemberFormModal({
                     />
                   </div>
                   <div style={{ marginTop: '12px' }}>
-                    <label className="cell-sub">Loại thẻ</label>
+                    <label className="cell-sub">Loại gói</label>
                     <select
                       value={form.membership_category}
                       onChange={(e) => onFormChange('membership_category', e.target.value)}
@@ -92,12 +92,12 @@ export default function MemberFormModal({
                       />
                     </div>
                     <div>
-                      <label className="cell-sub">Học phí</label>
+                      <label className="cell-sub">Phí hội viên</label>
                       <input
                         type="number"
                         value={form.fee}
                         onChange={(e) => onFormChange('fee', e.target.value)}
-                        placeholder="Học phí"
+                        placeholder="Phí hội viên"
                         required
                       />
                     </div>

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Clock, Droplets, LayoutDashboard, LogOut, Users, WalletCards, ScrollText, TrendingUp } from 'lucide-react';
+import { Clock, Droplets, LayoutDashboard, LogOut, Users, WalletCards, ScrollText, TrendingUp, BookOpen } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import logo from '../../assets/logo.png';
 
@@ -8,6 +8,7 @@ const icons = {
   members: Users,
   inventory: Droplets,
   shifts: Clock,
+  notes: BookOpen,
   staff: WalletCards,
   logs: ScrollText,
   statistics: TrendingUp,
@@ -22,6 +23,7 @@ export default function Sidebar({ isOpen, onClose }) {
     { key: 'members', path: '/members', label: 'Quản Lý Hội Viên' },
     { key: 'inventory', path: '/inventory', label: 'Quản Lý Nước' },
     { key: 'shifts', path: '/shifts', label: 'Ca Làm & Bàn Giao' },
+    { key: 'notes', path: '/notes', label: 'Sổ Nhật Ký (Ghi Chú)' },
   ];
 
   const menuItems = profile?.role === 'admin'

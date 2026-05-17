@@ -22,7 +22,7 @@ export default function RenewModal({
         <h3>Gia hạn hội viên: {member.full_name}</h3>
         <form className="modern-form" onSubmit={onSubmit}>
           <div>
-            <label className="cell-sub">Loại thẻ</label>
+            <label className="cell-sub">Loại gói</label>
             <select
               value={renewForm.membership_category}
               onChange={(e) => onFormChange('membership_category', e.target.value)}
@@ -44,12 +44,12 @@ export default function RenewModal({
               />
             </div>
             <div>
-              <label className="cell-sub">Học phí</label>
+              <label className="cell-sub">Phí hội viên</label>
               <input
                 type="number"
                 value={renewForm.fee}
                 onChange={(e) => onFormChange('fee', e.target.value)}
-                placeholder="Học phí"
+                placeholder="Phí hội viên"
                 required
               />
             </div>

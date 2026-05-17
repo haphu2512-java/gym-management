@@ -169,7 +169,7 @@ a {
 }
 
 .desktop-toggle:hover {
-  background: #f8fafc;
+  background: #f6f8fb;
   transform: scale(1.05);
 }
 
@@ -558,8 +558,8 @@ a {
 }
 
 .pay-badge.cash {
-  background: #ffedd5;
-  color: #c2410c;
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .pay-badge.transfer {
