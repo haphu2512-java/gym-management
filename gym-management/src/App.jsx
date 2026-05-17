@@ -14,6 +14,7 @@ import Shifts from './pages/Shifts/Shifts';
 import Staff from './pages/Staff/Staff';
 import Logs from './pages/Logs/Logs';
 import Statistics from './pages/Statistics/Statistics';
+import Notes from './pages/Notes/Notes';
 import ToastContainer from './components/common/ToastContainer';
 import ConfirmDialog from './components/common/ConfirmDialog';
 
@@ -69,6 +70,7 @@ function App() {
                       <Route path="/members" element={<Members />} />
                       <Route path="/inventory" element={<Inventory />} />
                       <Route path="/shifts" element={<Shifts />} />
+                      <Route path="/notes" element={<Notes />} />
                       <Route
                         path="/staff"
                         element={

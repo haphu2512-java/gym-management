@@ -16,7 +16,9 @@ export default function Inventory() {
   const [showModal, setShowModal] = useState(false);
   const [viewMode, setViewMode] = useState('sales'); // 'sales' or 'admin'
   const [editingProduct, setEditingProduct] = useState(null);
-  const [form, setForm] = useState({ name: '', price: '', stock_quantity: '', restock_quantity: '0', note: '' });
+  const [form, setForm] = useState({ name: '', price: '', stock_quantity: '', restock_quantity: '0', note: '', image_url: '' });
+  const [imageFile, setImageFile] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // Quantities for sales
   const [sellQuantities, setSellQuantities] = useState({});
@@ -75,8 +77,8 @@ export default function Inventory() {
   useEffect(() => {
     if (viewMode === 'stats') {
       setLoading(true);
-      productService.getFilteredSalesLogs({ 
-        date: statsDate, 
+      productService.getFilteredSalesLogs({
+        date: statsDate,
         shiftName: statsShiftName,
         paymentMethod: statsPaymentMethod
       })
@@ -96,7 +98,8 @@ export default function Inventory() {
 
   const handleOpenCreate = () => {
     setEditingProduct(null);
-    setForm({ name: '', price: '', stock_quantity: '', restock_quantity: '0', note: '' });
+    setForm({ name: '', price: '', stock_quantity: '', restock_quantity: '0', note: '', image_url: '' });
+    setImageFile(null);
     setShowModal(true);
   };
 
@@ -107,20 +110,55 @@ export default function Inventory() {
       price: String(product.price),
       stock_quantity: String(product.stock_quantity),
       restock_quantity: '0',
-      note: product.note || ''
+      note: product.note || '',
+      image_url: product.image_url || ''
     });
+    setImageFile(null);
     setShowModal(true);
+  };
+
+  const uploadToCloudinary = async (file) => {
+    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+
+    if (!cloudName || !uploadPreset || cloudName === 'your_cloud_name' || uploadPreset === 'your_upload_preset') {
+      throw new Error('Vui lòng cấu hình VITE_CLOUDINARY_CLOUD_NAME và VITE_CLOUDINARY_UPLOAD_PRESET trong file .env trước!');
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', uploadPreset);
+
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!res.ok) {
+      throw new Error('Tải ảnh lên Cloudinary thất bại!');
+    }
+
+    const data = await res.json();
+    return data.secure_url;
   };
 
   const handleAddOrUpdate = async (e) => {
     e.preventDefault();
     setError('');
+    setUploadingImage(true);
     try {
+      let finalImageUrl = form.image_url;
+
+      if (imageFile) {
+        finalImageUrl = await uploadToCloudinary(imageFile);
+      }
+
       const payload = {
         name: form.name,
         price: Number(form.price || 0),
         stock_quantity: Number(form.stock_quantity || 0) + Number(form.restock_quantity || 0),
         note: form.note,
+        image_url: finalImageUrl
       };
 
       if (editingProduct) {
@@ -145,11 +183,14 @@ export default function Inventory() {
 
       setShowModal(false);
       setEditingProduct(null);
-      setForm({ name: '', price: '', stock_quantity: '', restock_quantity: '0', note: '' });
+      setForm({ name: '', price: '', stock_quantity: '', restock_quantity: '0', note: '', image_url: '' });
+      setImageFile(null);
       await loadProducts();
       showSuccess('Cập nhật kho thành công!');
     } catch (err) {
       setError(err.message);
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -168,10 +209,10 @@ export default function Inventory() {
 
     try {
       await productService.sellProduct(
-        product, 
-        qty, 
-        activeShift.id, 
-        user?.id, 
+        product,
+        qty,
+        activeShift.id,
+        user?.id,
         activeStaff?.id,
         method
       );
@@ -235,7 +276,7 @@ export default function Inventory() {
           <h3 className="modern-title">Kho nước &amp; bán hàng</h3>
           <p className="muted-text">Bấm chọn số lượng và nhấn Bán hàng.</p>
         </div>
-        
+
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginLeft: 'auto' }}>
           {/* Doanh thu nước ca hiện tại */}
           <div style={{
@@ -255,7 +296,7 @@ export default function Inventory() {
           </div>
 
           <div className="tab-group" style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '8px' }}>
-            <button 
+            <button
               className={`tab-btn ${viewMode === 'sales' ? 'active' : ''}`}
               onClick={() => setViewMode('sales')}
               style={{ padding: '6px 12px', border: 'none', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', background: viewMode === 'sales' ? '#fff' : 'transparent', fontWeight: viewMode === 'sales' ? '600' : 'normal', boxShadow: viewMode === 'sales' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
@@ -263,7 +304,7 @@ export default function Inventory() {
               Bán hàng
             </button>
             {profile?.role === 'admin' && (
-              <button 
+              <button
                 className={`tab-btn ${viewMode === 'admin' ? 'active' : ''}`}
                 onClick={() => setViewMode('admin')}
                 style={{ padding: '6px 12px', border: 'none', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', background: viewMode === 'admin' ? '#fff' : 'transparent', fontWeight: viewMode === 'admin' ? '600' : 'normal', boxShadow: viewMode === 'admin' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
@@ -271,7 +312,7 @@ export default function Inventory() {
                 Quản lý kho
               </button>
             )}
-            <button 
+            <button
               className={`tab-btn ${viewMode === 'stats' ? 'active' : ''}`}
               onClick={() => setViewMode('stats')}
               style={{ padding: '6px 12px', border: 'none', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', background: viewMode === 'stats' ? '#fff' : 'transparent', fontWeight: viewMode === 'stats' ? '600' : 'normal', boxShadow: viewMode === 'stats' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
@@ -302,13 +343,35 @@ export default function Inventory() {
             return (
               <div key={item.id} className="pos-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', transition: 'all 0.2s', opacity: isOutOfStock ? 0.7 : 1 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                  <div style={{ width: '40px', height: '40px', background: '#f8fafc', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 'bold', color: '#64748b' }}>
+                  {item.image_url ? (
+                    <img
+                      src={item.image_url}
+                      alt={item.name}
+                      style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '10px' }}
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'flex';
+                      }}
+                    />
+                  ) : null}
+                  <div style={{
+                    width: '40px',
+                    height: '40px',
+                    background: '#f8fafc',
+                    borderRadius: '10px',
+                    display: item.image_url ? 'none' : 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '18px',
+                    fontWeight: 'bold',
+                    color: '#64748b'
+                  }}>
                     {item.name.charAt(0).toUpperCase()}
                   </div>
-                  <span style={{ 
-                    fontSize: '11px', 
-                    padding: '2px 8px', 
-                    borderRadius: '99px', 
+                  <span style={{
+                    fontSize: '11px',
+                    padding: '2px 8px',
+                    borderRadius: '99px',
                     fontWeight: 'bold',
                     background: isOutOfStock ? '#fee2e2' : (isLowStock ? '#fef9c3' : '#f0fdf4'),
                     color: isOutOfStock ? '#dc2626' : (isLowStock ? '#854d0e' : '#16a34a')
@@ -325,7 +388,7 @@ export default function Inventory() {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '4px', borderRadius: '10px', marginTop: 'auto' }}>
-                  <button 
+                  <button
                     onClick={() => handleQtyChange(item.id, -1, item.stock_quantity)}
                     style={{ width: '32px', height: '32px', border: 'none', background: '#fff', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
                     disabled={isOutOfStock}
@@ -333,7 +396,7 @@ export default function Inventory() {
                     <Minus size={14} />
                   </button>
                   <span style={{ fontWeight: 'bold', fontSize: '14px' }}>{qty}</span>
-                  <button 
+                  <button
                     onClick={() => handleQtyChange(item.id, 1, item.stock_quantity)}
                     style={{ width: '32px', height: '32px', border: 'none', background: '#fff', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
                     disabled={isOutOfStock || qty >= item.stock_quantity}
@@ -342,8 +405,8 @@ export default function Inventory() {
                   </button>
                 </div>
 
-                <button 
-                  className="primary-btn" 
+                <button
+                  className="primary-btn"
                   style={{ width: '100%', borderRadius: '10px', padding: '10px' }}
                   onClick={() => setSellingItem(item)}
                   disabled={isOutOfStock}
@@ -360,17 +423,17 @@ export default function Inventory() {
           <div style={{ display: 'flex', gap: '12px', background: '#f8fafc', padding: '12px', borderRadius: '12px', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569' }}>Ngày:</label>
-              <input 
-                type="date" 
-                value={statsDate} 
+              <input
+                type="date"
+                value={statsDate}
                 onChange={(e) => setStatsDate(e.target.value)}
                 style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
               />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569' }}>Ca:</label>
-              <select 
-                value={statsShiftName} 
+              <select
+                value={statsShiftName}
                 onChange={(e) => setStatsShiftName(e.target.value)}
                 style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
               >
@@ -382,8 +445,8 @@ export default function Inventory() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569' }}>Thanh toán:</label>
-              <select 
-                value={statsPaymentMethod} 
+              <select
+                value={statsPaymentMethod}
                 onChange={(e) => setStatsPaymentMethod(e.target.value)}
                 style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
               >
@@ -421,7 +484,7 @@ export default function Inventory() {
                     <td>{log.quantity}</td>
                     <td><p className="cell-main">{Number(log.total_price || 0).toLocaleString('vi-VN')}đ</p></td>
                     <td>
-                      <span style={{ 
+                      <span style={{
                         padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold',
                         background: log.payment_method === 'CK' ? '#dbeafe' : '#f1f5f9',
                         color: log.payment_method === 'CK' ? '#1d4ed8' : '#475569'
@@ -457,8 +520,23 @@ export default function Inventory() {
               {products.map((item) => (
                 <tr key={item.id}>
                   <td>
-                    <p className="cell-main">{item.name}</p>
-                    {item.note && <p className="cell-sub">{item.note}</p>}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      {item.image_url ? (
+                        <img
+                          src={item.image_url}
+                          alt={item.name}
+                          style={{ width: '36px', height: '36px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                        />
+                      ) : (
+                        <div style={{ width: '36px', height: '36px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', fontSize: '14px', fontWeight: 'bold', color: '#94a3b8' }}>
+                          N/A
+                        </div>
+                      )}
+                      <div>
+                        <p className="cell-main">{item.name}</p>
+                        {item.note && <p className="cell-sub">{item.note}</p>}
+                      </div>
+                    </div>
                   </td>
                   <td>
                     <p className="cell-main">{Number(item.price || 0).toLocaleString('vi-VN')}đ</p>
@@ -551,6 +629,38 @@ export default function Inventory() {
               )}
 
               <div style={{ marginTop: '12px' }}>
+                <label className="cell-sub" style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Hình ảnh sản phẩm</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setImageFile(e.target.files[0]);
+                    }
+                  }}
+                  style={{ width: '100%', padding: '6px', border: '1px solid #cbd5e1', borderRadius: '8px' }}
+                />
+
+                {/* Preview Image */}
+                {(imageFile || form.image_url) && (
+                  <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <img
+                      src={imageFile ? URL.createObjectURL(imageFile) : form.image_url}
+                      alt="Xem trước hình ảnh"
+                      style={{ width: '64px', height: '64px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                    />
+                    <div style={{ fontSize: '12px', color: '#64748b' }}>
+                      {imageFile ? (
+                        <span style={{ color: '#2563eb', fontWeight: 'bold' }}>Ảnh mới đã chọn (Sẽ tải lên khi nhấn lưu)</span>
+                      ) : (
+                        <span>Ảnh hiện tại trên Cloudinary</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ marginTop: '12px' }}>
                 <label className="cell-sub" style={{ display: 'block', marginBottom: '4px' }}>Ghi chú</label>
                 <textarea
                   rows={3}
@@ -561,8 +671,10 @@ export default function Inventory() {
               </div>
 
               <div className="modal-actions" style={{ marginTop: '20px' }}>
-                <button type="button" className="ghost-btn" onClick={() => setShowModal(false)}>Hủy</button>
-                <button type="submit" className="primary-btn">Lưu thay đổi</button>
+                <button type="button" className="ghost-btn" onClick={() => setShowModal(false)} disabled={uploadingImage}>Hủy</button>
+                <button type="submit" className="primary-btn" disabled={uploadingImage}>
+                  {uploadingImage ? 'Đang tải ảnh...' : 'Lưu thay đổi'}
+                </button>
               </div>
             </form>
           </div>
@@ -584,30 +696,30 @@ export default function Inventory() {
                 </span>
               </div>
             </div>
-            
+
             <p style={{ fontWeight: '600', marginBottom: '8px' }}>Phương thức thanh toán:</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <button 
-                type="button" 
-                className="primary-btn" 
+              <button
+                type="button"
+                className="primary-btn"
                 style={{ background: '#0f172a', height: '48px' }}
                 onClick={() => handleSell(sellingItem, 'TM')}
               >
                 Tiền mặt
               </button>
-              <button 
-                type="button" 
-                className="primary-btn" 
+              <button
+                type="button"
+                className="primary-btn"
                 style={{ background: '#2563eb', height: '48px' }}
                 onClick={() => handleSell(sellingItem, 'CK')}
               >
                 Chuyển khoản
               </button>
             </div>
-            
-            <button 
-              type="button" 
-              className="ghost-btn" 
+
+            <button
+              type="button"
+              className="ghost-btn"
               style={{ width: '100%', marginTop: '12px' }}
               onClick={() => setSellingItem(null)}
             >

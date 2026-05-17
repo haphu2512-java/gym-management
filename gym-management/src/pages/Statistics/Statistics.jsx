@@ -209,23 +209,23 @@ export default function Statistics() {
         <div className="modern-card">
           <h4 className="modern-title"><PieChart size={18} /> Cơ cấu gói tập đăng ký</h4>
           <div style={{ display: 'flex', alignItems: 'center', gap: '30px', marginTop: '20px' }}>
-            <div style={{ 
-              width: '150px', 
-              height: '150px', 
-              borderRadius: '50%', 
-              background: totalMembers > 0 
+            <div style={{
+              width: '150px',
+              height: '150px',
+              borderRadius: '50%',
+              background: totalMembers > 0
                 ? (() => {
-                    let cumulative = 0;
-                    const segments = packageStats.map(p => {
-                      const start = cumulative;
-                      const end = start + (p.count / totalMembers) * 100;
-                      cumulative = end;
-                      return `${p.color} ${start}% ${end}%`;
-                    });
-                    return `conic-gradient(${segments.join(', ')})`;
-                  })()
-                : '#f1f5f9', 
-              position: 'relative' 
+                  let cumulative = 0;
+                  const segments = packageStats.map(p => {
+                    const start = cumulative;
+                    const end = start + (p.count / totalMembers) * 100;
+                    cumulative = end;
+                    return `${p.color} ${start}% ${end}%`;
+                  });
+                  return `conic-gradient(${segments.join(', ')})`;
+                })()
+                : '#f1f5f9',
+              position: 'relative'
             }}>
               <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '80px', height: '80px', background: '#fff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#1e293b', fontSize: '14px', textAlign: 'center' }}>
                 {totalMembers} HV
@@ -250,7 +250,7 @@ export default function Statistics() {
       {/* Pivot Statistics Section */}
       <div className="modern-card">
         <div className="flex-row" style={{ justifyContent: 'space-between', marginBottom: '20px' }}>
-          <h4 className="modern-title"><Calendar size={18} /> Phân tích dữ liệu đa chiều (Pivot)</h4>
+          <h4 className="modern-title"><Calendar size={18} /> Thống kê theo đối tượng</h4>
           <div className="flex-row" style={{ gap: '12px' }}>
             <select className="ghost-btn" value={pivotSubject} onChange={(e) => setPivotSubject(e.target.value)}>
               <option value="water">Đối tượng: Nước</option>
@@ -289,7 +289,7 @@ export default function Statistics() {
                 <tr key={idx}>
                   <td style={{ fontWeight: '600', color: '#1e293b' }}>{row.key}</td>
                   <td style={{ color: '#059669', fontWeight: 'bold' }}>{row.revenue.toLocaleString('vi-VN')}đ</td>
-                  
+
                   {pivotSubject === 'water' ? (
                     <>
                       <td style={{ fontWeight: '500' }}>{row.quantity}</td>

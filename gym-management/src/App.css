@@ -1,5 +1,5 @@
 :root {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   color: #1f2937;
   background: #f6f8fb;
 }
@@ -56,7 +56,7 @@ a {
 .sidebar-brand h1 {
   margin: 0;
   font-size: 24px;
-  font-weight: 900;
+  font-weight: 700;
   color: #2563eb;
   letter-spacing: -0.5px;
 }
@@ -169,14 +169,14 @@ a {
 }
 
 .desktop-toggle:hover {
-  background: #f8fafc;
+  background: #f6f8fb;
   transform: scale(1.05);
 }
 
 .mobile-topbar h1 {
   margin: 0;
   font-size: 20px;
-  font-weight: 900;
+  font-weight: 700;
   color: #2563eb;
 }
 
@@ -203,7 +203,7 @@ a {
   margin: 0;
   font-size: 30px;
   letter-spacing: -0.6px;
-  font-weight: 900;
+  font-weight: 700;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -224,7 +224,7 @@ a {
   background: #ffffff;
   border: 1px solid #e9edf3;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   text-transform: uppercase;
   color: #6b7280;
 }
@@ -309,13 +309,13 @@ a {
 .stat-value-modern {
   margin: 4px 0 0;
   font-size: 30px;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .modern-title {
   margin: 0 0 14px;
   font-size: 20px;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .modern-title.flex-row {
@@ -345,7 +345,7 @@ a {
   border-radius: 999px;
   background: #f3f4f6;
   color: #4b5563;
-  font-weight: 900;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -353,7 +353,7 @@ a {
 
 .member-name {
   margin: 0;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .member-meta {
@@ -365,7 +365,7 @@ a {
 .member-fee {
   margin: 0;
   color: #2563eb;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .flex-1 {
@@ -406,7 +406,7 @@ a {
   border: none;
   border-radius: 12px;
   padding: 11px 14px;
-  font-weight: 800;
+  font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -505,7 +505,7 @@ a {
 
 .cell-main {
   margin: 0;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .cell-sub {
@@ -524,7 +524,7 @@ a {
   border: none;
   background: transparent;
   color: #2563eb;
-  font-weight: 800;
+  font-weight: 600;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -538,7 +538,7 @@ a {
   align-items: center;
   border-radius: 999px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   padding: 4px 8px;
 }
 
@@ -558,8 +558,8 @@ a {
 }
 
 .pay-badge.cash {
-  background: #ffedd5;
-  color: #c2410c;
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .pay-badge.transfer {
@@ -595,7 +595,7 @@ a {
 .product-price {
   margin: 12px 0 0;
   font-size: 28px;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .stock-badge.ok {

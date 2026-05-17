@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS products (
   name TEXT NOT NULL,
   price NUMERIC NOT NULL,
   stock_quantity INT DEFAULT 0,
+  image_url TEXT,
   note TEXT,
   deleted_at TIMESTAMP
 );
