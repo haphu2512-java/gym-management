@@ -31,8 +31,8 @@ function validateShiftTime(shiftName, allowOverride = false) {
   const startTotal = startH * 60 + startM;
   const endTotal = endH * 60 + endM;
 
-  // Cho phép mở sớm 30 phút trước giờ bắt đầu ca
-  const tolerance = 30;
+  // Cho phép mở sớm 10 phút trước giờ bắt đầu ca
+  const tolerance = 10;
   if (currentTotal < startTotal - tolerance || currentTotal > endTotal) {
     throw new Error(
       `Không thể mở ${shiftName} lúc này. ${shiftName} chỉ được mở trong khung giờ ${schedule.label}. Giờ hiện tại: ${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}.`

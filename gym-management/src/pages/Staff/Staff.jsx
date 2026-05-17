@@ -97,14 +97,6 @@ export default function Staff() {
         });
       }
       setSchedule(prev => ({ ...prev, [`${shift}-${day}`]: staffId }));
-
-      await staffLogService.logAction({
-        staffId: profile?.id,
-        action: 'Xếp lịch làm việc',
-        targetItem: `${shift} - ${day}`,
-        details: { staff_id: staffId, week_start: weekStart },
-        note: staffId ? 'Admin gán nhân viên vào ca' : 'Admin xóa nhân viên khỏi ca',
-      });
     } catch (e) {
       addToast("Lỗi cập nhật lịch: " + e.message, "error");
     }
