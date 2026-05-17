@@ -74,8 +74,8 @@ export default function Sidebar({ isOpen, onClose }) {
             </button>
           </div>
         )}
-        <div 
-          className="user-box" 
+        <div
+          className="user-box"
           onClick={() => setShowLogout(!showLogout)}
           style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', background: showLogout ? '#e2e8f0' : 'transparent', borderRadius: '12px', transition: 'background 0.2s', margin: '0 8px' }}
         >
