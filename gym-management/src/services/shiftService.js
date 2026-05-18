@@ -8,8 +8,8 @@ const DEFAULT_SHIFTS = ['Ca 1', 'Ca 2', 'Ca 3', 'Ca 4', 'Ca 5'];
 
 // Ca 1: 5-8h, Ca 2: 9-11h, Ca 3: 13-16h, Ca 4: 16-19h, Ca 5: 19-22h
 const SHIFT_TIME_MAP = {
-  'Ca 1': { start: '05:00', end: '09:00', label: '5:00 - 9:00 sáng' },
-  'Ca 2': { start: '09:00', end: '12:00', label: '9:00 - 12:00 trưa' },
+  'Ca 1': { start: '05:00', end: '08:00', label: '5:00 - 8:00 sáng' },
+  'Ca 2': { start: '08:00', end: '11:00', label: '8:00 - 11:00 trưa' },
   'Ca 3': { start: '13:00', end: '16:00', label: '13:00 - 16:00 chiều' },
   'Ca 4': { start: '16:00', end: '19:00', label: '16:00 - 19:00 chiều' },
   'Ca 5': { start: '19:00', end: '22:00', label: '19:00 - 22:00 tối' },

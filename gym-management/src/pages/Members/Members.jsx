@@ -27,7 +27,7 @@ function calculateFee(category, packageType) {
   return PRICING_TIERS[category]?.[packageType] || '';
 }
 
-const initialForm = {
+const getInitialForm = () => ({
   member_code: '',
   full_name: '',
   membership_category: 'normal',
@@ -36,9 +36,9 @@ const initialForm = {
   payment_method: 'TM',
   fingerprint_status: false,
   note: '',
-  start_date: new Date().toISOString().slice(0, 10),
+  start_date: getLocalISODate(),
   end_date: '',
-};
+});
 
 export default function Members() {
   const { user, profile, activeStaff } = useAuthStore();
@@ -51,7 +51,7 @@ export default function Members() {
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
-  const [form, setForm] = useState(initialForm);
+  const [form, setForm] = useState(getInitialForm);
 
   const [showRenewModal, setShowRenewModal] = useState(false);
   const [renewingMember, setRenewingMember] = useState(null);
@@ -179,7 +179,7 @@ export default function Members() {
   // Mở modal tạo hội viên mới
   const openCreateModal = () => {
     setEditingMember(null);
-    setForm(initialForm);
+    setForm(getInitialForm());
     setError('');
     setShowModal(true);
   };
@@ -313,7 +313,7 @@ export default function Members() {
       }
 
       setShowModal(false);
-      setForm(initialForm);
+      setForm(getInitialForm());
       setEditingMember(null);
     } catch (err) {
       setError(err.message);

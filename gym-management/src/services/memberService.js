@@ -166,9 +166,9 @@ export const memberService = {
     if (memberError) throw new Error(memberError.message);
     if (!member) throw new Error('Khong tim thay hoi vien');
 
-    const now = new Date();
-    const currentEnd = member.end_date ? new Date(member.end_date) : null;
-    const renewalStart = currentEnd && currentEnd > now ? currentEnd : now;
+    const todayStr = getLocalISODate();
+    const currentEnd = member.end_date;
+    const renewalStart = currentEnd && currentEnd >= todayStr ? currentEnd : todayStr;
 
     await validateMemberDates(renewalStart, packageType);
 
@@ -180,7 +180,7 @@ export const memberService = {
       p_payment_method: paymentMethod,
       p_shift_id: shiftId,
       p_staff_id: staffId,
-      p_start_date: toDateOnly(renewalStart),
+      p_start_date: renewalStart,
       p_created_at: new Date().toISOString()
     });
 

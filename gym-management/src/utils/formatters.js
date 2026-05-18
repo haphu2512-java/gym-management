@@ -8,9 +8,19 @@ export const formatCurrency = (value) => {
 };
 
 // Format date to DD-MM-YYYY
+// Handles both date-only strings (YYYY-MM-DD) and full ISO timestamps correctly.
+// Parsing a date-only string with `new Date()` treats it as UTC midnight, causing
+// a timezone shift (e.g., -1 day in UTC+7). We detect this case and parse directly.
 export const formatDate = (date) => {
   if (!date) return '';
-  const d = new Date(date);
+  const str = String(date);
+  // If it's a pure date string (YYYY-MM-DD), parse parts directly to avoid UTC shift
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    const [year, month, day] = str.split('-');
+    return `${day}-${month}-${year}`;
+  }
+  // For full timestamps, use local time from Date object
+  const d = new Date(str);
   const day = String(d.getDate()).padStart(2, '0');
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const year = d.getFullYear();
@@ -75,7 +85,13 @@ export const getStatusColor = (status) => {
 };
 
 export const addMonths = (dateInput, months) => {
-  const d = new Date(dateInput);
+  let d;
+  if (typeof dateInput === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+    const [year, month, day] = dateInput.split('-').map(Number);
+    d = new Date(year, month - 1, day);
+  } else {
+    d = new Date(dateInput);
+  }
   d.setMonth(d.getMonth() + Number(months || 1));
   return d;
 };
