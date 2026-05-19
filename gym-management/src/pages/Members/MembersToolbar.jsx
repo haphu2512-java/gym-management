@@ -83,17 +83,15 @@ export default function MembersToolbar({
             title="Lọc theo ngày đăng ký hoặc hết hạn"
           />
 
-          {profile?.role === 'admin' && (
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              style={{ padding: '8px', borderRadius: '6px', border: '1px solid #ddd' }}
-            >
-              <option value="all">Tất cả</option>
-              <option value="pending_ck">Chờ duyệt CK</option>
-              <option value="missing_code_7d">Chưa gắn Mã HV (&gt; 7 ngày)</option>
-            </select>
-          )}
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            style={{ padding: '8px', borderRadius: '6px', border: '1px solid #ddd' }}
+          >
+            <option value="all">Tất cả</option>
+            {profile?.role === 'admin' && <option value="pending_ck">Chờ duyệt CK</option>}
+            <option value="missing_code">Chưa gắn Mã HV</option>
+          </select>
           {profile?.role === 'admin' && (
             <button
               type="button"

@@ -53,13 +53,44 @@ export default function MembersTable({
           )}
           {paginated.map((m) => {
             const status = getStatus(m);
+            const createdDate = new Date(m.created_at);
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+            const showWarning = !m.member_code && m.created_at && (createdDate <= sevenDaysAgo);
+
             return (
               <tr key={m.id}>
                 <td>
                   <p className="cell-main">{formatDate(m.start_date) || 'N/A'}</p>
                 </td>
                 <td>
-                  <p className="cell-main">{m.member_code}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {m.member_code ? (
+                      <p className="cell-main">{m.member_code}</p>
+                    ) : (
+                      <p className="cell-main" style={{ color: '#94a3b8', fontStyle: 'italic', fontWeight: 'normal' }}>Chưa có mã</p>
+                    )}
+                    {showWarning && (
+                      <span 
+                        className="pay-badge" 
+                        style={{ 
+                          background: '#fef2f2', 
+                          color: '#991b1b', 
+                          border: '1px solid #fca5a5', 
+                          padding: '2px 6px',
+                          borderRadius: '6px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          fontSize: '10px'
+                        }}
+                        title="Tài khoản đăng ký hơn 7 ngày nhưng chưa có mã hội viên"
+                      >
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#dc2626', display: 'inline-block' }}></span>
+                        Chưa gắn mã &gt; 7 ngày
+                      </span>
+                    )}
+                  </div>
                   <p className="cell-sub">{m.full_name}</p>
                 </td>
                 <td>
