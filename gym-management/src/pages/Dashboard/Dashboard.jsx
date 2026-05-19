@@ -131,7 +131,15 @@ export default function Dashboard() {
 
     const lowStock = products.filter(p => Number(p.stock_quantity || 0) < 10);
 
-    return { activeCount, expiredCount, memberRevenue, pendingCkCount, expiringSoon, lowStock };
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const missingCodeCount = members.filter(m => {
+      if (m.member_code) return false;
+      const regDate = new Date(m.created_at);
+      return regDate <= sevenDaysAgo;
+    }).length;
+
+    return { activeCount, expiredCount, memberRevenue, pendingCkCount, expiringSoon, lowStock, missingCodeCount };
   }, [members, membershipRevenue, products]);
 
   const exportToExcel = () => {
@@ -181,6 +189,15 @@ export default function Dashboard() {
             <AlertTriangle size={18} />
             <div>
               Có <strong>{stats.expiringSoon.length}</strong> hội viên sắp hết hạn trong 7 ngày tới.
+            </div>
+          </div>
+        )}
+
+        {stats.missingCodeCount > 0 && (
+          <div className="modern-error" style={{ background: '#fff1f2', border: '1px solid #ffe4e6', color: '#be123c', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <AlertTriangle size={18} />
+            <div>
+              Có <strong>{stats.missingCodeCount}</strong> hội viên chưa gắn Mã HV sau 7 ngày đăng ký.
             </div>
           </div>
         )}

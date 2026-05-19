@@ -43,8 +43,7 @@ export default function MemberFormModal({
                   <input
                     value={form.member_code}
                     onChange={(e) => onFormChange('member_code', e.target.value)}
-                    placeholder="Mã hội viên"
-                    required
+                    placeholder="Mã hội viên (Không bắt buộc)"
                   />
                 </div>
                 <div>
