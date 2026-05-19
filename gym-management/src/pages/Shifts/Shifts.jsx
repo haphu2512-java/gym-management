@@ -262,10 +262,10 @@ export default function Shifts() {
         <div className="modern-card">
           <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
             <button type="button" className={activeTab === 'shift' ? 'primary-btn' : 'ghost-btn'} onClick={() => setActiveTab('shift')}>
-              Ca truc
+              CA TRỰC
             </button>
             <button type="button" className={activeTab === 'expense' ? 'primary-btn' : 'ghost-btn'} onClick={() => setActiveTab('expense')}>
-              Chi
+              CHI
             </button>
           </div>
           <h3 className="modern-title flex-row"><Clock size={18} /> Bàn giao ca trực</h3>

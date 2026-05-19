@@ -22,7 +22,7 @@ export default function MemberFormModal({
   onLogVerification
 }) {
   return (
-    <div className="modal-backdrop" onClick={onCancel}>
+    <div className="modal-backdrop">
       <div className="modal-panel" style={{ width: 'min(900px, 96vw)', maxWidth: '900px' }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -43,8 +43,7 @@ export default function MemberFormModal({
                   <input
                     value={form.member_code}
                     onChange={(e) => onFormChange('member_code', e.target.value)}
-                    placeholder="Mã hội viên"
-                    required
+                    placeholder="Mã hội viên (Không bắt buộc)"
                   />
                 </div>
                 <div>

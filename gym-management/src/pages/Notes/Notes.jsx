@@ -46,7 +46,7 @@ export default function Notes() {
           staffMemberId: activeStaff?.id,
           action: 'Sửa ghi chú chung',
           targetItem: 'Sổ nhật ký',
-          note: `Nội dung mới: ${noteForm.substring(0, 50)}${noteForm.length > 50 ? '...' : ''}`
+          note: `Nội dung mới: ${noteForm}`
         });
         setEditingNote(null);
       } else {
@@ -56,7 +56,7 @@ export default function Notes() {
           staffMemberId: activeStaff?.id,
           action: 'Thêm ghi chú chung',
           targetItem: 'Sổ nhật ký',
-          note: noteForm.substring(0, 100)
+          note: `Nội dung: ${noteForm}`
         });
       }
       setNoteForm('');

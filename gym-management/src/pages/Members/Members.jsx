@@ -107,6 +107,13 @@ export default function Members() {
         matchStatus = m.payment_method === 'CK' && !m.is_payment_verified;
       }
 
+      if (filterStatus === 'missing_code_7d' && matchStatus) {
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const regDate = new Date(m.created_at);
+        matchStatus = !m.member_code && regDate <= sevenDaysAgo;
+      }
+
       return matchSearch && matchDate && matchStatus;
     });
   }, [members, searchTerm, filterStatus, filterDate, activeTab]);
@@ -253,7 +260,7 @@ export default function Members() {
       const endDate = getLocalISODate(addMonths(startObj, Number(form.package_type || 1)));
 
       const payload = {
-        member_code: form.member_code,
+        member_code: form.member_code?.trim() || null,
         full_name: form.full_name,
         membership_category: form.membership_category || 'normal',
         package_type: Number(form.package_type || 1),
@@ -270,7 +277,7 @@ export default function Members() {
 
       if (editingMember?.id) {
         const updatePayload = {
-          member_code: form.member_code,
+          member_code: form.member_code?.trim() || null,
           full_name: form.full_name,
           fingerprint_status: form.fingerprint_status,
           note: form.note,
