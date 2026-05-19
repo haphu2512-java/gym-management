@@ -107,11 +107,8 @@ export default function Members() {
         matchStatus = m.payment_method === 'CK' && !m.is_payment_verified;
       }
 
-      if (filterStatus === 'missing_code_7d' && matchStatus) {
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        const regDate = new Date(m.created_at);
-        matchStatus = !m.member_code && regDate <= sevenDaysAgo;
+      if (filterStatus === 'missing_code' && matchStatus) {
+        matchStatus = !m.member_code;
       }
 
       return matchSearch && matchDate && matchStatus;
