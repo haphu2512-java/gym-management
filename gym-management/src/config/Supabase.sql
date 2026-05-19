@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS staff_members (
 -- ============================================================
 CREATE TABLE IF NOT EXISTS members (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  member_code TEXT UNIQUE NOT NULL,
+  member_code TEXT UNIQUE,
   full_name TEXT NOT NULL,
   fingerprint_status BOOLEAN DEFAULT FALSE,
   note TEXT,
