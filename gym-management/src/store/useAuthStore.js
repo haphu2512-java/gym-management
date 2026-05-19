@@ -34,17 +34,24 @@ export const useAuthStore = create((set) => ({
     set({ activeStaff: staff });
   },
 
-  initializeAuth: async () => {
-    set({ loading: true });
+  initializeAuth: async (silent = false) => {
+    if (!silent) set({ loading: true });
     try {
       const user = await authService.getCurrentUser();
       let profile = null;
       if (user?.id) {
         profile = await authService.getProfile(user.id);
       }
-      set({ user, profile, loading: false });
+      set({ 
+        user, 
+        profile, 
+        ...(!silent ? { loading: false } : {}) 
+      });
     } catch (error) {
-      set({ error: error.message, loading: false });
+      set({ 
+        error: error.message, 
+        ...(!silent ? { loading: false } : {}) 
+      });
     }
   },
 
