@@ -35,7 +35,7 @@ function App() {
       if (event === 'SIGNED_OUT') {
         useAuthStore.getState().clearLocalState();
       } else if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-        initializeAuth();
+        initializeAuth(true); // Cập nhật ngầm (silent) để tránh unmount giao diện
       }
     });
 
