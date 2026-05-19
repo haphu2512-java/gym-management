@@ -65,6 +65,44 @@ export const memberService = {
     return data || [];
   },
 
+  async getRecentTransactions(limit = 20, filters = {}) {
+    let query = supabase
+      .from('member_logs')
+      .select(`
+        *,
+        members (
+          full_name,
+          member_code,
+          note
+        )
+      `)
+      .in('action', ['CREATE', 'RENEW'])
+      .order('created_at', { ascending: false });
+
+    if (filters.date) {
+      const startOfDay = new Date(filters.date);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(filters.date);
+      endOfDay.setHours(23, 59, 59, 999);
+      query = query.gte('created_at', startOfDay.toISOString())
+                   .lte('created_at', endOfDay.toISOString());
+    }
+
+    if (limit) {
+      query = query.limit(limit);
+    }
+
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    
+    return (data || []).map(log => ({
+      ...log,
+      full_name: log.members?.full_name,
+      member_code: log.members?.member_code,
+      note: log.members?.note || log.note,
+      last_active_at: log.created_at,
+    }));
+  },
   async createMember(memberData) {
     const packageType = Number(memberData.package_type || 1);
     await validateMemberDates(memberData.start_date || new Date(), packageType);
