@@ -36,6 +36,7 @@ export const memberService = {
     const { data, error } = await supabase
       .from(VIEW_NAME)
       .select('*')
+      .order('start_date', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false });
     if (error) throw new Error(error.message);
     return data || [];
@@ -53,7 +54,7 @@ export const memberService = {
       const endOfDay = new Date(filters.date);
       endOfDay.setHours(23, 59, 59, 999);
       query = query.gte('last_active_at', startOfDay.toISOString())
-                   .lte('last_active_at', endOfDay.toISOString());
+        .lte('last_active_at', endOfDay.toISOString());
     }
 
     if (limit) {
@@ -85,7 +86,7 @@ export const memberService = {
       const endOfDay = new Date(filters.date);
       endOfDay.setHours(23, 59, 59, 999);
       query = query.gte('created_at', startOfDay.toISOString())
-                   .lte('created_at', endOfDay.toISOString());
+        .lte('created_at', endOfDay.toISOString());
     }
 
     if (limit) {
@@ -94,7 +95,7 @@ export const memberService = {
 
     const { data, error } = await query;
     if (error) throw new Error(error.message);
-    
+
     return (data || []).map(log => ({
       ...log,
       full_name: log.members?.full_name,
