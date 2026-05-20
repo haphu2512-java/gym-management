@@ -8,12 +8,12 @@ function toDateOnly(date) {
   return getLocalISODate(date);
 }
 
-export async function validateMemberDates(startDate, packageType) {
+export async function validateMemberDates(startDate, packageType, allowPastEnd = false) {
   const parsedPackage = Number(packageType || 0);
   const start = new Date(startDate);
   const end = addMonths(start, parsedPackage);
 
-  if (end < new Date()) {
+  if (!allowPastEnd && end < new Date()) {
     const day = String(end.getDate()).padStart(2, '0');
     const month = String(end.getMonth() + 1).padStart(2, '0');
     const year = end.getFullYear();
@@ -195,6 +195,7 @@ export const memberService = {
     const paymentMethod = renewalData.paymentMethod || 'TM';
     const staffId = renewalData.staffId || null;
     const shiftId = renewalData.shiftId || null;
+    const renewFrom = renewalData.renewFrom || 'today';
 
     const { data: member, error: memberError } = await supabase
       .from(VIEW_NAME)
@@ -207,9 +208,21 @@ export const memberService = {
 
     const todayStr = getLocalISODate();
     const currentEnd = member.end_date;
-    const renewalStart = currentEnd && currentEnd >= todayStr ? currentEnd : todayStr;
+    const isExpired = !currentEnd || currentEnd < todayStr;
 
-    await validateMemberDates(renewalStart, packageType);
+    let renewalStart;
+    if (isExpired) {
+      if (renewFrom === 'expired') {
+        renewalStart = currentEnd || todayStr;
+      } else {
+        renewalStart = todayStr;
+      }
+    } else {
+      renewalStart = currentEnd;
+    }
+
+    const allowPastEnd = renewFrom === 'expired';
+    await validateMemberDates(renewalStart, packageType, allowPastEnd);
 
     const { data: result, error: rpcError } = await supabase.rpc('renew_member_transaction', {
       p_member_id: memberId,
