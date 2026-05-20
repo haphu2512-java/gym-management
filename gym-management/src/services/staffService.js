@@ -142,6 +142,26 @@ export const staffService = {
     return data || [];
   },
 
+  getWeeklySchedulesRange: async (startWeek, endWeek) => {
+    const { data, error } = await supabase
+      .from('weekly_schedules')
+      .select('*, staff_members(full_name)')
+      .gte('week_start', startWeek)
+      .lte('week_start', endWeek);
+    if (error) throw error;
+    return data || [];
+  },
+
+  getAllSalaryAdjustmentsRange: async (startWeek, endWeek) => {
+    const { data, error } = await supabase
+      .from('salary_adjustments')
+      .select('*')
+      .gte('adjustment_date', startWeek)
+      .lte('adjustment_date', endWeek);
+    if (error) throw error;
+    return data || [];
+  },
+
   upsertSalaryAdjustment: async (adjustment) => {
     const payload = {
       staff_member_id: adjustment.staff_id, // staff_id từ UI map sang staff_member_id trong DB
