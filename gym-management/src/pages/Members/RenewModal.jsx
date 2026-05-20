@@ -1,3 +1,5 @@
+import { formatDate, getLocalISODate } from '../../utils/formatters';
+
 function calculateFee(category, packageType) {
   const PRICING_TIERS = {
     normal: { 1: 350000, 3: 795000, 6: 1440000 },
@@ -15,6 +17,9 @@ export default function RenewModal({
   onCancel
 }) {
   if (!member) return null;
+
+  const todayStr = getLocalISODate();
+  const isExpired = member.end_date && member.end_date < todayStr;
 
   return (
     <div className="modal-backdrop" onClick={onCancel}>
@@ -41,6 +46,8 @@ export default function RenewModal({
                 onChange={(e) => onFormChange('package_type', e.target.value)}
                 placeholder="Gói (tháng)"
                 required
+                min="1"
+                max="36"
               />
             </div>
             <div>
@@ -64,6 +71,33 @@ export default function RenewModal({
               <option value="CK">CK - Chuyển khoản</option>
             </select>
           </div>
+
+          {isExpired && (
+            <div style={{ marginTop: '14px' }}>
+              <label className="cell-sub" style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>Phương thức gia hạn (Hội viên đã hết hạn)</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer', fontWeight: '500', color: '#334155' }}>
+                  <input
+                    type="checkbox"
+                    checked={renewForm.renew_from === 'today'}
+                    onChange={() => onFormChange('renew_from', 'today')}
+                    style={{ width: '16px', height: '16px', accentColor: '#2563eb', cursor: 'pointer' }}
+                  />
+                  Gia hạn từ ngày gia hạn (Hôm nay: {formatDate(todayStr)})
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer', fontWeight: '500', color: '#334155' }}>
+                  <input
+                    type="checkbox"
+                    checked={renewForm.renew_from === 'expired'}
+                    onChange={() => onFormChange('renew_from', 'expired')}
+                    style={{ width: '16px', height: '16px', accentColor: '#2563eb', cursor: 'pointer' }}
+                  />
+                  Gia hạn từ ngày hết hạn (Ngày hết hạn: {formatDate(member.end_date)})
+                </label>
+              </div>
+            </div>
+          )}
+
           <div className="modal-actions" style={{ marginTop: '16px' }}>
             <button type="button" className="ghost-btn" onClick={onCancel}>Hủy</button>
             <button type="submit" className="primary-btn">Xác nhận gia hạn</button>
