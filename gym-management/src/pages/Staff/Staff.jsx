@@ -193,7 +193,7 @@ export default function Staff() {
   const updateAdj = async (staffId, field, val) => {
     const numericVal = Number(val) || 0;
     const currentAdj = adjustments[staffId] || {};
-    const updatedAdj = { ...currentAdj, [field]: numericVal };
+    const updatedAdj = { ...currentAdj, [field]: field === 'reason' ? val : numericVal };
 
     try {
       // Optimistic UI update
@@ -208,7 +208,7 @@ export default function Staff() {
         commission: field === 'commission' ? numericVal : (currentAdj.commission || 0),
         shortage: field === 'shortage' ? numericVal : (currentAdj.shortage || 0),
         penalty: field === 'penalty' ? numericVal : (currentAdj.penalty || 0),
-        reason: field === 'others' ? String(val) : (currentAdj.reason || ''),
+        reason: field === 'reason' ? String(val) : String(currentAdj.reason || ''),
         created_by: profile.id
       });
 
@@ -249,7 +249,8 @@ export default function Staff() {
       });
 
       const adj = adjustments[s.id] || { commission: 0, shortage: 0, penalty: 0, reason: '' };
-      const finalSalary = baseSalary + (adj.commission || 0) - (adj.shortage || 0) - (adj.penalty || 0);
+      const otherAmount = Number(adj.reason) || 0;
+      const finalSalary = baseSalary + (adj.commission || 0) + otherAmount - (adj.shortage || 0) - (adj.penalty || 0);
 
       return {
         ...s,
@@ -459,7 +460,7 @@ export default function Staff() {
               <tr key={calc.id}>
                 <td style={{ fontWeight: 'bold', borderRight: '1px solid #e2e8f0' }}>{calc.full_name}</td>
                 <td style={{ borderRight: '1px solid #e2e8f0' }}><input type="number" style={inputStyle} value={calc.adj?.commission || ''} onChange={e => updateAdj(calc.id, 'commission', e.target.value)} placeholder="0" /></td>
-                <td style={{ borderRight: '1px solid #e2e8f0' }}><input type="text" style={inputStyle} value={calc.adj?.reason || ''} onChange={e => updateAdj(calc.id, 'others', e.target.value)} placeholder="..." /></td>
+                <td style={{ borderRight: '1px solid #e2e8f0' }}><input type="number" style={inputStyle} value={calc.adj?.reason || ''} onChange={e => updateAdj(calc.id, 'reason', e.target.value)} placeholder="0" /></td>
                 <td style={{ borderRight: '1px solid #e2e8f0' }}><input type="number" style={inputStyle} value={calc.adj?.shortage || ''} onChange={e => updateAdj(calc.id, 'shortage', e.target.value)} placeholder="0" /></td>
                 <td style={{ borderRight: '1px solid #e2e8f0' }}><input type="number" style={inputStyle} value={calc.adj?.penalty || ''} onChange={e => updateAdj(calc.id, 'penalty', e.target.value)} placeholder="0" /></td>
                 <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#16a34a', fontSize: '16px', background: '#f0fdf4' }}>
