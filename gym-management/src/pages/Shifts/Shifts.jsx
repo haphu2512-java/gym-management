@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Clock, Banknote, FileText, Plus, Receipt, Trash2 } from 'lucide-react';
 import { shiftService } from '../../services/shiftService';
 import { staffService } from '../../services/staffService';
@@ -9,7 +9,7 @@ import { additionalService } from '../../services/additionalService';
 import { expenseService } from '../../services/expenseService';
 import { staffLogService } from '../../services/staffLogService';
 import { shiftNoteService } from '../../services/shiftNoteService';
-import { formatDateTime } from '../../utils/formatters';
+import { formatDateTime, getLocalISODate } from '../../utils/formatters';
 import { deviceSecurity } from '../../utils/deviceSecurity';
 
 export default function Shifts() {
@@ -18,6 +18,7 @@ export default function Shifts() {
   const [shifts, setShifts] = useState([]);
   const [skipTimeCheck, setSkipTimeCheck] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [shiftFilterDate, setShiftFilterDate] = useState(getLocalISODate());
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('shift');
   const [isTrusted, setIsTrusted] = useState(deviceSecurity.isDeviceTrusted());
@@ -63,20 +64,23 @@ export default function Shifts() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
 
-  const loadShifts = async () => {
+  const loadShifts = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const [shiftsData] = await Promise.all([
-        shiftService.getLatestShifts()
-      ]);
+      let shiftsData;
+      if (shiftFilterDate) {
+        shiftsData = await shiftService.getShiftsByDate(shiftFilterDate);
+      } else {
+        shiftsData = await shiftService.getLatestShifts(20);
+      }
       setShifts(shiftsData);
     } catch (e) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [shiftFilterDate]);
 
   const openShiftDetail = async (shift) => {
     setSelectedShiftSummary(null);
@@ -94,6 +98,9 @@ export default function Shifts() {
 
   useEffect(() => {
     loadShifts();
+  }, [loadShifts]);
+
+  useEffect(() => {
     // Tải danh sách nhân viên cho dropdown
     staffService.getStaffMembers().then(setStaffMembers).catch(console.error);
   }, []);
@@ -561,6 +568,36 @@ export default function Shifts() {
 
       {error && <div className="modern-error">{error}</div>}
       {loading && <div className="modern-info">Đang tải ca làm...</div>}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '24px', marginBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
+        <h3 className="modern-title" style={{ margin: 0 }}>Lịch sử ca làm</h3>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '500' }}>Lọc theo ngày:</span>
+          <input
+            type="date"
+            value={shiftFilterDate}
+            onChange={(e) => setShiftFilterDate(e.target.value)}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '8px',
+              border: '1px solid #cbd5e1',
+              fontSize: '13px',
+              outline: 'none',
+              cursor: 'pointer'
+            }}
+          />
+          {shiftFilterDate && (
+            <button
+              type="button"
+              className="ghost-btn"
+              onClick={() => setShiftFilterDate('')}
+              style={{ padding: '6px 12px', fontSize: '13px', height: 'auto' }}
+            >
+              Xem tất cả
+            </button>
+          )}
+        </div>
+      </div>
 
       <div className="modern-table-wrap">
         <table className="modern-table">

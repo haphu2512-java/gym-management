@@ -64,6 +64,28 @@ export const shiftService = {
     return data || [];
   },
 
+  async getShiftsByDate(dateStr) {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const startObj = new Date(year, month - 1, day, 0, 0, 0, 0);
+    const endObj = new Date(year, month - 1, day, 23, 59, 59, 999);
+    const start = startObj.toISOString();
+    const end = endObj.toISOString();
+
+    const { data, error } = await supabase
+      .from(SHIFT_TABLE)
+      .select(`
+        *,
+        profiles:opened_by (full_name),
+        staff_members:opened_by_member (id, full_name, staff_type)
+      `)
+      .gte('start_time', start)
+      .lte('start_time', end)
+      .order('start_time', { ascending: false });
+
+    if (error) throw new Error(error.message);
+    return data || [];
+  },
+
   async getTodayShifts() {
     const now = new Date();
     const startObj = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
