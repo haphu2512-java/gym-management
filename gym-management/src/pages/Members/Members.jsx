@@ -84,8 +84,8 @@ export default function Members() {
       let matchDate = true;
       if (filterDate) {
         const expDate = m.end_date ? m.end_date.split('T')[0] : '';
-        const regDate = m.start_date ? m.start_date.split('T')[0] : '';
-        matchDate = (expDate === filterDate) || (regDate === filterDate);
+        const actDate = (m.last_active_at || m.created_at || '').split('T')[0];
+        matchDate = (expDate === filterDate) || (actDate === filterDate);
       }
 
       let matchStatus = true;

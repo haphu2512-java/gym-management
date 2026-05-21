@@ -36,7 +36,7 @@ export default function MembersTable({
       <table className="modern-table">
         <thead>
           <tr>
-            <th>Ngày gia hạn</th>
+            <th>Ngày hành động</th>
             <th>Mã hội viên</th>
             <th>Ngày hết hạn</th>
             <th>Trạng thái</th>
@@ -61,7 +61,7 @@ export default function MembersTable({
             return (
               <tr key={m.id}>
                 <td>
-                  <p className="cell-main">{formatDate(m.start_date) || 'N/A'}</p>
+                  <p className="cell-main">{formatDate(m.last_active_at || m.created_at) || 'N/A'}</p>
                 </td>
                 <td>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
