@@ -36,7 +36,7 @@ export const memberService = {
     const { data, error } = await supabase
       .from(VIEW_NAME)
       .select('*')
-      .order('start_date', { ascending: false, nullsFirst: false })
+      .order('last_active_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false });
     if (error) throw new Error(error.message);
     return data || [];

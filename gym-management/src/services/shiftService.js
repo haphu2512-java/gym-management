@@ -174,6 +174,28 @@ export const shiftService = {
     return data;
   },
 
+  async deleteShiftNote(shiftId, authId, staffMemberId) {
+    const { data, error } = await supabase
+      .from(SHIFT_TABLE)
+      .update({ note: null })
+      .eq('id', shiftId)
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    await staffLogService.logAction({
+      staffId: authId,
+      staffMemberId: staffMemberId,
+      action: 'Xoa ghi chu ban giao ca',
+      targetItem: data.shift_name,
+      note: 'Xoa ghi chu ban giao',
+      created_at: new Date().toISOString()
+    });
+
+    return data;
+  },
+
   async getShiftSummary(shiftId) {
     // 1. Shift Basic Info
     const { data: shift, error: shiftError } = await supabase
