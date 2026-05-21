@@ -55,7 +55,7 @@ export default function Members() {
 
   const [showRenewModal, setShowRenewModal] = useState(false);
   const [renewingMember, setRenewingMember] = useState(null);
-  const [renewForm, setRenewForm] = useState({ membership_category: 'normal', package_type: '1', fee: '350000', payment_method: 'TM' });
+  const [renewForm, setRenewForm] = useState({ membership_category: 'normal', package_type: '1', fee: '350000', payment_method: 'TM', renew_from: 'today' });
 
   const [activeShift, setActiveShift] = useState(null);
 
@@ -107,11 +107,8 @@ export default function Members() {
         matchStatus = m.payment_method === 'CK' && !m.is_payment_verified;
       }
 
-      if (filterStatus === 'missing_code_7d' && matchStatus) {
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        const regDate = new Date(m.created_at);
-        matchStatus = !m.member_code && regDate <= sevenDaysAgo;
+      if (filterStatus === 'missing_code' && matchStatus) {
+        matchStatus = !m.member_code;
       }
 
       return matchSearch && matchDate && matchStatus;
@@ -335,7 +332,8 @@ export default function Members() {
       membership_category: cat,
       package_type: '1',
       fee: calculateFee(cat, '1') || '',
-      payment_method: 'TM'
+      payment_method: 'TM',
+      renew_from: 'today'
     });
     setError('');
     setShowRenewModal(true);
@@ -366,6 +364,7 @@ export default function Members() {
         paymentMethod: renewForm.payment_method,
         staffId: activeStaff?.id || user?.id,
         shiftId: activeShift.id,
+        renewFrom: renewForm.renew_from,
       });
 
       await staffLogService.logAction({

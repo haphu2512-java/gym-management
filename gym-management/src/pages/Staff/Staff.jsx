@@ -20,6 +20,15 @@ function getMonday(d) {
   return `${year}-${month}-${date}`;
 }
 
+function getNextWeeks(mondayStr, numWeeks) {
+  const date = new Date(mondayStr);
+  date.setDate(date.getDate() + 7 * numWeeks);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const dateDay = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${dateDay}`;
+}
+
 export default function Staff() {
   const { profile } = useAuthStore();
   const { showConfirm, addToast } = useUIStore();
@@ -34,16 +43,25 @@ export default function Staff() {
   const [newStaffName, setNewStaffName] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
 
+  // Range-based salary state variables
+  const [salaryStartWeek, setSalaryStartWeek] = useState(getMonday(new Date()));
+  const [salaryEndWeek, setSalaryEndWeek] = useState(getNextWeeks(getMonday(new Date()), 3)); // default to 4 weeks
+  const [rangeSchedules, setRangeSchedules] = useState([]);
+  const [rangeAdjustmentsData, setRangeAdjustmentsData] = useState([]);
+
+  // Decoupled: top-level weekStart and range selectors are independent.
+
   // Fetch initial data
   const loadData = useCallback(async () => {
     if (profile?.role !== 'admin') return;
     setLoading(true);
     try {
-      const [staffData, configData, scheduleData, adjustmentData] = await Promise.all([
+      const [staffData, configData, scheduleData, rangeSchedData, rangeAdjData] = await Promise.all([
         staffService.getStaffs(),
         staffService.getSalaryConfigs(),
         staffService.getWeeklySchedules(weekStart),
-        staffService.getAllSalaryAdjustments(weekStart)
+        staffService.getWeeklySchedulesRange(salaryStartWeek, salaryEndWeek),
+        staffService.getAllSalaryAdjustmentsRange(salaryStartWeek, salaryEndWeek)
       ]);
 
       setStaffs(staffData);
@@ -56,22 +74,29 @@ export default function Staff() {
       });
       setSchedule(schedMap);
 
-      const adjMap = {};
-      adjustmentData.forEach(a => {
-        adjMap[a.staff_member_id] = {
-          commission: a.commission || 0,
-          shortage: a.shortage || 0,
-          penalty: a.penalty || 0,
-          reason: a.reason || ''
-        };
-      });
-      setAdjustments(adjMap);
+      setRangeSchedules(rangeSchedData);
+      setRangeAdjustmentsData(rangeAdjData);
+
+      // Populate local adjustments state for single-week editing if exactly 1 week is selected
+      const isSingleWeek = salaryStartWeek === salaryEndWeek;
+      if (isSingleWeek) {
+        const adjMap = {};
+        rangeAdjData.forEach(a => {
+          adjMap[a.staff_member_id] = {
+            commission: a.commission || 0,
+            shortage: a.shortage || 0,
+            penalty: a.penalty || 0,
+            reason: a.reason || ''
+          };
+        });
+        setAdjustments(adjMap);
+      }
     } catch (e) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  }, [profile?.role, weekStart]);
+  }, [profile?.role, weekStart, salaryStartWeek, salaryEndWeek]);
 
   useEffect(() => {
     loadData();
@@ -193,7 +218,7 @@ export default function Staff() {
   const updateAdj = async (staffId, field, val) => {
     const numericVal = Number(val) || 0;
     const currentAdj = adjustments[staffId] || {};
-    const updatedAdj = { ...currentAdj, [field]: numericVal };
+    const updatedAdj = { ...currentAdj, [field]: field === 'reason' ? val : numericVal };
 
     try {
       // Optimistic UI update
@@ -208,7 +233,7 @@ export default function Staff() {
         commission: field === 'commission' ? numericVal : (currentAdj.commission || 0),
         shortage: field === 'shortage' ? numericVal : (currentAdj.shortage || 0),
         penalty: field === 'penalty' ? numericVal : (currentAdj.penalty || 0),
-        reason: field === 'others' ? String(val) : (currentAdj.reason || ''),
+        reason: field === 'reason' ? String(val) : String(currentAdj.reason || ''),
         created_by: profile.id
       });
 
@@ -219,42 +244,115 @@ export default function Staff() {
         details: { field, value: val, week: weekStart },
         note: 'Admin nhập hoa hồng, phạt hoặc phụ cấp khác',
       });
+
+      // Fetch fresh range adjustments in background to update calculations
+      const freshAdjData = await staffService.getAllSalaryAdjustmentsRange(salaryStartWeek, salaryEndWeek);
+      setRangeAdjustmentsData(freshAdjData);
     } catch (e) {
       console.error("Lỗi cập nhật phụ cấp:", e.message);
       // Revert on error if needed
     }
   };
 
-  // Calculations
-  const calculations = useMemo(() => {
-    const counts = {};
-    staffs.forEach(s => counts[s.id] = { 'Ca 1': 0, 'Ca 2': 0, 'Ca 3': 0, 'Ca 4': 0, 'Ca 5': 0 });
+  // Single-week calculations based on current weekStart selection (for Table 2 Bảng Chấm Công)
+  const singleWeekCalculations = useMemo(() => {
+    const singleWeekCounts = {};
+    staffs.forEach(s => {
+      singleWeekCounts[s.id] = { 'Ca 1': 0, 'Ca 2': 0, 'Ca 3': 0, 'Ca 4': 0, 'Ca 5': 0 };
+    });
 
     Object.entries(schedule).forEach(([key, staffId]) => {
-      if (!staffId) return;
-      const [shift] = key.split('-');
-      if (counts[staffId] && counts[staffId][shift] !== undefined) {
-        counts[staffId][shift]++;
+      if (staffId && singleWeekCounts[staffId]) {
+        const shift = key.split('-')[0];
+        if (singleWeekCounts[staffId][shift] !== undefined) {
+          singleWeekCounts[staffId][shift]++;
+        }
       }
     });
+
+    return staffs.map(s => {
+      const type = s.staff_type || 'CT';
+      let baseSalary = 0;
+
+      SHIFTS.forEach(shift => {
+        const count = singleWeekCounts[s.id][shift];
+        const config = salaryConfigs.find(c => c.shift_name === shift && c.staff_type === type);
+        baseSalary += count * (config?.rate_per_shift || 0);
+      });
+
+      return {
+        ...s,
+        type,
+        counts: singleWeekCounts[s.id],
+        baseSalary
+      };
+    });
+  }, [staffs, schedule, salaryConfigs]);
+
+  // Calculations aggregated over rangeSchedules and rangeAdjustmentsData (for Table 3 Bảng Kết Lương)
+  const calculations = useMemo(() => {
+    const rangeCounts = {};
+    staffs.forEach(s => rangeCounts[s.id] = { 'Ca 1': 0, 'Ca 2': 0, 'Ca 3': 0, 'Ca 4': 0, 'Ca 5': 0 });
+
+    rangeSchedules.forEach(s => {
+      const staffId = s.staff_member_id;
+      const shift = s.shift_name;
+      if (rangeCounts[staffId] && rangeCounts[staffId][shift] !== undefined) {
+        rangeCounts[staffId][shift]++;
+      }
+    });
+
+    const isSingleWeek = salaryStartWeek === salaryEndWeek;
+    const aggregatedAdjs = {};
+    staffs.forEach(s => {
+      aggregatedAdjs[s.id] = { commission: 0, shortage: 0, penalty: 0, reason: '' };
+    });
+
+    if (isSingleWeek) {
+      // In single-week mode, read from the editable adjustments state
+      staffs.forEach(s => {
+        const localAdj = adjustments[s.id] || { commission: 0, shortage: 0, penalty: 0, reason: '' };
+        aggregatedAdjs[s.id] = {
+          commission: Number(localAdj.commission) || 0,
+          shortage: Number(localAdj.shortage) || 0,
+          penalty: Number(localAdj.penalty) || 0,
+          reason: String(localAdj.reason || '')
+        };
+      });
+    } else {
+      // In multi-week mode, sum up adjustments over the range
+      rangeAdjustmentsData.forEach(a => {
+        const staffId = a.staff_member_id;
+        if (aggregatedAdjs[staffId]) {
+          aggregatedAdjs[staffId].commission += Number(a.commission) || 0;
+          aggregatedAdjs[staffId].shortage += Number(a.shortage) || 0;
+          aggregatedAdjs[staffId].penalty += Number(a.penalty) || 0;
+
+          const otherAmount = Number(a.reason) || 0;
+          const currentOther = Number(aggregatedAdjs[staffId].reason) || 0;
+          aggregatedAdjs[staffId].reason = String(currentOther + otherAmount);
+        }
+      });
+    }
 
     const results = staffs.map(s => {
       const type = s.staff_type || 'CT';
       let baseSalary = 0;
 
       SHIFTS.forEach(shift => {
-        const count = counts[s.id][shift];
+        const count = rangeCounts[s.id][shift];
         const config = salaryConfigs.find(c => c.shift_name === shift && c.staff_type === type);
         baseSalary += count * (config?.rate_per_shift || 0);
       });
 
-      const adj = adjustments[s.id] || { commission: 0, shortage: 0, penalty: 0, reason: '' };
-      const finalSalary = baseSalary + (adj.commission || 0) - (adj.shortage || 0) - (adj.penalty || 0);
+      const adj = aggregatedAdjs[s.id];
+      const otherAmount = Number(adj.reason) || 0;
+      const finalSalary = baseSalary + adj.commission + otherAmount - adj.shortage - adj.penalty;
 
       return {
         ...s,
         type,
-        counts: counts[s.id],
+        counts: rangeCounts[s.id],
         baseSalary,
         adj,
         finalSalary
@@ -262,7 +360,7 @@ export default function Staff() {
     });
 
     return results;
-  }, [staffs, schedule, salaryConfigs, adjustments]);
+  }, [staffs, rangeSchedules, salaryConfigs, salaryStartWeek, salaryEndWeek, adjustments, rangeAdjustmentsData]);
 
   if (profile?.role !== 'admin') {
     return <div className="modern-error">Chỉ admin được truy cập mục quản lý nhân viên.</div>;
@@ -367,6 +465,66 @@ export default function Staff() {
         </table>
       </div>
 
+      {/* Cấu hình khoảng tính lương */}
+      <div className="modern-card" style={{ padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', flexWrap: 'wrap', gap: '15px', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <h4 style={{ margin: 0, color: '#0f172a', fontWeight: 600 }}>Cấu hình Kỳ Tính Lương</h4>
+          <p className="muted-text" style={{ margin: 0, fontSize: '12px', marginTop: '4px' }}>
+            Tính lương gộp từ thứ 2 ngày <strong>{formatDate(salaryStartWeek)}</strong> đến chủ nhật ngày <strong>{formatDate(getNextWeeks(salaryEndWeek, 0))}</strong> (Tổng cộng: <strong>{Math.round((new Date(salaryEndWeek) - new Date(salaryStartWeek)) / (7 * 24 * 60 * 60 * 1000)) + 1} tuần</strong>)
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <label style={{ fontSize: '13px', fontWeight: 600 }}>Từ tuần:</label>
+            <input
+              type="date"
+              value={salaryStartWeek}
+              onChange={(e) => setSalaryStartWeek(getMonday(e.target.value))}
+              style={{ padding: '6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <label style={{ fontSize: '13px', fontWeight: 600 }}>Đến tuần:</label>
+            <input
+              type="date"
+              value={salaryEndWeek}
+              onChange={(e) => setSalaryEndWeek(getMonday(e.target.value))}
+              style={{ padding: '6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              className="ghost-btn"
+              style={{ padding: '6px 12px', fontSize: '12px', background: salaryStartWeek === salaryEndWeek ? '#eff6ff' : '#ffffff', borderColor: salaryStartWeek === salaryEndWeek ? '#3b82f6' : '#cbd5e1', color: salaryStartWeek === salaryEndWeek ? '#2563eb' : '#475569', cursor: 'pointer', borderRadius: '4px' }}
+              onClick={() => {
+                setSalaryStartWeek(weekStart);
+                setSalaryEndWeek(weekStart);
+              }}
+            >
+              Tuần này
+            </button>
+            <button
+              className="ghost-btn"
+              style={{ padding: '6px 12px', fontSize: '12px', background: salaryEndWeek === getNextWeeks(salaryStartWeek, 3) ? '#eff6ff' : '#ffffff', borderColor: salaryEndWeek === getNextWeeks(salaryStartWeek, 3) ? '#3b82f6' : '#cbd5e1', color: salaryEndWeek === getNextWeeks(salaryStartWeek, 3) ? '#2563eb' : '#475569', cursor: 'pointer', borderRadius: '4px' }}
+              onClick={() => {
+                setSalaryEndWeek(getNextWeeks(salaryStartWeek, 3));
+              }}
+            >
+              Tính 4 tuần
+            </button>
+            <button
+              className="ghost-btn"
+              style={{ padding: '6px 12px', fontSize: '12px', background: salaryEndWeek === getNextWeeks(salaryStartWeek, 7) ? '#eff6ff' : '#ffffff', borderColor: salaryEndWeek === getNextWeeks(salaryStartWeek, 7) ? '#3b82f6' : '#cbd5e1', color: salaryEndWeek === getNextWeeks(salaryStartWeek, 7) ? '#2563eb' : '#475569', cursor: 'pointer', borderRadius: '4px' }}
+              onClick={() => {
+                setSalaryEndWeek(getNextWeeks(salaryStartWeek, 7));
+              }}
+            >
+              Tính 8 tuần
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* 2. Rates Config Table */}
       <div className="modern-card" style={{ overflowX: 'auto', padding: '16px' }}>
         <h4 style={{ marginBottom: '16px', color: '#0f172a', fontWeight: 600 }}>2. Bảng Chấm Công & Khai Báo Đơn Giá</h4>
@@ -408,7 +566,7 @@ export default function Staff() {
             </tr>
           </thead>
           <tbody>
-            {calculations.map(calc => (
+            {singleWeekCalculations.map(calc => (
               <tr key={calc.id}>
                 <td style={{ fontWeight: 'bold', borderRight: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px' }}>
                   <span>{calc.full_name}</span>
@@ -442,7 +600,24 @@ export default function Staff() {
 
       {/* 3. Final Salary Table */}
       <div className="modern-card" style={{ overflowX: 'auto', padding: '16px' }}>
-        <h4 style={{ marginBottom: '16px', color: '#0f172a', fontWeight: 600 }}>3. Bảng Kết Lương</h4>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+          <h4 style={{ margin: 0, color: '#0f172a', fontWeight: 600 }}>3. Bảng Kết Lương</h4>
+          {salaryStartWeek !== salaryEndWeek && (
+            <span style={{ fontSize: '12px', color: '#1e293b', background: '#fef3c7', border: '1px solid #fde68a', padding: '4px 10px', borderRadius: '12px', fontWeight: 600 }}>
+              Đang tính gộp {Math.round((new Date(salaryEndWeek) - new Date(salaryStartWeek)) / (7 * 24 * 60 * 60 * 1000)) + 1} tuần: {formatDate(salaryStartWeek)} → {formatDate(salaryEndWeek)}
+            </span>
+          )}
+        </div>
+
+        {salaryStartWeek !== salaryEndWeek && (
+          <div style={{ marginBottom: '16px', background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1e40af', display: 'flex', gap: '8px', alignItems: 'flex-start', padding: '10px 14px', borderRadius: '6px', fontSize: '13px' }}>
+            <span style={{ fontSize: '16px' }}>💡</span>
+            <div>
+              <strong>Chế độ Xem Tổng Hợp (Nhiều tuần):</strong> Phụ cấp, phạt, hoa hồng và khoản khác được tự động cộng dồn và hiển thị ở chế độ chỉ đọc. Để chỉnh sửa/nhập các khoản này, vui lòng chọn khoảng tính lương là <strong>1 tuần duy nhất</strong> (hoặc bấm nút "Tuần này" ở trên).
+            </div>
+          </div>
+        )}
+
         <table className="modern-table" style={{ width: '100%', border: '1px solid #e2e8f0' }}>
           <thead>
             <tr>
@@ -458,10 +633,50 @@ export default function Staff() {
             {calculations.map(calc => (
               <tr key={calc.id}>
                 <td style={{ fontWeight: 'bold', borderRight: '1px solid #e2e8f0' }}>{calc.full_name}</td>
-                <td style={{ borderRight: '1px solid #e2e8f0' }}><input type="number" style={inputStyle} value={calc.adj?.commission || ''} onChange={e => updateAdj(calc.id, 'commission', e.target.value)} placeholder="0" /></td>
-                <td style={{ borderRight: '1px solid #e2e8f0' }}><input type="text" style={inputStyle} value={calc.adj?.reason || ''} onChange={e => updateAdj(calc.id, 'others', e.target.value)} placeholder="..." /></td>
-                <td style={{ borderRight: '1px solid #e2e8f0' }}><input type="number" style={inputStyle} value={calc.adj?.shortage || ''} onChange={e => updateAdj(calc.id, 'shortage', e.target.value)} placeholder="0" /></td>
-                <td style={{ borderRight: '1px solid #e2e8f0' }}><input type="number" style={inputStyle} value={calc.adj?.penalty || ''} onChange={e => updateAdj(calc.id, 'penalty', e.target.value)} placeholder="0" /></td>
+                <td style={{ borderRight: '1px solid #e2e8f0' }}>
+                  <input
+                    type="number"
+                    style={inputStyle}
+                    value={calc.adj?.commission || ''}
+                    onChange={e => updateAdj(calc.id, 'commission', e.target.value)}
+                    placeholder="0"
+                    disabled={salaryStartWeek !== salaryEndWeek}
+                    title={salaryStartWeek !== salaryEndWeek ? "Vui lòng chọn tính lương 1 tuần duy nhất để chỉnh sửa" : ""}
+                  />
+                </td>
+                <td style={{ borderRight: '1px solid #e2e8f0' }}>
+                  <input
+                    type="number"
+                    style={inputStyle}
+                    value={calc.adj?.reason || ''}
+                    onChange={e => updateAdj(calc.id, 'reason', e.target.value)}
+                    placeholder="0"
+                    disabled={salaryStartWeek !== salaryEndWeek}
+                    title={salaryStartWeek !== salaryEndWeek ? "Vui lòng chọn tính lương 1 tuần duy nhất để chỉnh sửa" : ""}
+                  />
+                </td>
+                <td style={{ borderRight: '1px solid #e2e8f0' }}>
+                  <input
+                    type="number"
+                    style={inputStyle}
+                    value={calc.adj?.shortage || ''}
+                    onChange={e => updateAdj(calc.id, 'shortage', e.target.value)}
+                    placeholder="0"
+                    disabled={salaryStartWeek !== salaryEndWeek}
+                    title={salaryStartWeek !== salaryEndWeek ? "Vui lòng chọn tính lương 1 tuần duy nhất để chỉnh sửa" : ""}
+                  />
+                </td>
+                <td style={{ borderRight: '1px solid #e2e8f0' }}>
+                  <input
+                    type="number"
+                    style={inputStyle}
+                    value={calc.adj?.penalty || ''}
+                    onChange={e => updateAdj(calc.id, 'penalty', e.target.value)}
+                    placeholder="0"
+                    disabled={salaryStartWeek !== salaryEndWeek}
+                    title={salaryStartWeek !== salaryEndWeek ? "Vui lòng chọn tính lương 1 tuần duy nhất để chỉnh sửa" : ""}
+                  />
+                </td>
                 <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#16a34a', fontSize: '16px', background: '#f0fdf4' }}>
                   {calc.finalSalary.toLocaleString('vi-VN')}đ
                 </td>
