@@ -160,27 +160,39 @@ export const memberService = {
       if (error) throw new Error(error.message);
     }
 
-    // If any log fields changed, create an UPDATE log entry
+    // If any log fields changed, create an UPDATE log entry if values differ
     if (Object.keys(logUpdates).length > 0) {
       // Get current values to fill the gaps in the log
       const { data: current } = await supabase.from(VIEW_NAME).select('*').eq('id', id).single();
 
-      const { error: logError } = await supabase.from('member_logs').insert([{
-        member_id: id,
-        action: 'UPDATE',
-        package_type: logUpdates.package_type ?? current.package_type,
-        membership_category: logUpdates.membership_category ?? current.membership_category,
-        start_date: logUpdates.start_date ?? current.start_date,
-        end_date: logUpdates.end_date ?? current.end_date,
-        fee: logUpdates.fee ?? current.fee,
-        payment_method: logUpdates.payment_method ?? current.payment_method,
-        is_payment_verified: logUpdates.is_payment_verified ?? current.is_payment_verified,
-        details: { updates: logUpdates },
-        note: 'Cập nhật trạng thái hội viên',
-        created_at: new Date().toISOString()
-      }]);
+      const changedLogUpdates = {};
+      Object.keys(logUpdates).forEach(key => {
+        const currentVal = current[key];
+        const newVal = logUpdates[key];
+        // Check difference, convert both to string to avoid type mismatches (e.g. 1 vs "1")
+        if (currentVal !== newVal && String(currentVal || '') !== String(newVal || '')) {
+          changedLogUpdates[key] = newVal;
+        }
+      });
 
-      if (logError) throw new Error('Lỗi lưu log cập nhật hội viên: ' + logError.message);
+      if (Object.keys(changedLogUpdates).length > 0) {
+        const { error: logError } = await supabase.from('member_logs').insert([{
+          member_id: id,
+          action: 'UPDATE',
+          package_type: logUpdates.package_type ?? current.package_type,
+          membership_category: logUpdates.membership_category ?? current.membership_category,
+          start_date: logUpdates.start_date ?? current.start_date,
+          end_date: logUpdates.end_date ?? current.end_date,
+          fee: logUpdates.fee ?? current.fee,
+          payment_method: logUpdates.payment_method ?? current.payment_method,
+          is_payment_verified: logUpdates.is_payment_verified ?? current.is_payment_verified,
+          details: { updates: changedLogUpdates },
+          note: 'Cập nhật trạng thái hội viên',
+          created_at: new Date().toISOString()
+        }]);
+
+        if (logError) throw new Error('Lỗi lưu log cập nhật hội viên: ' + logError.message);
+      }
     }
 
     const { data, error } = await supabase.from(VIEW_NAME).select().eq('id', id).single();

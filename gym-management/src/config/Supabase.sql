@@ -187,7 +187,13 @@ SELECT
   m.suspended_at, m.remaining_days,
   lp.package_type, lp.membership_category, lp.start_date, lp.end_date, lp.fee, lp.payment_method,
   COALESCE(ls.is_payment_verified, FALSE) as is_payment_verified,
-  lp.created_at as last_active_at
+  (
+    SELECT ml.created_at 
+    FROM member_logs ml 
+    WHERE ml.member_id = m.id AND ml.action IN ('CREATE', 'RENEW') 
+    ORDER BY ml.created_at DESC 
+    LIMIT 1
+  ) as last_active_at
 FROM members m
 LEFT JOIN LatestPackage lp ON m.id = lp.member_id
 LEFT JOIN LatestStatus ls ON m.id = ls.member_id
