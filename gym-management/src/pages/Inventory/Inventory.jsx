@@ -361,7 +361,7 @@ export default function Inventory() {
             .pos-card-modern {
               background: #ffffff;
               border-radius: 16px;
-              padding: 16px;
+              padding: 20px;
               display: flex;
               flex-direction: column;
               gap: 12px;
@@ -416,7 +416,7 @@ export default function Inventory() {
             />
           </div>
 
-          <div className="pos-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: '16px', marginTop: '4px' }}>
+          <div className="pos-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: '32px', marginTop: '4px' }}>
             {products
               .filter(item => item.name.toLowerCase().includes(salesSearchTerm.toLowerCase()))
               .map((item) => {
