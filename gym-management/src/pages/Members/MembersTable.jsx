@@ -37,7 +37,7 @@ export default function MembersTable({
         <thead>
           <tr>
             <th>Ngày hành động</th>
-            <th>Mã hội viên</th>
+            <th>Hội viên</th>
             <th>Ngày hết hạn</th>
             <th>Trạng thái</th>
             {activeTab === 'suspended' && <th>Ngày bảo lưu</th>}
@@ -64,11 +64,12 @@ export default function MembersTable({
                   <p className="cell-main">{formatDate(m.last_active_at || m.created_at) || 'N/A'}</p>
                 </td>
                 <td>
+                  <p className="cell-main">{m.full_name}</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {m.member_code ? (
-                      <p className="cell-main">{m.member_code}</p>
+                      <p className="cell-sub">ID : {m.member_code}</p>
                     ) : (
-                      <p className="cell-main" style={{ color: '#94a3b8', fontStyle: 'italic', fontWeight: 'normal' }}>Chưa có mã</p>
+                      <p className="cell-sub" style={{ color: '#94a3b8', fontStyle: 'italic' }}>Chưa có mã</p>
                     )}
                     {showWarning && (
                       <span 
@@ -91,7 +92,6 @@ export default function MembersTable({
                       </span>
                     )}
                   </div>
-                  <p className="cell-sub">{m.full_name}</p>
                 </td>
                 <td>
                   <p className="cell-main">{formatDate(m.end_date) || 'N/A'}</p>
