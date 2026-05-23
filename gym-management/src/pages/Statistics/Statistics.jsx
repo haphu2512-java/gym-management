@@ -252,10 +252,11 @@ export default function Statistics() {
         <div className="flex-row" style={{ justifyContent: 'space-between', marginBottom: '20px' }}>
           <h4 className="modern-title"><Calendar size={18} /> Thống kê theo đối tượng</h4>
           <div className="flex-row" style={{ gap: '12px' }}>
-            <select className="ghost-btn" value={pivotSubject} onChange={(e) => setPivotSubject(e.target.value)}>
+            <select style={{margin:'10px'}} className="ghost-btn" value={pivotSubject} onChange={(e) => setPivotSubject(e.target.value)}>
               <option value="water">Đối tượng: Nước</option>
               <option value="membership">Đối tượng: Hội viên</option>
             </select>
+            
             <select className="ghost-btn" value={pivotBy} onChange={(e) => setPivotBy(e.target.value)}>
               <option value="date">Nhóm theo: Ngày</option>
               <option value="shift">Nhóm theo: Ca làm</option>
