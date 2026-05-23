@@ -27,6 +27,7 @@ export default function Shifts() {
   const [expenses, setExpenses] = useState([]);
   const [sharedNotes, setSharedNotes] = useState([]);
   const [totalExpense, setTotalExpense] = useState(0);
+  const [latestClosedShift, setLatestClosedShift] = useState(null);
   const [expenseForm, setExpenseForm] = useState(() => {
     const saved = localStorage.getItem('gym_expense_form');
     if (saved) {
@@ -75,6 +76,9 @@ export default function Shifts() {
         shiftsData = await shiftService.getLatestShifts(20);
       }
       setShifts(shiftsData);
+      
+      const latestClosed = await shiftService.getLatestClosedShift();
+      setLatestClosedShift(latestClosed);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -111,10 +115,7 @@ export default function Shifts() {
     [shifts],
   );
 
-  const previousShift = useMemo(
-    () => shifts.find((s) => s.status === 'closed') || null,
-    [shifts]
-  );
+  const previousShift = latestClosedShift;
   const previousEndingCash = previousShift ? Number(previousShift.ending_cash || 0) : 0;
 
   // Tính toán tiền bàn giao khi có ca đang mở

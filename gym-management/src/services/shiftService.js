@@ -64,6 +64,19 @@ export const shiftService = {
     return data || [];
   },
 
+  async getLatestClosedShift() {
+    const { data, error } = await supabase
+      .from(SHIFT_TABLE)
+      .select('*')
+      .eq('status', 'closed')
+      .order('end_time', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    return data;
+  },
+
   async getShiftsByDate(dateStr) {
     const [year, month, day] = dateStr.split('-').map(Number);
     const startObj = new Date(year, month - 1, day, 0, 0, 0, 0);
