@@ -80,7 +80,17 @@ export const memberService = {
       .in('action', ['CREATE', 'RENEW'])
       .order('created_at', { ascending: false });
 
-    if (filters.date) {
+    if (filters.startDate) {
+      const start = new Date(filters.startDate);
+      start.setHours(0, 0, 0, 0);
+      query = query.gte('created_at', start.toISOString());
+    }
+    if (filters.endDate) {
+      const end = new Date(filters.endDate);
+      end.setHours(23, 59, 59, 999);
+      query = query.lte('created_at', end.toISOString());
+    }
+    if (filters.date && !filters.startDate && !filters.endDate) {
       const startOfDay = new Date(filters.date);
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(filters.date);
