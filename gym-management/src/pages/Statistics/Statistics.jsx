@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { PieChart, TrendingUp, Users, Droplets, Calendar, Download, User } from 'lucide-react';
+import { TrendingUp, Users, Droplets, Calendar, Download } from 'lucide-react';
 import { statisticsService } from '../../services/statisticsService';
 import { exportRevenueToExcel } from '../../utils/excelExport';
 
@@ -9,7 +9,6 @@ export default function Statistics() {
   const [customEndDate, setCustomEndDate] = useState('');
   const [detailedStats, setDetailedStats] = useState({ waterSales: [], memberships: [] });
   const [overallStats, setOverallStats] = useState({ waterRevenue: 0, memberRevenue: 0, totalRevenue: 0 });
-  const [packageStats, setPackageStats] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Pivot States
@@ -58,15 +57,13 @@ export default function Statistics() {
           endDate = endDate.toISOString();
         }
 
-        const [detailed, overall, pkg] = await Promise.all([
+        const [detailed, overall] = await Promise.all([
           statisticsService.getDetailedStats({ startDate, endDate }),
-          statisticsService.getOverallStats({ startDate, endDate }),
-          statisticsService.getPackageStats()
+          statisticsService.getOverallStats({ startDate, endDate })
         ]);
 
         setDetailedStats(detailed);
         setOverallStats(overall);
-        setPackageStats(pkg);
       } catch (error) {
         console.error("Error fetching statistics:", error);
       } finally {
@@ -84,8 +81,6 @@ export default function Statistics() {
       combined: overallStats.totalRevenue
     };
   }, [overallStats]);
-
-  const totalMembers = useMemo(() => packageStats.reduce((s, p) => s + p.count, 0), [packageStats]);
 
   const pivotData = useMemo(() => {
     const data = [];
@@ -164,7 +159,6 @@ export default function Statistics() {
             onClick={() => exportRevenueToExcel({
               overallStats,
               detailedStats,
-              packageStats,
               dateRange
             })}
             title="Xuất báo cáo ra file Excel"
@@ -204,48 +198,7 @@ export default function Statistics() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px' }}>
-        {/* Cơ cấu gói tập (Pie Chart style) */}
-        <div className="modern-card">
-          <h4 className="modern-title"><PieChart size={18} /> Cơ cấu gói tập đăng ký</h4>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '30px', marginTop: '20px' }}>
-            <div style={{
-              width: '150px',
-              height: '150px',
-              borderRadius: '50%',
-              background: totalMembers > 0
-                ? (() => {
-                  let cumulative = 0;
-                  const segments = packageStats.map(p => {
-                    const start = cumulative;
-                    const end = start + (p.count / totalMembers) * 100;
-                    cumulative = end;
-                    return `${p.color} ${start}% ${end}%`;
-                  });
-                  return `conic-gradient(${segments.join(', ')})`;
-                })()
-                : '#f1f5f9',
-              position: 'relative'
-            }}>
-              <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '80px', height: '80px', background: '#fff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: '#1e293b', fontSize: '14px', textAlign: 'center' }}>
-                {totalMembers} HV
-              </div>
-            </div>
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {packageStats.map((item, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '12px', height: '12px', background: item.color, borderRadius: '3px' }}></div>
-                    <span style={{ fontSize: '13px', color: '#475569' }}>{item.label}</span>
-                  </div>
-                  <span style={{ fontSize: '13px', fontWeight: 'bold' }}>{item.count} HV</span>
-                </div>
-              ))}
-              {packageStats.length === 0 && <p className="muted-text">Chưa có dữ liệu gói tập</p>}
-            </div>
-          </div>
-        </div>
-      </div>
+
 
       {/* Pivot Statistics Section */}
       <div className="modern-card">
