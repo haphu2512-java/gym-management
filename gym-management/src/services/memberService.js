@@ -208,6 +208,8 @@ export const memberService = {
     const staffId = renewalData.staffId || null;
     const shiftId = renewalData.shiftId || null;
     const renewFrom = renewalData.renewFrom || 'today';
+    const customRenewDate = renewalData.customRenewDate || null;
+    const note = renewalData.note || '';
 
     const { data: member, error: memberError } = await supabase
       .from(VIEW_NAME)
@@ -225,7 +227,7 @@ export const memberService = {
     let renewalStart;
     if (isExpired) {
       if (renewFrom === 'expired') {
-        renewalStart = currentEnd || todayStr;
+        renewalStart = customRenewDate || currentEnd || todayStr;
       } else {
         renewalStart = todayStr;
       }
@@ -236,6 +238,8 @@ export const memberService = {
     const allowPastEnd = renewFrom === 'expired';
     await validateMemberDates(renewalStart, packageType, allowPastEnd);
 
+    const createdAt = new Date().toISOString();
+
     const { data: result, error: rpcError } = await supabase.rpc('renew_member_transaction', {
       p_member_id: memberId,
       p_package_type: packageType,
@@ -245,12 +249,25 @@ export const memberService = {
       p_shift_id: shiftId,
       p_staff_id: staffId,
       p_start_date: renewalStart,
-      p_created_at: new Date().toISOString()
+      p_created_at: createdAt
     });
 
     if (rpcError) throw new Error('Gia hạn thất bại: ' + rpcError.message);
     if (result?.success === false) {
       throw new Error(result.error || 'Gia hạn thất bại');
+    }
+
+    // Lưu ghi chú nếu có
+    if (note && result.payment_id) {
+      try {
+        await Promise.all([
+          supabase.from('payment_logs').update({ note }).eq('id', result.payment_id),
+          supabase.from('members').update({ note }).eq('id', memberId),
+          supabase.from('member_logs').update({ note }).eq('member_id', memberId).eq('action', 'RENEW').eq('created_at', createdAt)
+        ]);
+      } catch (err) {
+        console.error("Lỗi lưu ghi chú gia hạn:", err);
+      }
     }
 
     return { member: result.member || result, payment: { id: result.payment_id } };
