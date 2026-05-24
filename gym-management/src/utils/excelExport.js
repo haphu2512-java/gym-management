@@ -54,7 +54,7 @@ export function exportMembersToExcel(members) {
 // =============================================
 // 2. Xuất Báo Cáo Doanh Thu
 // =============================================
-export function exportRevenueToExcel({ overallStats, detailedStats, packageStats, dateRange }) {
+export function exportRevenueToExcel({ overallStats, detailedStats, dateRange }) {
   const wb = XLSX.utils.book_new();
 
   // --- Sheet 1: Tổng quan ---
@@ -98,17 +98,7 @@ export function exportRevenueToExcel({ overallStats, detailedStats, packageStats
     XLSX.utils.book_append_sheet(wb, wsWater, 'Chi tiết nước');
   }
 
-  // --- Sheet 4: Cơ cấu gói tập ---
-  if (packageStats?.length > 0) {
-    const pkgRows = packageStats.map((p, idx) => ({
-      'STT': idx + 1,
-      'Gói tập': p.label || '',
-      'Số hội viên': p.count || 0,
-    }));
-    const wsPkg = XLSX.utils.json_to_sheet(pkgRows);
-    wsPkg['!cols'] = [{ wch: 5 }, { wch: 20 }, { wch: 14 }];
-    XLSX.utils.book_append_sheet(wb, wsPkg, 'Cơ cấu gói tập');
-  }
+
 
   const today = new Date().toLocaleDateString('vi-VN').replace(/\//g, '-');
   const rangeLabel = dateRange === 'today' ? 'HomNay' : dateRange === 'week' ? 'TuanNay' : dateRange === 'month' ? 'ThangNay' : 'TuyChon';

@@ -6,7 +6,7 @@ import { productService } from '../../services/productService';
 import { shiftService } from '../../services/shiftService';
 import { paymentService } from '../../services/paymentService';
 import { additionalService } from '../../services/additionalService';
-import { formatDate } from '../../utils/formatters';
+import { formatDate, formatMemberCode } from '../../utils/formatters';
 
 function getMemberStatus(endDate) {
   if (!endDate) return 'Expired';
@@ -25,6 +25,12 @@ export default function Dashboard() {
   const [activeShift, setActiveShift] = useState(null);
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
   const [loadingRecent, setLoadingRecent] = useState(false);
+
+  // States for Date Range Excel Export
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportStartDate, setExportStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [exportEndDate, setExportEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [exportLoading, setExportLoading] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -142,34 +148,91 @@ export default function Dashboard() {
     return { activeCount, expiredCount, memberRevenue, pendingCkCount, expiringSoon, lowStock, missingCodeCount };
   }, [members, membershipRevenue, products]);
 
-  const exportToExcel = () => {
-    if (recentMembers.length === 0) {
-      alert('Không có dữ liệu để xuất!');
+  const handleExportRange = async () => {
+    if (!exportStartDate || !exportEndDate) {
+      alert('Vui lòng chọn đầy đủ ngày bắt đầu và ngày kết thúc!');
       return;
     }
 
-    const exportData = recentMembers.map(m => ({
-      'Ngày': formatDate(m.last_active_at || m.created_at),
-      'Tên': m.full_name,
-      'Gói': m.package_type ? `${m.package_type} tháng` : '',
-      'Hết hạn': formatDate(m.end_date) || '',
-      'Số tiền': Number(m.fee || 0),
-      'Mã HV': m.member_code || '',
-      'Ghi chú': m.note || '',
-      'Thanh toán': m.payment_method || ''
-    }));
+    if (new Date(exportStartDate) > new Date(exportEndDate)) {
+      alert('Ngày bắt đầu không được lớn hơn ngày kết thúc!');
+      return;
+    }
 
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'DangKy_GiaHan');
+    setExportLoading(true);
+    try {
+      const [membersRes, servicesRes] = await Promise.all([
+        memberService.getRecentTransactions(null, { startDate: exportStartDate, endDate: exportEndDate }),
+        additionalService.getFilteredServiceLogs({ startDate: exportStartDate, endDate: exportEndDate })
+      ]);
 
-    const colWidths = [
-      { wch: 12 }, { wch: 25 }, { wch: 10 }, { wch: 12 },
-      { wch: 15 }, { wch: 10 }, { wch: 30 }, { wch: 12 }
-    ];
-    worksheet['!cols'] = colWidths;
+      const groupedServices = {};
+      (servicesRes || []).forEach(s => {
+        const serviceName = s.services?.name || 'Dịch vụ lẻ';
+        const key = `${serviceName}_${s.payment_method}`;
+        if (!groupedServices[key]) {
+          groupedServices[key] = {
+            id: `svc-${s.id}`,
+            last_active_at: s.sold_at,
+            full_name: serviceName,
+            package_type: '',
+            end_date: '',
+            fee: 0,
+            quantity: 0,
+            member_code: '',
+            payment_method: s.payment_method,
+            is_payment_verified: true,
+          };
+        }
+        groupedServices[key].fee += Number(s.total_price || 0);
+        groupedServices[key].quantity += Number(s.quantity || 1);
+      });
 
-    XLSX.writeFile(workbook, `Danh_Sach_Dang_Ky_${filterDate || 'All'}.xlsx`);
+      const mappedServices = Object.values(groupedServices).map(s => ({
+        ...s,
+        note: `Số lượng: ${s.quantity}`
+      }));
+
+      const combined = [...(membersRes || []), ...mappedServices].sort((a, b) => {
+        const dateA = new Date(a.last_active_at || a.created_at || 0);
+        const dateB = new Date(b.last_active_at || b.created_at || 0);
+        return dateB - dateA;
+      });
+
+      if (combined.length === 0) {
+        alert('Không có dữ liệu trong khoảng thời gian đã chọn!');
+        return;
+      }
+
+      const exportData = combined.map(m => ({
+        'Ngày': formatDate(m.last_active_at || m.created_at),
+        'Tên': m.full_name,
+        'Gói': m.package_type ? `${m.package_type} tháng` : '',
+        'Hết hạn': formatDate(m.end_date) || '',
+        'Số tiền': Number(m.fee || 0),
+        'Mã HV': formatMemberCode(m.member_code) || '',
+        'Ghi chú': m.note || '',
+        'Thanh toán': m.payment_method || ''
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'DangKy_GiaHan');
+
+      const colWidths = [
+        { wch: 12 }, { wch: 25 }, { wch: 10 }, { wch: 12 },
+        { wch: 15 }, { wch: 10 }, { wch: 30 }, { wch: 12 }
+      ];
+      worksheet['!cols'] = colWidths;
+
+      XLSX.writeFile(workbook, `Danh_Sach_Dang_Ky_${exportStartDate}_den_${exportEndDate}.xlsx`);
+      setShowExportModal(false);
+    } catch (err) {
+      console.error("Error exporting excel range", err);
+      alert("Đã xảy ra lỗi khi truy vấn và xuất Excel!");
+    } finally {
+      setExportLoading(false);
+    }
   };
 
   return (
@@ -274,8 +337,8 @@ export default function Dashboard() {
               type="button"
               className="primary-btn"
               style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '13px', background: '#10b981' }}
-              onClick={exportToExcel}
-              disabled={loadingRecent || recentMembers.length === 0}
+              onClick={() => setShowExportModal(true)}
+              disabled={loadingRecent}
             >
               <Download size={16} /> Xuất Excel
             </button>
@@ -310,7 +373,7 @@ export default function Dashboard() {
                     <td style={{ fontWeight: '600', color: '#16a34a' }}>
                       {Number(m.fee || 0).toLocaleString('vi-VN')}đ
                     </td>
-                    <td>{m.member_code}</td>
+                    <td>{formatMemberCode(m.member_code)}</td>
                     <td style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={m.note}>
                       {m.note}
                     </td>
@@ -332,6 +395,56 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {showExportModal && (
+        <div className="modal-backdrop" onClick={() => setShowExportModal(false)} style={{ zIndex: 1000 }}>
+          <div className="modal-panel" style={{ maxWidth: '400px' }} onClick={(e) => e.stopPropagation()}>
+            <h3 className="modern-title" style={{ marginBottom: '16px' }}>Xuất Báo Cáo Excel</h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', color: '#475569', marginBottom: '6px', fontWeight: '500' }}>Từ ngày</label>
+                <input
+                  type="date"
+                  className="modern-input"
+                  value={exportStartDate}
+                  onChange={(e) => setExportStartDate(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', color: '#475569', marginBottom: '6px', fontWeight: '500' }}>Đến ngày</label>
+                <input
+                  type="date"
+                  className="modern-input"
+                  value={exportEndDate}
+                  onChange={(e) => setExportEndDate(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="modal-actions" style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                className="ghost-btn"
+                onClick={() => setShowExportModal(false)}
+                disabled={exportLoading}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="primary-btn"
+                style={{ background: '#10b981' }}
+                onClick={handleExportRange}
+                disabled={exportLoading}
+              >
+                {exportLoading ? 'Đang xử lý...' : 'Xuất Excel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -85,7 +85,17 @@ export const additionalService = {
       `)
       .order('sold_at', { ascending: false });
 
-    if (filters.date) {
+    if (filters.startDate) {
+      const start = new Date(filters.startDate);
+      start.setHours(0, 0, 0, 0);
+      query = query.gte('sold_at', start.toISOString());
+    }
+    if (filters.endDate) {
+      const end = new Date(filters.endDate);
+      end.setHours(23, 59, 59, 999);
+      query = query.lte('sold_at', end.toISOString());
+    }
+    if (filters.date && !filters.startDate && !filters.endDate) {
       const startOfDay = new Date(filters.date);
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(filters.date);
@@ -102,7 +112,10 @@ export const additionalService = {
       query = query.eq('payment_method', filters.paymentMethod);
     }
     
-    query = query.limit(200);
+    const lim = filters.limit !== undefined ? filters.limit : (filters.startDate || filters.endDate ? null : 200);
+    if (lim) {
+      query = query.limit(lim);
+    }
 
     const { data, error } = await query;
     if (error) throw new Error(error.message);
