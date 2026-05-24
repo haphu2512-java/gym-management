@@ -9,7 +9,7 @@ import { additionalService } from '../../services/additionalService';
 import { expenseService } from '../../services/expenseService';
 import { staffLogService } from '../../services/staffLogService';
 import { shiftNoteService } from '../../services/shiftNoteService';
-import { formatDateTime, getLocalISODate } from '../../utils/formatters';
+import { formatDateTime, getLocalISODate, formatMemberCode } from '../../utils/formatters';
 import { deviceSecurity } from '../../utils/deviceSecurity';
 
 export default function Shifts() {
@@ -695,7 +695,7 @@ export default function Shifts() {
                       )}
                       {selectedShiftSummary.payments.map(p => (
                         <tr key={p.id}>
-                          <td>{p.members?.member_code} - {p.members?.full_name}</td>
+                          <td>{formatMemberCode(p.members?.member_code)} - {p.members?.full_name}</td>
                           <td>{Number(p.amount).toLocaleString()}đ</td>
                           <td>{p.payment_method}</td>
                         </tr>

@@ -313,17 +313,35 @@ export const memberService = {
   },
 
   async deleteMember(id) {
-    const { data: member } = await supabase.from(TABLE_NAME).select('member_code').eq('id', id).single();
+    const { data: member } = await supabase.from(TABLE_NAME).select('member_code, created_at').eq('id', id).single();
     if (member) {
+      const now = new Date();
+      const created = new Date(member.created_at);
+      const isWithinOneWeek = (now - created) <= 7 * 24 * 60 * 60 * 1000;
+
       const newCode = `${member.member_code}_del_${Date.now()}`;
       const { error } = await supabase
         .from(TABLE_NAME)
         .update({
-          deleted_at: new Date().toISOString(),
+          deleted_at: now.toISOString(),
           member_code: newCode
         })
         .eq('id', id);
       if (error) throw new Error(error.message);
+
+      if (isWithinOneWeek) {
+        const { error: paymentError } = await supabase
+          .from('payment_logs')
+          .update({ amount: 0 })
+          .eq('member_id', id);
+        if (paymentError) throw new Error(paymentError.message);
+
+        const { error: logError } = await supabase
+          .from('member_logs')
+          .update({ fee: 0 })
+          .eq('member_id', id);
+        if (logError) throw new Error(logError.message);
+      }
     }
   },
 

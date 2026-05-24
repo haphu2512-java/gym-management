@@ -95,3 +95,11 @@ export const addMonths = (dateInput, months) => {
   d.setMonth(d.getMonth() + Number(months || 1));
   return d;
 };
+
+// Format member code (show "Đã xóa" if the code contains "_del_")
+export const formatMemberCode = (code) => {
+  if (!code) return '';
+  if (code.includes('_del_')) return 'Đã xóa';
+  return code;
+};
+

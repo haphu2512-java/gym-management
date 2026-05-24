@@ -6,7 +6,7 @@ import { productService } from '../../services/productService';
 import { shiftService } from '../../services/shiftService';
 import { paymentService } from '../../services/paymentService';
 import { additionalService } from '../../services/additionalService';
-import { formatDate } from '../../utils/formatters';
+import { formatDate, formatMemberCode } from '../../utils/formatters';
 
 function getMemberStatus(endDate) {
   if (!endDate) return 'Expired';
@@ -210,7 +210,7 @@ export default function Dashboard() {
         'Gói': m.package_type ? `${m.package_type} tháng` : '',
         'Hết hạn': formatDate(m.end_date) || '',
         'Số tiền': Number(m.fee || 0),
-        'Mã HV': m.member_code || '',
+        'Mã HV': formatMemberCode(m.member_code) || '',
         'Ghi chú': m.note || '',
         'Thanh toán': m.payment_method || ''
       }));
@@ -373,7 +373,7 @@ export default function Dashboard() {
                     <td style={{ fontWeight: '600', color: '#16a34a' }}>
                       {Number(m.fee || 0).toLocaleString('vi-VN')}đ
                     </td>
-                    <td>{m.member_code}</td>
+                    <td>{formatMemberCode(m.member_code)}</td>
                     <td style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={m.note}>
                       {m.note}
                     </td>
