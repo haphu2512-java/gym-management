@@ -16,9 +16,34 @@ export default function Shifts() {
   const { user, profile, activeStaff, setActiveStaff } = useAuthStore();
   const [staffMembers, setStaffMembers] = useState([]);
   const [shifts, setShifts] = useState([]);
+
+  // Tìm bất kỳ ca nào đang mở (không lọc theo tên dropdown)
+  const activeShift = useMemo(
+    () => shifts.find((s) => s.status === 'open') || null,
+    [shifts],
+  );
   const [skipTimeCheck, setSkipTimeCheck] = useState(false);
   const [loading, setLoading] = useState(false);
   const [shiftFilterDate, setShiftFilterDate] = useState(getLocalISODate());
+
+  const [weeklySchedules, setWeeklySchedules] = useState([]);
+  const [isStaffManuallySelected, setIsStaffManuallySelected] = useState(false);
+
+  const todayDayIndex = useMemo(() => {
+    const day = new Date().getDay();
+    return day === 0 ? 6 : day - 1; // 0 = Mon, 6 = Sun
+  }, []);
+
+  const currentWeekStart = useMemo(() => {
+    const d = new Date();
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(d.setDate(diff));
+    const year = monday.getFullYear();
+    const month = String(monday.getMonth() + 1).padStart(2, '0');
+    const dateDay = String(monday.getDate()).padStart(2, '0');
+    return `${year}-${month}-${dateDay}`;
+  }, []);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('shift');
   const [isTrusted, setIsTrusted] = useState(deviceSecurity.isDeviceTrusted());
@@ -79,6 +104,52 @@ export default function Shifts() {
       
       const latestClosed = await shiftService.getLatestClosedShift();
       setLatestClosedShift(latestClosed);
+
+      // Gợi ý ca làm dựa trên thời gian thực hoặc ca chốt gần nhất
+      const active = shiftsData.find((s) => s.status === 'open') || null;
+      if (!active) {
+        const shiftOrder = ['Ca 1', 'Ca 2', 'Ca 3', 'Ca 4', 'Ca 5'];
+        
+        // Lấy tất cả các ca đã chốt trong ngày hôm nay
+        const todayStr = getLocalISODate();
+        const todayShifts = shiftsData.filter(s => s.start_time && s.start_time.startsWith(todayStr));
+        const closedShiftNames = new Set(
+          todayShifts
+            .filter(s => s.status === 'closed')
+            .map(s => s.shift_name)
+        );
+
+        // Gợi ý ca theo giờ thực tế
+        const hour = new Date().getHours();
+        let suggested = 'Ca 5';
+        if (hour >= 5 && hour < 8) suggested = 'Ca 1';
+        else if (hour >= 8 && hour < 11) suggested = 'Ca 2';
+        else if (hour >= 11 && hour < 16) suggested = 'Ca 3';
+        else if (hour >= 16 && hour < 19) suggested = 'Ca 4';
+
+        // Nếu ca gợi ý theo giờ đã bị chốt, tìm ca kế tiếp chưa chốt
+        if (closedShiftNames.has(suggested)) {
+          const startIndex = shiftOrder.indexOf(suggested);
+          let foundNext = false;
+          for (let i = startIndex + 1; i < shiftOrder.length; i++) {
+            if (!closedShiftNames.has(shiftOrder[i])) {
+              suggested = shiftOrder[i];
+              foundNext = true;
+              break;
+            }
+          }
+          if (!foundNext) {
+            for (let i = 0; i < startIndex; i++) {
+              if (!closedShiftNames.has(shiftOrder[i])) {
+                suggested = shiftOrder[i];
+                break;
+              }
+            }
+          }
+        }
+
+        setForm(prev => ({ ...prev, shift_name: suggested }));
+      }
     } catch (e) {
       setError(e.message);
     } finally {
@@ -109,11 +180,31 @@ export default function Shifts() {
     staffService.getStaffMembers().then(setStaffMembers).catch(console.error);
   }, []);
 
-  // Tìm bất kỳ ca nào đang mở (không lọc theo tên dropdown)
-  const activeShift = useMemo(
-    () => shifts.find((s) => s.status === 'open') || null,
-    [shifts],
-  );
+  useEffect(() => {
+    // Tải lịch xếp ca tuần cho tuần hiện tại
+    staffService.getWeeklySchedules(currentWeekStart)
+      .then(setWeeklySchedules)
+      .catch(console.error);
+  }, [currentWeekStart]);
+
+  // Tự động gợi ý nhân viên trực theo lịch xếp ca tuần
+  useEffect(() => {
+    if (!activeShift && form.shift_name && weeklySchedules.length > 0 && staffMembers.length > 0 && !isStaffManuallySelected) {
+      const match = weeklySchedules.find(
+        (s) => s.shift_name === form.shift_name && s.day_of_week === todayDayIndex
+      );
+      if (match && match.staff_member_id) {
+        const scheduledStaff = staffMembers.find((sm) => sm.id === match.staff_member_id);
+        if (scheduledStaff) {
+          setActiveStaff(scheduledStaff);
+        }
+      } else {
+        setActiveStaff(null);
+      }
+    }
+  }, [form.shift_name, weeklySchedules, staffMembers, activeShift, todayDayIndex, isStaffManuallySelected, setActiveStaff]);
+
+
 
   const previousShift = latestClosedShift;
   const previousEndingCash = previousShift ? Number(previousShift.ending_cash || 0) : 0;
@@ -164,6 +255,7 @@ export default function Shifts() {
       setSuggestedEndingCash(0);
       setTotalExpense(0);
       setExpenses([]);
+      setIsStaffManuallySelected(false);
     }
   }, [activeShift, activeStaff, setActiveStaff]);
 
@@ -332,6 +424,7 @@ export default function Shifts() {
                       onChange={(e) => {
                         const found = staffMembers.find(s => s.id === e.target.value);
                         setActiveStaff(found || null);
+                        setIsStaffManuallySelected(true);
                       }}
                       required
                     >
@@ -343,7 +436,14 @@ export default function Shifts() {
                   )}
 
                   <label className="field-label">Chọn ca làm</label>
-                  <select value={form.shift_name} onChange={(e) => setForm({ ...form, shift_name: e.target.value })} disabled={!!activeShift}>
+                  <select 
+                    value={form.shift_name} 
+                    onChange={(e) => {
+                      setForm(prev => ({ ...prev, shift_name: e.target.value }));
+                      setIsStaffManuallySelected(false);
+                    }} 
+                    disabled={!!activeShift}
+                  >
                     {shiftService.shiftOptions.map((item) => (
                       <option key={item} value={item}>{item}</option>
                     ))}
