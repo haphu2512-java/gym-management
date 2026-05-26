@@ -84,8 +84,8 @@ export default function Members() {
       let matchDate = true;
       if (filterDate) {
         const expDate = m.end_date ? m.end_date.split('T')[0] : '';
-        const regDate = m.start_date ? m.start_date.split('T')[0] : '';
-        matchDate = (expDate === filterDate) || (regDate === filterDate);
+        const actDate = (m.last_active_at || m.created_at || '').split('T')[0];
+        matchDate = (expDate === filterDate) || (actDate === filterDate);
       }
 
       let matchStatus = true;
@@ -333,7 +333,9 @@ export default function Members() {
       package_type: '1',
       fee: calculateFee(cat, '1') || '',
       payment_method: 'TM',
-      renew_from: 'today'
+      renew_from: 'today',
+      custom_renew_date: member.end_date ? new Date(member.end_date).toISOString().slice(0, 10) : getLocalISODate(),
+      note: ''
     });
     setError('');
     setShowRenewModal(true);
@@ -365,6 +367,8 @@ export default function Members() {
         staffId: activeStaff?.id || user?.id,
         shiftId: activeShift.id,
         renewFrom: renewForm.renew_from,
+        customRenewDate: renewForm.custom_renew_date,
+        note: renewForm.note,
       });
 
       await staffLogService.logAction({
@@ -375,9 +379,10 @@ export default function Members() {
         details: { 
           member_id: renewingMember.id, 
           package: packageType, 
-          fee: Number(renewForm.fee || 0) 
+          fee: Number(renewForm.fee || 0),
+          note: renewForm.note
         },
-        note: 'Admin/Staff thực hiện gia hạn học phí',
+        note: renewForm.note || 'Admin/Staff thực hiện gia hạn học phí',
       });
 
       // Làm mới danh sách để cập nhật ngày hết hạn mới

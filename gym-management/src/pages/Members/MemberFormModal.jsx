@@ -39,11 +39,11 @@ export default function MemberFormModal({
             <form className="modern-form" onSubmit={onSubmit}>
               <div className="form-grid-2">
                 <div>
-                  <label className="cell-sub">Mã HV</label>
+                  <label className="cell-sub">Mã HV (Không bắt buộc)</label>
                   <input
                     value={form.member_code}
                     onChange={(e) => onFormChange('member_code', e.target.value)}
-                    placeholder="Mã hội viên (Không bắt buộc)"
+                    placeholder="Mã hội viên"
                   />
                 </div>
                 <div>

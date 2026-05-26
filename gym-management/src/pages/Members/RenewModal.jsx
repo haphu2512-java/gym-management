@@ -85,18 +85,59 @@ export default function RenewModal({
                   />
                   Gia hạn từ ngày gia hạn (Hôm nay: {formatDate(todayStr)})
                 </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer', fontWeight: '500', color: '#334155' }}>
-                  <input
-                    type="checkbox"
-                    checked={renewForm.renew_from === 'expired'}
-                    onChange={() => onFormChange('renew_from', 'expired')}
-                    style={{ width: '16px', height: '16px', accentColor: '#2563eb', cursor: 'pointer' }}
-                  />
-                  Gia hạn từ ngày hết hạn (Ngày hết hạn: {formatDate(member.end_date)})
-                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer', fontWeight: '500', color: '#334155' }}>
+                    <input
+                      type="checkbox"
+                      checked={renewForm.renew_from === 'expired'}
+                      onChange={() => onFormChange('renew_from', 'expired')}
+                      style={{ width: '16px', height: '16px', accentColor: '#2563eb', cursor: 'pointer' }}
+                    />
+                    Gia hạn từ ngày hết hạn (Ngày hết hạn: {formatDate(member.end_date)})
+                  </label>
+                  {renewForm.renew_from === 'expired' && (
+                    <div style={{ marginLeft: '24px', marginTop: '2px' }}>
+                      <label className="cell-sub" style={{ fontSize: '12px', display: 'block', marginBottom: '4px' }}>Bắt đầu từ ngày:</label>
+                      <input
+                        type="date"
+                        value={renewForm.custom_renew_date || ''}
+                        onChange={(e) => onFormChange('custom_renew_date', e.target.value)}
+                        style={{
+                          padding: '6px 10px',
+                          borderRadius: '6px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '13px',
+                          outline: 'none',
+                          width: '100%',
+                          maxWidth: '200px'
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
+
+          <div style={{ marginTop: '12px' }}>
+            <label className="cell-sub">Ghi chú gia hạn</label>
+            <br></br> <br></br>
+            <textarea
+              rows={2}
+              value={renewForm.note || ''}
+              onChange={(e) => onFormChange('note', e.target.value)}
+              placeholder="Nhập ghi chú gia hạn nếu có...  (Sales hoặc +7days...)"
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                border: '1px solid #cbd5e1',
+                fontSize: '13px',
+                outline: 'none',
+                resize: 'vertical'
+              }}
+            />
+          </div>
 
           <div className="modal-actions" style={{ marginTop: '16px' }}>
             <button type="button" className="ghost-btn" onClick={onCancel}>Hủy</button>

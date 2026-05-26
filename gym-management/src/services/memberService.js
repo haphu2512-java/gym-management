@@ -36,8 +36,8 @@ export const memberService = {
     const { data, error } = await supabase
       .from(VIEW_NAME)
       .select('*')
-      .order('start_date', { ascending: false, nullsFirst: false })
-      .order('last_active_at', { ascending: false });
+      .order('last_active_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false });
     if (error) throw new Error(error.message);
     return data || [];
   },
@@ -80,7 +80,17 @@ export const memberService = {
       .in('action', ['CREATE', 'RENEW'])
       .order('created_at', { ascending: false });
 
-    if (filters.date) {
+    if (filters.startDate) {
+      const start = new Date(filters.startDate);
+      start.setHours(0, 0, 0, 0);
+      query = query.gte('created_at', start.toISOString());
+    }
+    if (filters.endDate) {
+      const end = new Date(filters.endDate);
+      end.setHours(23, 59, 59, 999);
+      query = query.lte('created_at', end.toISOString());
+    }
+    if (filters.date && !filters.startDate && !filters.endDate) {
       const startOfDay = new Date(filters.date);
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(filters.date);
@@ -160,27 +170,39 @@ export const memberService = {
       if (error) throw new Error(error.message);
     }
 
-    // If any log fields changed, create an UPDATE log entry
+    // If any log fields changed, create an UPDATE log entry if values differ
     if (Object.keys(logUpdates).length > 0) {
       // Get current values to fill the gaps in the log
       const { data: current } = await supabase.from(VIEW_NAME).select('*').eq('id', id).single();
 
-      const { error: logError } = await supabase.from('member_logs').insert([{
-        member_id: id,
-        action: 'UPDATE',
-        package_type: logUpdates.package_type ?? current.package_type,
-        membership_category: logUpdates.membership_category ?? current.membership_category,
-        start_date: logUpdates.start_date ?? current.start_date,
-        end_date: logUpdates.end_date ?? current.end_date,
-        fee: logUpdates.fee ?? current.fee,
-        payment_method: logUpdates.payment_method ?? current.payment_method,
-        is_payment_verified: logUpdates.is_payment_verified ?? current.is_payment_verified,
-        details: { updates: logUpdates },
-        note: 'Cập nhật trạng thái hội viên',
-        created_at: new Date().toISOString()
-      }]);
+      const changedLogUpdates = {};
+      Object.keys(logUpdates).forEach(key => {
+        const currentVal = current[key];
+        const newVal = logUpdates[key];
+        // Check difference, convert both to string to avoid type mismatches (e.g. 1 vs "1")
+        if (currentVal !== newVal && String(currentVal || '') !== String(newVal || '')) {
+          changedLogUpdates[key] = newVal;
+        }
+      });
 
-      if (logError) throw new Error('Lỗi lưu log cập nhật hội viên: ' + logError.message);
+      if (Object.keys(changedLogUpdates).length > 0) {
+        const { error: logError } = await supabase.from('member_logs').insert([{
+          member_id: id,
+          action: 'UPDATE',
+          package_type: logUpdates.package_type ?? current.package_type,
+          membership_category: logUpdates.membership_category ?? current.membership_category,
+          start_date: logUpdates.start_date ?? current.start_date,
+          end_date: logUpdates.end_date ?? current.end_date,
+          fee: logUpdates.fee ?? current.fee,
+          payment_method: logUpdates.payment_method ?? current.payment_method,
+          is_payment_verified: logUpdates.is_payment_verified ?? current.is_payment_verified,
+          details: { updates: changedLogUpdates },
+          note: 'Cập nhật trạng thái hội viên',
+          created_at: new Date().toISOString()
+        }]);
+
+        if (logError) throw new Error('Lỗi lưu log cập nhật hội viên: ' + logError.message);
+      }
     }
 
     const { data, error } = await supabase.from(VIEW_NAME).select().eq('id', id).single();
@@ -196,6 +218,8 @@ export const memberService = {
     const staffId = renewalData.staffId || null;
     const shiftId = renewalData.shiftId || null;
     const renewFrom = renewalData.renewFrom || 'today';
+    const customRenewDate = renewalData.customRenewDate || null;
+    const note = renewalData.note || '';
 
     const { data: member, error: memberError } = await supabase
       .from(VIEW_NAME)
@@ -213,7 +237,7 @@ export const memberService = {
     let renewalStart;
     if (isExpired) {
       if (renewFrom === 'expired') {
-        renewalStart = currentEnd || todayStr;
+        renewalStart = customRenewDate || currentEnd || todayStr;
       } else {
         renewalStart = todayStr;
       }
@@ -224,6 +248,8 @@ export const memberService = {
     const allowPastEnd = renewFrom === 'expired';
     await validateMemberDates(renewalStart, packageType, allowPastEnd);
 
+    const createdAt = new Date().toISOString();
+
     const { data: result, error: rpcError } = await supabase.rpc('renew_member_transaction', {
       p_member_id: memberId,
       p_package_type: packageType,
@@ -233,12 +259,25 @@ export const memberService = {
       p_shift_id: shiftId,
       p_staff_id: staffId,
       p_start_date: renewalStart,
-      p_created_at: new Date().toISOString()
+      p_created_at: createdAt
     });
 
     if (rpcError) throw new Error('Gia hạn thất bại: ' + rpcError.message);
     if (result?.success === false) {
       throw new Error(result.error || 'Gia hạn thất bại');
+    }
+
+    // Lưu ghi chú nếu có
+    if (note && result.payment_id) {
+      try {
+        await Promise.all([
+          supabase.from('payment_logs').update({ note }).eq('id', result.payment_id),
+          supabase.from('members').update({ note }).eq('id', memberId),
+          supabase.from('member_logs').update({ note }).eq('member_id', memberId).eq('action', 'RENEW').eq('created_at', createdAt)
+        ]);
+      } catch (err) {
+        console.error("Lỗi lưu ghi chú gia hạn:", err);
+      }
     }
 
     return { member: result.member || result, payment: { id: result.payment_id } };
@@ -274,17 +313,35 @@ export const memberService = {
   },
 
   async deleteMember(id) {
-    const { data: member } = await supabase.from(TABLE_NAME).select('member_code').eq('id', id).single();
+    const { data: member } = await supabase.from(TABLE_NAME).select('member_code, created_at').eq('id', id).single();
     if (member) {
+      const now = new Date();
+      const created = new Date(member.created_at);
+      const isWithinOneWeek = (now - created) <= 7 * 24 * 60 * 60 * 1000;
+
       const newCode = `${member.member_code}_del_${Date.now()}`;
       const { error } = await supabase
         .from(TABLE_NAME)
         .update({
-          deleted_at: new Date().toISOString(),
+          deleted_at: now.toISOString(),
           member_code: newCode
         })
         .eq('id', id);
       if (error) throw new Error(error.message);
+
+      if (isWithinOneWeek) {
+        const { error: paymentError } = await supabase
+          .from('payment_logs')
+          .update({ amount: 0 })
+          .eq('member_id', id);
+        if (paymentError) throw new Error(paymentError.message);
+
+        const { error: logError } = await supabase
+          .from('member_logs')
+          .update({ fee: 0 })
+          .eq('member_id', id);
+        if (logError) throw new Error(logError.message);
+      }
     }
   },
 

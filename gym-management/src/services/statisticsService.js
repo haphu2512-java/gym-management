@@ -88,25 +88,5 @@ export const statisticsService = {
       memberRevenue,
       totalRevenue: waterRevenue + memberRevenue
     };
-  },
-
-  async getPackageStats() {
-    const { data } = await supabase
-      .from('member_current_status')
-      .select('package_type')
-      .not('package_type', 'is', null);
-    
-    const counts = {};
-    (data || []).forEach(m => {
-      const label = `Gói ${m.package_type} tháng`;
-      counts[label] = (counts[label] || 0) + 1;
-    });
-
-    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
-    return Object.entries(counts).map(([label, count], idx) => ({
-      label,
-      count,
-      color: colors[idx % colors.length]
-    })).sort((a, b) => b.count - a.count);
   }
 };
