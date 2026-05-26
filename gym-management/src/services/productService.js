@@ -101,7 +101,7 @@ export const productService = {
         products (name),
         profiles:sold_by (full_name),
         staff_members:sold_by_member (full_name),
-        shifts!inner (shift_name)
+        shifts!inner (id, shift_name, status)
       `)
       .order('sold_at', { ascending: false });
 
@@ -127,6 +127,66 @@ export const productService = {
     const { data, error } = await query;
     if (error) throw new Error(error.message);
     return data || [];
+  },
+
+  async rollbackSale(saleId, authId, staffId, activeShiftId) {
+    // 1. Lấy thông tin bản ghi bán hàng kèm theo trạng thái ca làm
+    const { data: sale, error: fetchError } = await supabase
+      .from('sales_logs')
+      .select('*, shifts(status)')
+      .eq('id', saleId)
+      .single();
+
+    if (fetchError || !sale) {
+      throw new Error('Không tìm thấy giao dịch hoặc lỗi: ' + (fetchError?.message || 'Unknown'));
+    }
+
+    // 2. Kiểm tra điều kiện bảo mật/quyền hạn
+    const isShiftOpen = sale.shifts?.status === 'open';
+    const isOwnSale = sale.sold_by === authId || (staffId && sale.sold_by_member === staffId);
+    const isInActiveShift = activeShiftId && sale.shift_id === activeShiftId;
+
+    if (!isShiftOpen && !isOwnSale && !isInActiveShift) {
+      throw new Error('Bạn không có quyền rollback giao dịch này (chỉ được rollback giao dịch trong ca đang mở hoặc do chính bạn bấm nhầm).');
+    }
+
+    // 3. Lấy tồn kho hiện tại của sản phẩm để cộng dồn chính xác
+    const { data: product, error: prodError } = await supabase
+      .from('products')
+      .select('stock_quantity')
+      .eq('id', sale.product_id)
+      .single();
+
+    if (prodError || !product) {
+      throw new Error('Không lấy được thông tin tồn kho sản phẩm: ' + (prodError?.message || 'Unknown'));
+    }
+
+    // 4. Cộng trả lại số lượng vào kho
+    const { error: stockUpdateError } = await supabase
+      .from('products')
+      .update({ stock_quantity: Number(product.stock_quantity || 0) + Number(sale.quantity || 1) })
+      .eq('id', sale.product_id);
+
+    if (stockUpdateError) {
+      throw new Error('Cập nhật tồn kho thất bại: ' + stockUpdateError.message);
+    }
+
+    // 5. Xóa nhật ký bán hàng trong sales_logs
+    const { error: deleteError } = await supabase
+      .from('sales_logs')
+      .delete()
+      .eq('id', saleId);
+
+    if (deleteError) {
+      // Revert lại số lượng tồn kho nếu xóa nhật ký thất bại
+      await supabase
+        .from('products')
+        .update({ stock_quantity: product.stock_quantity })
+        .eq('id', sale.product_id);
+      throw new Error('Xóa lịch sử bán hàng thất bại: ' + deleteError.message);
+    }
+
+    return { success: true };
   },
 };
 
