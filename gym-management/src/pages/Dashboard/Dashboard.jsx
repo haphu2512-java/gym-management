@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Droplets, TrendingUp, UserCheck, UserX, AlertTriangle, AlertCircle, Download } from 'lucide-react';
+import { Droplets, TrendingUp, UserCheck, UserX, AlertTriangle, AlertCircle, Download, RotateCcw } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { memberService } from '../../services/memberService';
 import { productService } from '../../services/productService';
@@ -7,6 +7,7 @@ import { shiftService } from '../../services/shiftService';
 import { paymentService } from '../../services/paymentService';
 import { additionalService } from '../../services/additionalService';
 import { formatDate, formatMemberCode } from '../../utils/formatters';
+import { useAuthStore } from '../../store/useAuthStore';
 
 function getMemberStatus(endDate) {
   if (!endDate) return 'Expired';
@@ -16,6 +17,7 @@ function getMemberStatus(endDate) {
 }
 
 export default function Dashboard() {
+  const { profile } = useAuthStore();
   const [members, setMembers] = useState([]);
   const [recentMembers, setRecentMembers] = useState([]);
   const [products, setProducts] = useState([]);
@@ -235,6 +237,41 @@ export default function Dashboard() {
     }
   };
 
+  const handleUndoRenewal = async (log) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn hoàn tác lượt gia hạn của hội viên ${log.full_name}?\nHành động này sẽ xóa giao dịch thanh toán và khôi phục gói tập về trạng thái trước đó.`)) {
+      return;
+    }
+
+    try {
+      setLoadingRecent(true);
+      await memberService.revertRenewTransaction(log.id, profile?.id);
+      alert('Hoàn tác gia hạn thành công!');
+      
+      // Tải lại các số liệu thống kê doanh thu và danh sách hội viên
+      const now = new Date();
+      const startOfMonthObj = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+      const startOfMonth = startOfMonthObj.toISOString();
+      
+      const [allMembers, totalMemberRev, allProducts, totalDrinkRev] = await Promise.all([
+        memberService.getAllMembers(),
+        paymentService.getTotalMemberRevenue({ startDate: startOfMonth }),
+        productService.getAllProducts(),
+        productService.getTotalDrinkRevenue({ startDate: startOfMonth })
+      ]);
+      setMembers(allMembers);
+      setMembershipRevenue(totalMemberRev);
+      setProducts(allProducts);
+      setDrinkRevenue(totalDrinkRev);
+
+      // Kích hoạt reload bảng bằng cách gán lại filterDate
+      setFilterDate(prev => prev);
+    } catch (err) {
+      alert(err.message || 'Có lỗi xảy ra khi hoàn tác.');
+    } finally {
+      setLoadingRecent(false);
+    }
+  };
+
   return (
     <div className="modern-stack">
       {loading && <div className="modern-info">Đang tải dữ liệu...</div>}
@@ -361,35 +398,71 @@ export default function Dashboard() {
                   <th>Mã HV</th>
                   <th>Ghi chú</th>
                   <th>Thanh toán</th>
+                  {profile?.role === 'admin' && <th>Thao tác</th>}
                 </tr>
               </thead>
               <tbody>
-                {recentMembers.map((m) => (
-                  <tr key={m.id}>
-                    <td>{formatDate(m.last_active_at || m.created_at)}</td>
-                    <td style={{ fontWeight: '500' }}>{m.full_name}</td>
-                    <td>{m.package_type ? `${m.package_type} tháng` : ''}</td>
-                    <td>{formatDate(m.end_date)}</td>
-                    <td style={{ fontWeight: '600', color: '#16a34a' }}>
-                      {Number(m.fee || 0).toLocaleString('vi-VN')}đ
-                    </td>
-                    <td>{formatMemberCode(m.member_code)}</td>
-                    <td style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={m.note}>
-                      {m.note}
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>{m.payment_method}</span>
-                        {m.payment_method === 'CK' && !m.is_payment_verified && (
-                          <span style={{
-                            background: '#fef08a', color: '#854d0e',
-                            borderRadius: '4px', padding: '2px 6px', fontSize: '10px', fontWeight: 'bold'
-                          }}>Chờ duyệt</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {recentMembers.map((m) => {
+                  const createdTime = new Date(m.created_at || m.last_active_at);
+                  const isRecent = (new Date() - createdTime) <= 48 * 60 * 60 * 1000;
+                  const showUndo = profile?.role === 'admin' && m.action === 'RENEW' && isRecent;
+
+                  return (
+                    <tr key={m.id}>
+                      <td>{formatDate(m.last_active_at || m.created_at)}</td>
+                      <td style={{ fontWeight: '500' }}>{m.full_name}</td>
+                      <td>{m.package_type ? `${m.package_type} tháng` : ''}</td>
+                      <td>{formatDate(m.end_date)}</td>
+                      <td style={{ fontWeight: '600', color: '#16a34a' }}>
+                        {Number(m.fee || 0).toLocaleString('vi-VN')}đ
+                      </td>
+                      <td>{formatMemberCode(m.member_code)}</td>
+                      <td style={{ maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={m.note}>
+                        {m.note}
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>{m.payment_method}</span>
+                          {m.payment_method === 'CK' && !m.is_payment_verified && (
+                            <span style={{
+                              background: '#fef08a', color: '#854d0e',
+                              borderRadius: '4px', padding: '2px 6px', fontSize: '10px', fontWeight: 'bold'
+                            }}>Chờ duyệt</span>
+                          )}
+                        </div>
+                      </td>
+                      {profile?.role === 'admin' && (
+                        <td>
+                          {showUndo ? (
+                            <button
+                              type="button"
+                              className="ghost-btn-sm"
+                              style={{ 
+                                color: '#dc2626', 
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                gap: '4px', 
+                                padding: '4px 8px',
+                                border: '1px solid #fee2e2',
+                                borderRadius: '4px',
+                                background: '#fef2f2',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                fontWeight: '500'
+                              }}
+                              onClick={() => handleUndoRenewal(m)}
+                              title="Hoàn tác lượt gia hạn này"
+                            >
+                              <RotateCcw size={13} /> Hoàn tác
+                            </button>
+                          ) : (
+                            <span style={{ color: '#94a3b8', fontSize: '12px' }}>-</span>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
