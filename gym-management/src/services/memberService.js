@@ -367,4 +367,17 @@ export const memberService = {
     if (error) throw new Error('Kích hoạt lại thất bại: ' + error.message);
     return data;
   },
+
+  async revertRenewTransaction(logId, adminId) {
+    const { data, error } = await supabase.rpc('revert_renew_transaction', {
+      p_log_id: logId,
+      p_admin_id: adminId
+    });
+
+    if (error) throw new Error('Hoàn tác gia hạn thất bại: ' + error.message);
+    if (data?.success === false) {
+      throw new Error(data.error || 'Hoàn tác gia hạn thất bại');
+    }
+    return data;
+  }
 };
