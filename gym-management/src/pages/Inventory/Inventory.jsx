@@ -269,13 +269,13 @@ export default function Inventory() {
     }
   };
 
-  // Kiểm tra quyền rollback bản ghi bán hàng (Chỉ admin, hoặc trong ca, hoặc của nhân viên tự bán)
+  // Kiểm tra quyền rollback bản ghi bán hàng (Chỉ admin, hoặc đồng thời thỏa mãn: trong ca mở, thuộc ca hoạt động và do chính nhân viên đó bán)
   const canRollback = (log) => {
     if (profile?.role === 'admin') return true;
     const isShiftOpen = log.shifts?.status === 'open';
     const isInActiveShift = activeShift && log.shift_id === activeShift.id;
     const isOwnSale = log.sold_by === user?.id || (activeStaff?.id && log.sold_by_member === activeStaff.id);
-    return isShiftOpen || isInActiveShift || isOwnSale;
+    return isShiftOpen && isInActiveShift && isOwnSale;
   };
 
   // Hoàn tác giao dịch bán hàng (Rollback)
