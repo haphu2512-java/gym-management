@@ -390,6 +390,7 @@ export default function Members() {
 
       setShowRenewModal(false);
       setRenewingMember(null);
+      addToast("Gia hạn thành công!");
     } catch (err) {
       setError(err.message);
     }

@@ -141,13 +141,24 @@ export const productService = {
       throw new Error('Không tìm thấy giao dịch hoặc lỗi: ' + (fetchError?.message || 'Unknown'));
     }
 
-    // 2. Kiểm tra điều kiện bảo mật/quyền hạn
-    const isShiftOpen = sale.shifts?.status === 'open';
-    const isOwnSale = sale.sold_by === authId || (staffId && sale.sold_by_member === staffId);
-    const isInActiveShift = activeShiftId && sale.shift_id === activeShiftId;
+    // Lấy thông tin role của người dùng thực hiện
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', authId)
+      .single();
 
-    if (!isShiftOpen && !isOwnSale && !isInActiveShift) {
-      throw new Error('Bạn không có quyền rollback giao dịch này (chỉ được rollback giao dịch trong ca đang mở hoặc do chính bạn bấm nhầm).');
+    const isAdmin = profile?.role === 'admin';
+
+    // 2. Kiểm tra điều kiện bảo mật/quyền hạn
+    if (!isAdmin) {
+      const isShiftOpen = sale.shifts?.status === 'open';
+      const isOwnSale = sale.sold_by === authId || (staffId && sale.sold_by_member === staffId);
+      const isInActiveShift = activeShiftId && sale.shift_id === activeShiftId;
+
+      if (!isShiftOpen || !isInActiveShift || !isOwnSale) {
+        throw new Error('Bạn không có quyền hoàn tác giao dịch này (chỉ được hoàn tác giao dịch do chính bạn bán trong ca đang mở của bạn).');
+      }
     }
 
     // 3. Lấy tồn kho hiện tại của sản phẩm để cộng dồn chính xác
