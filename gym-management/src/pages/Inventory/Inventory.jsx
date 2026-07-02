@@ -34,6 +34,7 @@ export default function Inventory() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [viewMode, setViewMode] = useState('sales'); // 'sales' or 'admin'
   const [editingProduct, setEditingProduct] = useState(null);
@@ -220,6 +221,7 @@ export default function Inventory() {
   const [sellingItem, setSellingItem] = useState(null);
 
   const handleSell = async (product, method = 'TM') => {
+    if (submitting) return;
     setError('');
     const shiftId = activeShift?.id || null;
     const qty = sellQuantities[product.id] || 1;
@@ -229,6 +231,7 @@ export default function Inventory() {
       return;
     }
 
+    setSubmitting(true);
     try {
       await productService.sellProduct(
         product,
@@ -266,6 +269,8 @@ export default function Inventory() {
       setSellingItem(null);
     } catch (err) {
       showError(`Bán hàng thất bại: ${err.message}`);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -896,16 +901,18 @@ export default function Inventory() {
                 className="primary-btn"
                 style={{ background: '#0f172a', height: '48px' }}
                 onClick={() => handleSell(sellingItem, 'TM')}
+                disabled={submitting}
               >
-                Tiền mặt
+                {submitting ? '...' : 'Tiền mặt'}
               </button>
               <button
                 type="button"
                 className="primary-btn"
                 style={{ background: '#2563eb', height: '48px' }}
                 onClick={() => handleSell(sellingItem, 'CK')}
+                disabled={submitting}
               >
-                Chuyển khoản
+                {submitting ? '...' : 'Chuyển khoản'}
               </button>
             </div>
 
@@ -914,6 +921,7 @@ export default function Inventory() {
               className="ghost-btn"
               style={{ width: '100%', marginTop: '12px' }}
               onClick={() => setSellingItem(null)}
+              disabled={submitting}
             >
               Quay lại
             </button>

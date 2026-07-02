@@ -19,13 +19,29 @@ export const staffLogService = {
     if (error) console.error('Thêm Staff Log thất bại:', error.message);
   },
 
-  async getLogs() {
-    const { data, error } = await supabase
+  async getLogs(page = 1, pageSize = 50, filterDate = '') {
+    const from = (page - 1) * pageSize;
+    const to = page * pageSize - 1;
+
+    let query = supabase
       .from(TABLE_NAME)
-      .select('*, profiles(full_name), staff_members(full_name)')
-      .order('created_at', { ascending: false });
+      .select('*, profiles(full_name), staff_members(full_name)', { count: 'exact' });
+
+    if (filterDate && /^\d{4}-\d{2}-\d{2}$/.test(filterDate)) {
+      const start = new Date(`${filterDate}T00:00:00`).toISOString();
+      const end = new Date(`${filterDate}T23:59:59.999`).toISOString();
+      query = query.gte('created_at', start).lte('created_at', end);
+    }
+
+    const { data, error, count } = await query
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
     if (error) throw new Error(error.message);
-    return data || [];
+    return {
+      data: data || [],
+      totalCount: count || 0,
+    };
   },
 };
 

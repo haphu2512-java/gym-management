@@ -69,6 +69,8 @@ CREATE TABLE IF NOT EXISTS shifts (
   note TEXT
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS unique_open_shift ON shifts (status) WHERE status = 'open';
+
 -- ============================================================
 -- 3b. SHIFT EXPENSES (Quản lý chi tiêu trong ca)
 -- ============================================================
@@ -275,6 +277,11 @@ CREATE OR REPLACE FUNCTION suspend_member(
 RETURNS JSON AS $$
 DECLARE v_remaining_days INT; v_end_date DATE; v_admin_id UUID;
 BEGIN
+  -- 1. Check if member is already suspended (Idempotency)
+  IF EXISTS (SELECT 1 FROM members WHERE id = p_member_id AND suspended_at IS NOT NULL) THEN
+    RETURN json_build_object('success', true, 'days', (SELECT remaining_days FROM members WHERE id = p_member_id), 'message', 'Already suspended');
+  END IF;
+
   -- Kiểm tra ca có tồn tại và đang mở không
   IF NOT EXISTS (SELECT 1 FROM shifts WHERE id = p_shift_id AND status = 'open') THEN
     RAISE EXCEPTION 'Ca làm việc không tồn tại hoặc đã đóng.';
@@ -308,6 +315,11 @@ CREATE OR REPLACE FUNCTION reactivate_member(
 RETURNS JSON AS $$
 DECLARE v_days INT; v_new_end DATE; v_admin_id UUID;
 BEGIN
+  -- 1. Check if member is already active (Idempotency)
+  IF EXISTS (SELECT 1 FROM members WHERE id = p_member_id AND suspended_at IS NULL) THEN
+    RETURN json_build_object('success', true, 'new_end', (SELECT end_date FROM member_current_status WHERE id = p_member_id), 'message', 'Already active');
+  END IF;
+
   -- Kiểm tra ca có tồn tại và đang mở không
   IF NOT EXISTS (SELECT 1 FROM shifts WHERE id = p_shift_id AND status = 'open') THEN
     RAISE EXCEPTION 'Ca làm việc không tồn tại hoặc đã đóng.';
@@ -327,28 +339,59 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- E. Tạo hội viên mới (Atomic)
 CREATE OR REPLACE FUNCTION create_member_transaction(
   p_code TEXT, p_name TEXT, p_package_type INT, p_membership_category TEXT, 
   p_fee NUMERIC, p_payment_method TEXT, p_shift_id UUID, p_staff_id UUID, 
-  p_fingerprint_status BOOLEAN, p_note TEXT, p_start_date DATE, p_created_at TIMESTAMP WITH TIME ZONE
+  p_fingerprint_status BOOLEAN, p_note TEXT, p_start_date DATE, p_created_at TIMESTAMP WITH TIME ZONE,
+  p_idempotency_key TEXT DEFAULT NULL
 ) RETURNS JSON AS $$
 DECLARE v_member_id UUID; v_payment_id UUID; v_end_date DATE;
 BEGIN
+  -- 1. Check idempotency key if provided
+  IF p_idempotency_key IS NOT NULL THEN
+    SELECT member_id INTO v_member_id 
+    FROM member_logs 
+    WHERE details->>'idempotency_key' = p_idempotency_key 
+    LIMIT 1;
+    
+    IF v_member_id IS NOT NULL THEN
+      RETURN json_build_object('success', true, 'member_id', v_member_id, 'idempotent', true);
+    END IF;
+  ELSE
+    -- 2. Fallback: Prevent duplicate create within 5 seconds for the same name and code
+    SELECT m.id INTO v_member_id
+    FROM members m
+    JOIN member_logs ml ON m.id = ml.member_id
+    WHERE ml.action = 'CREATE'
+      AND ml.staff_member_id = p_staff_id
+      AND m.full_name = p_name
+      AND (p_code IS NULL OR m.member_code = p_code)
+      AND m.created_at >= p_created_at - INTERVAL '5 seconds'
+    ORDER BY m.created_at DESC
+    LIMIT 1;
+
+    IF v_member_id IS NOT NULL THEN
+      RETURN json_build_object('success', true, 'member_id', v_member_id, 'idempotent', true);
+    END IF;
+  END IF;
+
   v_end_date := p_start_date + (p_package_type || ' months')::INTERVAL;
   INSERT INTO members (member_code, full_name, fingerprint_status, note, created_at)
   VALUES (p_code, p_name, p_fingerprint_status, p_note, p_created_at) RETURNING id INTO v_member_id;
 
-  INSERT INTO member_logs (member_id, staff_id, staff_member_id, action, package_type, membership_category, start_date, end_date, fee, payment_method, is_payment_verified, created_at)
-  VALUES (v_member_id, (SELECT opened_by FROM shifts WHERE id = p_shift_id), p_staff_id, 'CREATE', p_package_type, p_membership_category, p_start_date, v_end_date, p_fee, p_payment_method, (p_payment_method = 'TM'), p_created_at);
+  INSERT INTO member_logs (member_id, staff_id, staff_member_id, action, package_type, membership_category, start_date, end_date, fee, payment_method, is_payment_verified, created_at, details)
+  VALUES (v_member_id, (SELECT opened_by FROM shifts WHERE id = p_shift_id), p_staff_id, 'CREATE', p_package_type, p_membership_category, p_start_date, v_end_date, p_fee, p_payment_method, (p_payment_method = 'TM'), p_created_at, jsonb_build_object('idempotency_key', p_idempotency_key));
 
   INSERT INTO payment_logs (member_id, shift_id, staff_id, staff_member_id, amount, payment_method, payment_type, is_verified, created_at)
   VALUES (v_member_id, p_shift_id, (SELECT opened_by FROM shifts WHERE id = p_shift_id), p_staff_id, p_fee, p_payment_method, 'new', (p_payment_method = 'TM'), p_created_at) RETURNING id INTO v_payment_id;
 
-  UPDATE member_logs SET details = jsonb_build_object('payment_id', v_payment_id) WHERE member_id = v_member_id AND action = 'CREATE';
+  -- Merge payment_id with details
+  UPDATE member_logs 
+  SET details = COALESCE(details, '{}'::JSONB) || jsonb_build_object('payment_id', v_payment_id) 
+  WHERE member_id = v_member_id AND action = 'CREATE';
 
   INSERT INTO staff_logs (staff_member_id, action, target_item, details, created_at)
-  VALUES (p_staff_id, 'Tạo hội viên mới', p_name, json_build_object('code', p_code, 'fee', p_fee), p_created_at);
+  VALUES (p_staff_id, 'Tạo hội viên mới', p_name, json_build_object('code', p_code, 'fee', p_fee, 'idempotency_key', p_idempotency_key), p_created_at);
 
   RETURN json_build_object('success', true, 'member_id', v_member_id);
 END;
@@ -358,23 +401,54 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION renew_member_transaction(
   p_member_id UUID, p_package_type INT, p_membership_category TEXT, 
   p_fee NUMERIC, p_payment_method TEXT, p_shift_id UUID, p_staff_id UUID, 
-  p_start_date DATE, p_created_at TIMESTAMP WITH TIME ZONE
+  p_start_date DATE, p_created_at TIMESTAMP WITH TIME ZONE,
+  p_idempotency_key TEXT DEFAULT NULL
 ) RETURNS JSON AS $$
 DECLARE v_payment_id UUID; v_end_date DATE; v_name TEXT;
 BEGIN
+  -- 1. Check idempotency key if provided
+  IF p_idempotency_key IS NOT NULL THEN
+    SELECT (details->>'payment_id')::UUID INTO v_payment_id 
+    FROM member_logs 
+    WHERE member_id = p_member_id 
+      AND details->>'idempotency_key' = p_idempotency_key 
+    LIMIT 1;
+    
+    IF v_payment_id IS NOT NULL THEN
+      RETURN json_build_object('success', true, 'payment_id', v_payment_id, 'idempotent', true);
+    END IF;
+  ELSE
+    -- 2. Backward compatibility: Prevent duplicate RENEW within 5 seconds
+    SELECT (details->>'payment_id')::UUID INTO v_payment_id 
+    FROM member_logs 
+    WHERE member_id = p_member_id 
+      AND action = 'RENEW' 
+      AND staff_member_id = p_staff_id 
+      AND created_at >= p_created_at - INTERVAL '5 seconds'
+    ORDER BY created_at DESC 
+    LIMIT 1;
+    
+    IF v_payment_id IS NOT NULL THEN
+      RETURN json_build_object('success', true, 'payment_id', v_payment_id, 'idempotent', true);
+    END IF;
+  END IF;
+
   v_end_date := p_start_date + (p_package_type || ' months')::INTERVAL;
   SELECT full_name INTO v_name FROM members WHERE id = p_member_id;
 
-  INSERT INTO member_logs (member_id, staff_id, staff_member_id, action, package_type, membership_category, start_date, end_date, fee, payment_method, is_payment_verified, created_at)
-  VALUES (p_member_id, (SELECT opened_by FROM shifts WHERE id = p_shift_id), p_staff_id, 'RENEW', p_package_type, p_membership_category, p_start_date, v_end_date, p_fee, p_payment_method, (p_payment_method = 'TM'), p_created_at);
+  INSERT INTO member_logs (member_id, staff_id, staff_member_id, action, package_type, membership_category, start_date, end_date, fee, payment_method, is_payment_verified, created_at, details)
+  VALUES (p_member_id, (SELECT opened_by FROM shifts WHERE id = p_shift_id), p_staff_id, 'RENEW', p_package_type, p_membership_category, p_start_date, v_end_date, p_fee, p_payment_method, (p_payment_method = 'TM'), p_created_at, jsonb_build_object('idempotency_key', p_idempotency_key));
 
   INSERT INTO payment_logs (member_id, shift_id, staff_id, staff_member_id, amount, payment_method, payment_type, is_verified, created_at)
   VALUES (p_member_id, p_shift_id, (SELECT opened_by FROM shifts WHERE id = p_shift_id), p_staff_id, p_fee, p_payment_method, 'renew', (p_payment_method = 'TM'), p_created_at) RETURNING id INTO v_payment_id;
 
-  UPDATE member_logs SET details = jsonb_build_object('payment_id', v_payment_id) WHERE member_id = p_member_id AND action = 'RENEW' AND created_at = p_created_at;
+  -- Merge payment_id with details
+  UPDATE member_logs 
+  SET details = COALESCE(details, '{}'::JSONB) || jsonb_build_object('payment_id', v_payment_id) 
+  WHERE member_id = p_member_id AND action = 'RENEW' AND created_at = p_created_at;
 
   INSERT INTO staff_logs (staff_member_id, action, target_item, details, created_at)
-  VALUES (p_staff_id, 'Gia hạn hội viên', v_name, json_build_object('fee', p_fee, 'months', p_package_type), p_created_at);
+  VALUES (p_staff_id, 'Gia hạn hội viên', v_name, json_build_object('fee', p_fee, 'months', p_package_type, 'idempotency_key', p_idempotency_key), p_created_at);
 
   RETURN json_build_object('success', true, 'payment_id', v_payment_id);
 END;

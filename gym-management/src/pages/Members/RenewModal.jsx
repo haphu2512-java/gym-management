@@ -1,20 +1,14 @@
 import { formatDate, getLocalISODate } from '../../utils/formatters';
 
-function calculateFee(category, packageType) {
-  const PRICING_TIERS = {
-    normal: { 1: 350000, 3: 795000, 6: 1440000 },
-    couple: { 1: 320000, 3: 720000, 6: 1320000 },
-    team: { 1: 300000, 3: 660000, 6: 1200000 }
-  };
-  return PRICING_TIERS[category]?.[packageType] || '';
-}
+
 
 export default function RenewModal({
   member,
   renewForm,
   onFormChange,
   onSubmit,
-  onCancel
+  onCancel,
+  submitting
 }) {
   if (!member) return null;
 
@@ -140,8 +134,10 @@ export default function RenewModal({
           </div>
 
           <div className="modal-actions" style={{ marginTop: '16px' }}>
-            <button type="button" className="ghost-btn" onClick={onCancel}>Hủy</button>
-            <button type="submit" className="primary-btn">Xác nhận gia hạn</button>
+            <button type="button" className="ghost-btn" onClick={onCancel} disabled={submitting}>Hủy</button>
+            <button type="submit" className="primary-btn" disabled={submitting}>
+              {submitting ? 'Đang gia hạn...' : 'Xác nhận gia hạn'}
+            </button>
           </div>
         </form>
       </div>

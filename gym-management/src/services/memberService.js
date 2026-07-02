@@ -131,6 +131,7 @@ export const memberService = {
       p_note: memberData.note || '',
       p_start_date: memberData.start_date || getLocalISODate(),
       p_created_at: new Date().toISOString(),
+      p_idempotency_key: memberData.idempotencyKey || null
     });
 
     if (error) {
@@ -220,6 +221,7 @@ export const memberService = {
     const renewFrom = renewalData.renewFrom || 'today';
     const customRenewDate = renewalData.customRenewDate || null;
     const note = renewalData.note || '';
+    const idempotencyKey = renewalData.idempotencyKey || null;
 
     const { data: member, error: memberError } = await supabase
       .from(VIEW_NAME)
@@ -259,7 +261,8 @@ export const memberService = {
       p_shift_id: shiftId,
       p_staff_id: staffId,
       p_start_date: renewalStart,
-      p_created_at: createdAt
+      p_created_at: createdAt,
+      p_idempotency_key: idempotencyKey
     });
 
     if (rpcError) throw new Error('Gia hạn thất bại: ' + rpcError.message);

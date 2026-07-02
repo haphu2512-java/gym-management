@@ -91,6 +91,7 @@ export default function MembersToolbar({
             <option value="all">Tất cả</option>
             {profile?.role === 'admin' && <option value="pending_ck">Chờ duyệt CK</option>}
             <option value="missing_code">Chưa gắn Mã HV</option>
+            <option value="expired">Hết hạn</option>
           </select>
           {profile?.role === 'admin' && (
             <button

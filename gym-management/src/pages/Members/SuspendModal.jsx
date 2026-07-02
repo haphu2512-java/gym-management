@@ -4,7 +4,8 @@ export default function SuspendModal({
   member,
   suspendInfo,
   onConfirm,
-  onCancel
+  onCancel,
+  submitting
 }) {
   if (!member) return null;
 
@@ -29,14 +30,15 @@ export default function SuspendModal({
           * Lưu ý: Sau khi bảo lưu, hội viên sẽ không thể check-in cho đến khi được kích hoạt lại.
         </p>
         <div className="modal-actions" style={{ marginTop: '24px' }}>
-          <button type="button" className="ghost-btn" onClick={onCancel}>Hủy</button>
+          <button type="button" className="ghost-btn" onClick={onCancel} disabled={submitting}>Hủy</button>
           <button
             type="button"
             className="primary-btn"
             style={{ background: '#f59e0b' }}
             onClick={onConfirm}
+            disabled={submitting}
           >
-            Xác nhận bảo lưu
+            {submitting ? 'Đang xử lý...' : 'Xác nhận bảo lưu'}
           </button>
         </div>
       </div>
