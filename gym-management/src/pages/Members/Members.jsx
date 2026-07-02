@@ -111,6 +111,10 @@ export default function Members() {
         matchStatus = !m.member_code;
       }
 
+      if (filterStatus === 'expired' && matchStatus) {
+        matchStatus = status === 'Expired';
+      }
+
       return matchSearch && matchDate && matchStatus;
     });
   }, [members, searchTerm, filterStatus, filterDate, activeTab]);
