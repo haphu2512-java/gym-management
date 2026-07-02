@@ -1,14 +1,7 @@
 import { formatDate } from '../../utils/formatters';
 import logo from '../../assets/logo.png';
 
-function calculateFee(category, packageType) {
-  const PRICING_TIERS = {
-    normal: { 1: 350000, 3: 795000, 6: 1440000 },
-    couple: { 1: 320000, 3: 720000, 6: 1320000 },
-    team: { 1: 300000, 3: 660000, 6: 1200000 }
-  };
-  return PRICING_TIERS[category]?.[packageType] || '';
-}
+
 
 export default function MemberFormModal({
   editingMember,
@@ -19,7 +12,8 @@ export default function MemberFormModal({
   historyLogs,
   historyLoading,
   profile,
-  onLogVerification
+  onLogVerification,
+  submitting
 }) {
   return (
     <div className="modal-backdrop">
@@ -29,7 +23,7 @@ export default function MemberFormModal({
             <img src={logo} alt="Logo" style={{ width: '40px', height: 'auto', borderRadius: '8px' }} />
             <h3 style={{ margin: 0 }}>Chi tiết hội viên: {editingMember?.full_name || 'Mới'}</h3>
           </div>
-          <button className="ghost-btn" onClick={onCancel}>Đóng</button>
+          <button className="ghost-btn" onClick={onCancel} disabled={submitting}>Đóng</button>
         </div>
 
         <div className="form-grid-2" style={{ gap: '24px', alignItems: 'start' }}>
@@ -174,8 +168,10 @@ export default function MemberFormModal({
               </div>
 
               <div className="modal-actions" style={{ marginTop: '16px' }}>
-                <button type="submit" className="primary-btn" style={{ width: '100%' }}>
-                  {editingMember ? 'Cập nhật thông tin' : 'Tạo hội viên mới'}
+                <button type="submit" className="primary-btn" style={{ width: '100%' }} disabled={submitting}>
+                  {submitting 
+                    ? 'Đang xử lý...' 
+                    : (editingMember ? 'Cập nhật thông tin' : 'Tạo hội viên mới')}
                 </button>
               </div>
             </form>

@@ -45,6 +45,7 @@ export default function Shifts() {
     return `${year}-${month}-${dateDay}`;
   }, []);
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState('shift');
   const [isTrusted, setIsTrusted] = useState(deviceSecurity.isDeviceTrusted());
   const [deviceSecret, setDeviceSecret] = useState('');
@@ -317,6 +318,7 @@ export default function Shifts() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
     setError('');
 
     if (!isTrusted) {
@@ -324,6 +326,7 @@ export default function Shifts() {
       return;
     }
 
+    setSubmitting(true);
     try {
       if (activeShift) {
         if (form.ending_cash === '') {
@@ -363,6 +366,8 @@ export default function Shifts() {
       await loadShifts();
     } catch (err) {
       setError(err.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -535,8 +540,8 @@ export default function Shifts() {
                     </div>
                   )}
 
-                  <button type="submit" className="primary-btn large">
-                    {activeShift ? 'Chốt Ca Trực' : 'Mở Ca Trực'}
+                  <button type="submit" className="primary-btn large" disabled={submitting}>
+                    {submitting ? 'Đang xử lý...' : (activeShift ? 'Chốt Ca Trực' : 'Mở Ca Trực')}
                   </button>
                 </form>
               )}

@@ -52,6 +52,7 @@ export default function Members() {
   const [showModal, setShowModal] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
   const [form, setForm] = useState(getInitialForm);
+  const [submitting, setSubmitting] = useState(false);
 
   const [showRenewModal, setShowRenewModal] = useState(false);
   const [renewingMember, setRenewingMember] = useState(null);
@@ -248,6 +249,7 @@ export default function Members() {
   // Submit form tạo/chỉnh sửa hội viên
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
     setError('');
 
     if (!activeShift?.id) {
@@ -255,10 +257,13 @@ export default function Members() {
       return;
     }
 
+    setSubmitting(true);
     try {
       const startDate = form.start_date || getLocalISODate();
       const startObj = new Date(startDate);
       const endDate = getLocalISODate(addMonths(startObj, Number(form.package_type || 1)));
+
+      const idempotencyKey = crypto.randomUUID();
 
       const payload = {
         member_code: form.member_code?.trim() || null,
@@ -274,6 +279,7 @@ export default function Members() {
         note: form.note,
         shift_id: activeShift.id,
         staff_id: activeStaff?.id || user?.id,
+        idempotencyKey,
       };
 
       if (editingMember?.id) {
@@ -306,6 +312,7 @@ export default function Members() {
       } else {
         if (payload.package_type < 1 || payload.package_type > 36) {
           setError('Gói tập từ 1 đến 36 tháng.');
+          setSubmitting(false);
           return;
         }
         await addMember(payload);
@@ -315,7 +322,7 @@ export default function Members() {
           staffMemberId: activeStaff?.id,
           action: 'Thêm hội viên mới',
           targetItem: payload.full_name,
-          details: { member_code: payload.member_code, package: payload.package_type },
+          details: { member_code: payload.member_code, package: payload.package_type, idempotency_key: idempotencyKey },
           note: 'Admin/Staff tạo hội viên mới',
         });
       }
@@ -325,6 +332,8 @@ export default function Members() {
       setEditingMember(null);
     } catch (err) {
       setError(err.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -349,6 +358,7 @@ export default function Members() {
   const handleRenew = async (e) => {
     e.preventDefault();
     if (!renewingMember) return;
+    if (submitting) return;
     setError('');
 
     if (!activeShift?.id) {
@@ -356,12 +366,16 @@ export default function Members() {
       return;
     }
 
+    setSubmitting(true);
     try {
       const packageType = Number(renewForm.package_type || 0);
       if (packageType < 1 || packageType > 36) {
         setError('Goi tap tu 1 den 36 thang.');
+        setSubmitting(false);
         return;
       }
+
+      const idempotencyKey = crypto.randomUUID();
 
       await memberService.renewMember(renewingMember.id, {
         packageType,
@@ -373,6 +387,7 @@ export default function Members() {
         renewFrom: renewForm.renew_from,
         customRenewDate: renewForm.custom_renew_date,
         note: renewForm.note,
+        idempotencyKey,
       });
 
       await staffLogService.logAction({
@@ -384,7 +399,8 @@ export default function Members() {
           member_id: renewingMember.id, 
           package: packageType, 
           fee: Number(renewForm.fee || 0),
-          note: renewForm.note
+          note: renewForm.note,
+          idempotency_key: idempotencyKey
         },
         note: renewForm.note || 'Admin/Staff thực hiện gia hạn học phí',
       });
@@ -397,6 +413,8 @@ export default function Members() {
       addToast("Gia hạn thành công!");
     } catch (err) {
       setError(err.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -424,6 +442,7 @@ export default function Members() {
   // Xác nhận bảo lưu
   const handleSuspendConfirm = async () => {
     if (!suspendingMember) return;
+    if (submitting) return;
     setError('');
 
     if (!activeShift?.id) {
@@ -431,6 +450,7 @@ export default function Members() {
       return;
     }
 
+    setSubmitting(true);
     try {
       await suspendMember(suspendingMember.id, activeStaff?.id || user?.id, activeShift.id);
       
@@ -448,6 +468,8 @@ export default function Members() {
       addToast("Đã bảo lưu hội viên thành công!");
     } catch (err) {
       setError("Lỗi bảo lưu: " + err.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -457,11 +479,14 @@ export default function Members() {
       addToast("Vui lòng mở ca trước khi kích hoạt lại hội viên.", "error");
       return;
     }
+    if (submitting) return;
 
     showConfirm({
       title: 'Kích hoạt lại hội viên',
       message: `Kích hoạt lại cho hội viên ${member.full_name}? Ngày hết hạn mới sẽ được cộng thêm ${member.remaining_days} ngày kể từ hôm nay.`,
       onConfirm: async () => {
+        if (submitting) return;
+        setSubmitting(true);
         try {
           await reactivateMember(member.id, activeStaff?.id || user?.id, activeShift.id);
           
@@ -478,6 +503,8 @@ export default function Members() {
         } catch (err) {
           setError("Lỗi kích hoạt lại: " + err.message);
           addToast("Lỗi kích hoạt lại", "error");
+        } finally {
+          setSubmitting(false);
         }
       }
     });
@@ -535,6 +562,7 @@ export default function Members() {
           historyLoading={historyLoading}
           profile={profile}
           onLogVerification={handleLogVerification}
+          submitting={submitting}
         />
       )}
 
@@ -545,6 +573,7 @@ export default function Members() {
           onFormChange={handleRenewFormChange}
           onSubmit={handleRenew}
           onCancel={() => setShowRenewModal(false)}
+          submitting={submitting}
         />
       )}
 
@@ -562,6 +591,7 @@ export default function Members() {
           suspendInfo={suspendInfo}
           onConfirm={handleSuspendConfirm}
           onCancel={() => setShowSuspendModal(false)}
+          submitting={submitting}
         />
       )}
     </div>
