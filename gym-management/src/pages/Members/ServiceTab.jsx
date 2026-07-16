@@ -203,6 +203,66 @@ export default function ServiceTab() {
     }
   };
 
+  // Kiểm tra quyền rollback bản ghi bán dịch vụ (Chỉ admin, hoặc đồng thời thỏa mãn: trong ca mở, thuộc ca hoạt động và do chính nhân viên đó bán)
+  const canRollback = (log) => {
+    if (profile?.role === 'admin') return true;
+    const isShiftOpen = log.shifts?.status === 'open';
+    const isInActiveShift = activeShift && log.shift_id === activeShift.id;
+    const isOwnSale = log.sold_by === user?.id || (activeStaff?.id && log.sold_by_member === activeStaff.id);
+    return isShiftOpen && isInActiveShift && isOwnSale;
+  };
+
+  // Hoàn tác giao dịch bán dịch vụ (Rollback)
+  const handleRollback = async (log) => {
+    if (!window.confirm(`Bạn có chắc muốn rollback (hoàn tác) giao dịch bán dịch vụ "${log.services?.name || 'N/A'}" này?\nHành động này sẽ xóa nhật ký bán hàng.`)) {
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    try {
+      await additionalService.rollbackServiceSale(
+        log.id,
+        user?.id,
+        activeStaff?.id,
+        activeShift?.id
+      );
+
+      // Ghi log hành động rollback
+      await staffLogService.logAction({
+        staffId: user?.id,
+        staffMemberId: activeStaff?.id,
+        action: 'Rollback bán dịch vụ',
+        targetItem: log.services?.name || 'N/A',
+        details: { qty: log.quantity, total: Number(log.total_price || 0), method: log.payment_method },
+        note: 'Nhân viên hoàn tác giao dịch dịch vụ bán nhầm',
+      });
+
+      // Tải lại danh sách sản phẩm (để đồng bộ)
+      await loadProducts();
+
+      // Cập nhật lại danh sách thống kê
+      const updatedLogs = await additionalService.getFilteredServiceLogs({
+        date: statsDate,
+        shiftName: statsShiftName,
+        paymentMethod: statsPaymentMethod
+      });
+      setSalesLogs(updatedLogs);
+
+      // Cập nhật lại doanh thu dịch vụ của ca hiện tại
+      if (activeShift) {
+        const rev = await additionalService.getServiceRevenueForShift(activeShift.id);
+        setDrinkRevenue(rev);
+      }
+
+      showSuccess('Hoàn tác giao dịch bán dịch vụ thành công!');
+    } catch (err) {
+      showError(`Hoàn tác thất bại: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Xóa sản phẩm (chỉ admin)
   const handleConfirmDelete = async () => {
     if (!deletingProduct) return;
@@ -398,12 +458,13 @@ export default function ServiceTab() {
                   <th>Tổng tiền</th>
                   <th>Thanh toán</th>
                   <th>Nhân viên</th>
+                  <th>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
                 {!loading && salesLogs.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="table-empty-cell">Chưa có dữ liệu bán hàng</td>
+                    <td colSpan={7} className="table-empty-cell">Chưa có dữ liệu bán hàng</td>
                   </tr>
                 )}
                 {salesLogs.map((log) => (
@@ -425,6 +486,27 @@ export default function ServiceTab() {
                       </span>
                     </td>
                     <td><p className="cell-main">{log.staff_members?.full_name || log.profiles?.full_name || 'N/A'}</p></td>
+                    <td>
+                      {canRollback(log) ? (
+                        <button
+                          type="button"
+                          className="ghost-btn"
+                          style={{
+                            color: '#dc2626',
+                            background: '#fef2f2',
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: '600'
+                          }}
+                          onClick={() => handleRollback(log)}
+                        >
+                          Hoàn tác
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: '12px', color: '#94a3b8' }}>-</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
