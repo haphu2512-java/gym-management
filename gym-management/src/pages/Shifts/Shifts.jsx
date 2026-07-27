@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Clock, Banknote, FileText, Plus, Receipt, Trash2 } from 'lucide-react';
+import { Clock, Banknote, FileText, Plus, Receipt, Trash2, Pencil, Check, X } from 'lucide-react';
 import { shiftService } from '../../services/shiftService';
 import { staffService } from '../../services/staffService';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -54,6 +54,9 @@ export default function Shifts() {
   const [sharedNotes, setSharedNotes] = useState([]);
   const [totalExpense, setTotalExpense] = useState(0);
   const [latestClosedShift, setLatestClosedShift] = useState(null);
+  const [editingExpenseId, setEditingExpenseId] = useState(null);
+  const [editingExpenseForm, setEditingExpenseForm] = useState({ amount: '', reason: '' });
+
   const [expenseForm, setExpenseForm] = useState(() => {
     const saved = localStorage.getItem('gym_expense_form');
     if (saved) {
@@ -302,6 +305,50 @@ export default function Shifts() {
       setSuggestedEndingCash(suggested);
     } catch (err) {
       setError(err.message);
+    }
+  };
+
+  const handleStartEditExpense = (item) => {
+    setEditingExpenseId(item.id);
+    setEditingExpenseForm({ amount: String(item.amount || ''), reason: item.reason || '' });
+  };
+
+  const handleSaveExpense = async (id) => {
+    setError('');
+    try {
+      await expenseService.updateExpense(id, {
+        amount: Number(editingExpenseForm.amount || 0),
+        reason: editingExpenseForm.reason,
+      });
+      setEditingExpenseId(null);
+      if (activeShift) {
+        const [rows, suggested] = await Promise.all([
+          expenseService.getByShift(activeShift.id),
+          calculateHandoverCash(activeShift),
+        ]);
+        setExpenses(rows);
+        setSuggestedEndingCash(suggested);
+      }
+    } catch (err) {
+      setError('Lỗi khi sửa khoản chi: ' + err.message);
+    }
+  };
+
+  const handleDeleteExpense = async (id) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa khoản chi này?')) return;
+    setError('');
+    try {
+      await expenseService.deleteExpense(id);
+      if (activeShift) {
+        const [rows, suggested] = await Promise.all([
+          expenseService.getByShift(activeShift.id),
+          calculateHandoverCash(activeShift),
+        ]);
+        setExpenses(rows);
+        setSuggestedEndingCash(suggested);
+      }
+    } catch (err) {
+      setError('Lỗi khi xóa khoản chi: ' + err.message);
     }
   };
 
@@ -609,13 +656,68 @@ export default function Shifts() {
                           <div style={{ width: '40px', height: '40px', background: '#fef2f2', color: '#ef4444', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Banknote size={18} />
                           </div>
-                          <div className="flex-1">
-                            <p style={{ margin: 0, fontWeight: '600', color: '#0f172a', fontSize: '14px' }}>{item.reason || 'Không có lý do'}</p>
-                            <p style={{ margin: '2px 0 0', color: '#64748b', fontSize: '12px' }}>{formatDateTime(item.created_at)}</p>
-                          </div>
-                          <div style={{ fontWeight: '700', color: '#dc2626', fontSize: '15px' }}>
-                            -{Number(item.amount || 0).toLocaleString('vi-VN')}đ
-                          </div>
+                          {editingExpenseId === item.id ? (
+                            <div className="flex-1" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                              <input
+                                type="number"
+                                value={editingExpenseForm.amount}
+                                onChange={(e) => setEditingExpenseForm({ ...editingExpenseForm, amount: e.target.value })}
+                                placeholder="Số tiền"
+                                style={{ width: '100px', padding: '4px 8px', fontSize: '13px' }}
+                              />
+                              <input
+                                type="text"
+                                value={editingExpenseForm.reason}
+                                onChange={(e) => setEditingExpenseForm({ ...editingExpenseForm, reason: e.target.value })}
+                                placeholder="Lý do"
+                                style={{ flex: 1, padding: '4px 8px', fontSize: '13px' }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleSaveExpense(item.id)}
+                                style={{ background: '#22c55e', color: '#fff', border: 'none', borderRadius: '6px', padding: '6px', cursor: 'pointer' }}
+                                title="Lưu thay đổi"
+                              >
+                                <Check size={16} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingExpenseId(null)}
+                                style={{ background: '#94a3b8', color: '#fff', border: 'none', borderRadius: '6px', padding: '6px', cursor: 'pointer' }}
+                                title="Hủy"
+                              >
+                                <X size={16} />
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="flex-1">
+                                <p style={{ margin: 0, fontWeight: '600', color: '#0f172a', fontSize: '14px' }}>{item.reason || 'Không có lý do'}</p>
+                                <p style={{ margin: '2px 0 0', color: '#64748b', fontSize: '12px' }}>{formatDateTime(item.created_at)}</p>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <div style={{ fontWeight: '700', color: '#dc2626', fontSize: '15px' }}>
+                                  -{Number(item.amount || 0).toLocaleString('vi-VN')}đ
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEditExpense(item)}
+                                  style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+                                  title="Sửa khoản chi"
+                                >
+                                  <Pencil size={15} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteExpense(item.id)}
+                                  style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+                                  title="Xóa khoản chi"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              </div>
+                            </>
+                          )}
                         </div>
                       ))}
                     </div>

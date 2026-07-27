@@ -35,5 +35,28 @@ export const expenseService = {
     const rows = await this.getByShift(shiftId);
     return rows.reduce((sum, item) => sum + Number(item.amount || 0), 0);
   },
+
+  async updateExpense(id, { amount, reason }) {
+    const { data, error } = await supabase
+      .from(TABLE_NAME)
+      .update({
+        amount: Number(amount || 0),
+        reason,
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+
+  async deleteExpense(id) {
+    const { error } = await supabase
+      .from(TABLE_NAME)
+      .delete()
+      .eq('id', id);
+    if (error) throw new Error(error.message);
+    return true;
+  },
 };
 
