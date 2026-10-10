@@ -315,13 +315,96 @@ export const memberService = {
     return true;
   },
 
+  async verifyAllPendingPayments(adminId, staffMemberId = null) {
+    const verifiedAt = new Date().toISOString();
+
+    // 1. Thử gọi RPC atomic verify_all_payments_atomic nếu có trong DB
+    try {
+      const { data, error } = await supabase.rpc('verify_all_payments_atomic', {
+        p_admin_id: adminId,
+        p_staff_member_id: staffMemberId,
+        p_verified_at: verifiedAt
+      });
+      if (!error && data && data.success !== false) {
+        return { count: data.count || 0, success: true };
+      }
+    } catch (rpcErr) {
+      console.warn('RPC verify_all_payments_atomic chưa có sẵn, fallback sang batch:', rpcErr);
+    }
+
+    // 2. Fallback: Lấy tất cả payment_logs chuyển khoản chưa duyệt
+    const { data: pendingPayments, error: pError } = await supabase
+      .from('payment_logs')
+      .select('id, member_id, amount')
+      .eq('payment_method', 'CK')
+      .or('is_verified.is.null,is_verified.eq.false');
+
+    if (pError) throw pError;
+
+    // Lấy thêm member_logs có payment_method = 'CK' chưa duyệt
+    const { data: pendingLogs } = await supabase
+      .from('member_logs')
+      .select('id, member_id, details')
+      .eq('payment_method', 'CK')
+      .or('is_payment_verified.is.null,is_payment_verified.eq.false');
+
+    const paymentIds = new Set();
+    (pendingPayments || []).forEach(p => paymentIds.add(p.id));
+    (pendingLogs || []).forEach(l => {
+      if (l.details?.payment_id) paymentIds.add(l.details.payment_id);
+    });
+
+    let count = 0;
+    for (const paymentId of paymentIds) {
+      try {
+        const { data, error } = await supabase.rpc('verify_payment_atomic', {
+          p_payment_id: paymentId,
+          p_admin_id: adminId,
+          p_staff_member_id: staffMemberId,
+          p_verified_at: verifiedAt
+        });
+        if (!error && (data?.success || data === true)) {
+          count++;
+        }
+      } catch (err) {
+        console.error('Lỗi khi duyệt payment:', paymentId, err);
+      }
+    }
+
+    // Đồng bộ các member_logs còn lại nếu có
+    const { data: remainingLogs } = await supabase
+      .from('member_logs')
+      .select('id, member_id')
+      .eq('payment_method', 'CK')
+      .or('is_payment_verified.is.null,is_payment_verified.eq.false');
+
+    if (remainingLogs && remainingLogs.length > 0) {
+      await supabase
+        .from('member_logs')
+        .update({ is_payment_verified: true })
+        .in('id', remainingLogs.map(l => l.id));
+
+      for (const rLog of remainingLogs) {
+        await supabase.from('member_logs').insert([{
+          member_id: rLog.member_id,
+          staff_id: adminId,
+          staff_member_id: staffMemberId,
+          action: 'VERIFY_PAYMENT',
+          is_payment_verified: true,
+          note: 'Admin duyệt thanh toán hàng loạt',
+          created_at: verifiedAt
+        }]);
+      }
+    }
+
+    const totalProcessed = Math.max(count, (pendingPayments || []).length, (pendingLogs || []).length);
+    return { count: totalProcessed, success: true };
+  },
+
   async deleteMember(id) {
     const { data: member } = await supabase.from(TABLE_NAME).select('member_code, created_at').eq('id', id).single();
     if (member) {
       const now = new Date();
-      const created = new Date(member.created_at);
-      const isWithinOneWeek = (now - created) <= 7 * 24 * 60 * 60 * 1000;
-
       const newCode = `${member.member_code}_del_${Date.now()}`;
       const { error } = await supabase
         .from(TABLE_NAME)
@@ -332,19 +415,18 @@ export const memberService = {
         .eq('id', id);
       if (error) throw new Error(error.message);
 
-      if (isWithinOneWeek) {
-        const { error: paymentError } = await supabase
-          .from('payment_logs')
-          .update({ amount: 0 })
-          .eq('member_id', id);
-        if (paymentError) throw new Error(paymentError.message);
+      // Đặt số tiền giao dịch về 0 để không bị cộng dồn vào doanh thu ca trực
+      const { error: paymentError } = await supabase
+        .from('payment_logs')
+        .update({ amount: 0 })
+        .eq('member_id', id);
+      if (paymentError) console.error('Lỗi reset payment_logs khi xóa hội viên:', paymentError);
 
-        const { error: logError } = await supabase
-          .from('member_logs')
-          .update({ fee: 0 })
-          .eq('member_id', id);
-        if (logError) throw new Error(logError.message);
-      }
+      const { error: logError } = await supabase
+        .from('member_logs')
+        .update({ fee: 0 })
+        .eq('member_id', id);
+      if (logError) console.error('Lỗi reset member_logs khi xóa hội viên:', logError);
     }
   },
 
