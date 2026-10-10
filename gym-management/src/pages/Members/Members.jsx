@@ -1,6 +1,8 @@
 import { useMemo, useState, useEffect } from 'react';
+import { CheckCheck } from 'lucide-react';
 import { useMembers } from '../../hooks/useMembers';
 import { memberService } from '../../services/memberService';
+import { paymentService } from '../../services/paymentService';
 import { staffLogService } from '../../services/staffLogService';
 import { shiftService } from '../../services/shiftService';
 import { memberLogService } from '../../services/memberLogService';
@@ -66,6 +68,11 @@ export default function Members() {
   const [showSuspendModal, setShowSuspendModal] = useState(false);
   const [suspendingMember, setSuspendingMember] = useState(null);
   const [suspendInfo, setSuspendInfo] = useState({ remainingDays: 0, endDate: '' });
+  const [verifyingAll, setVerifyingAll] = useState(false);
+
+  const pendingCkCount = useMemo(() => {
+    return members.filter((m) => m.payment_method === 'CK' && !m.is_payment_verified).length;
+  }, [members]);
 
   useEffect(() => {
     const fetchShift = async () => {
@@ -157,6 +164,44 @@ export default function Members() {
         } catch (err) {
           setError("Lỗi duyệt thanh toán: " + err.message);
           addToast("Lỗi duyệt thanh toán", "error");
+        }
+      }
+    });
+  };
+
+  // Duyệt chuyển khoản cho tất cả hội viên đang chờ
+  const handleVerifyAllPendingCk = async () => {
+    if (pendingCkCount === 0) {
+      addToast('Hiện không có chuyển khoản nào chờ duyệt.', 'info');
+      return;
+    }
+
+    showConfirm({
+      title: 'Duyệt chuyển khoản tất cả',
+      message: `Bạn có chắc chắn muốn duyệt chuyển khoản cho tất cả ${pendingCkCount} hội viên đang chờ duyệt không?`,
+      confirmText: 'Duyệt tất cả',
+      onConfirm: async () => {
+        setVerifyingAll(true);
+        setError('');
+        try {
+          const result = await memberService.verifyAllPendingPayments(user?.id, activeStaff?.id);
+
+          await staffLogService.logAction({
+            staffId: user?.id,
+            staffMemberId: activeStaff?.id,
+            action: 'Duyệt tất cả thanh toán CK',
+            targetItem: `Duyệt ${result.count || pendingCkCount} giao dịch CK`,
+            details: { count: result.count, totalPending: pendingCkCount },
+            note: 'Admin duyệt chuyển khoản hàng loạt cho tất cả hội viên',
+          });
+
+          await fetchMembers();
+          addToast(`Đã duyệt chuyển khoản thành công cho tất cả (${result.count || pendingCkCount} giao dịch)!`, 'success');
+        } catch (err) {
+          setError('Lỗi duyệt chuyển khoản: ' + err.message);
+          addToast('Lỗi duyệt chuyển khoản: ' + err.message, 'error');
+        } finally {
+          setVerifyingAll(false);
         }
       }
     });
@@ -530,7 +575,75 @@ export default function Members() {
         onAddMember={openCreateModal}
         onExportExcel={handleExportExcel}
         profile={profile}
+        pendingCkCount={pendingCkCount}
+        onVerifyAllPendingCk={handleVerifyAllPendingCk}
+        verifyingAll={verifyingAll}
       />
+
+      {profile?.role === 'admin' && pendingCkCount > 0 && activeTab !== 'services' && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '12px 16px',
+          background: '#fefce8',
+          border: '1px solid #fef08a',
+          borderRadius: '8px',
+          color: '#854d0e',
+          fontSize: '13px',
+          gap: '12px',
+          flexWrap: 'wrap'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '18px' }}>⚠️</span>
+            <span>
+              Có <strong>{pendingCkCount}</strong> hội viên thanh toán chuyển khoản đang <strong>chờ duyệt</strong>.
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {filterStatus !== 'pending_ck' && (
+              <button
+                type="button"
+                onClick={() => setFilterStatus('pending_ck')}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #ca8a04',
+                  color: '#854d0e',
+                  borderRadius: '6px',
+                  padding: '5px 12px',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Lọc danh sách chờ duyệt
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleVerifyAllPendingCk}
+              disabled={verifyingAll}
+              style={{
+                background: '#16a34a',
+                border: 'none',
+                color: 'white',
+                borderRadius: '6px',
+                padding: '5px 14px',
+                fontSize: '12px',
+                fontWeight: '600',
+                cursor: verifyingAll ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+              }}
+            >
+              <CheckCheck size={15} />
+              {verifyingAll ? 'Đang duyệt...' : 'Duyệt chuyển khoản tất cả'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {error && <div className="modern-error">{error}</div>}
 

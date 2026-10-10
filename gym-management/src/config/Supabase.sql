@@ -242,6 +242,34 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- A2. Duyệt tất cả chuyển khoản CK (Atomic)
+CREATE OR REPLACE FUNCTION verify_all_payments_atomic(
+  p_admin_id UUID, 
+  p_staff_member_id UUID DEFAULT NULL,
+  p_verified_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+)
+RETURNS JSON AS $$
+DECLARE
+  v_rec RECORD;
+  v_count INT := 0;
+BEGIN
+  FOR v_rec IN 
+    SELECT id FROM payment_logs 
+    WHERE payment_method = 'CK' AND (is_verified = false OR is_verified IS NULL)
+  LOOP
+    PERFORM verify_payment_atomic(v_rec.id, p_admin_id, p_staff_member_id, p_verified_at);
+    v_count := v_count + 1;
+  END LOOP;
+
+  -- Đồng bộ các member_logs nếu có bản ghi chưa được duyệt
+  UPDATE member_logs 
+  SET is_payment_verified = true 
+  WHERE payment_method = 'CK' AND (is_payment_verified = false OR is_payment_verified IS NULL);
+
+  RETURN json_build_object('success', true, 'count', v_count);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- B. Bán hàng nước (Atomic)
 CREATE OR REPLACE FUNCTION sell_bottle_transaction(p_product_id UUID, p_shift_id UUID, p_auth_id UUID, p_staff_id UUID, p_quantity INT, p_total_price NUMERIC, p_payment_method TEXT, p_sold_at TIMESTAMP WITH TIME ZONE)
 RETURNS JSON AS $$

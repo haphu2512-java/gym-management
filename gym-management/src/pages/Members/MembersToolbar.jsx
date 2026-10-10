@@ -1,4 +1,4 @@
-import { Plus, Search, FileSpreadsheet } from 'lucide-react';
+import { Plus, Search, FileSpreadsheet, CheckCheck } from 'lucide-react';
 
 export default function MembersToolbar({
   activeTab,
@@ -11,7 +11,10 @@ export default function MembersToolbar({
   setFilterDate,
   onAddMember,
   onExportExcel,
-  profile
+  profile,
+  pendingCkCount = 0,
+  onVerifyAllPendingCk,
+  verifyingAll = false
 }) {
   return (
     <>
@@ -93,6 +96,37 @@ export default function MembersToolbar({
             <option value="missing_code">Chưa gắn Mã HV</option>
             <option value="expired">Hết hạn</option>
           </select>
+          {profile?.role === 'admin' && (
+            <button
+              type="button"
+              className="ghost-btn"
+              onClick={onVerifyAllPendingCk}
+              disabled={verifyingAll || pendingCkCount === 0}
+              title={
+                pendingCkCount > 0
+                  ? `Duyệt chuyển khoản cho tất cả ${pendingCkCount} hội viên đang chờ duyệt`
+                  : 'Hiện không có chuyển khoản nào chờ duyệt'
+              }
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: pendingCkCount > 0 ? '#15803d' : '#94a3b8',
+                background: pendingCkCount > 0 ? '#dcfce7' : '#f8fafc',
+                border: `1px solid ${pendingCkCount > 0 ? '#86efac' : '#cbd5e1'}`,
+                fontWeight: '600',
+                cursor: pendingCkCount > 0 && !verifyingAll ? 'pointer' : 'not-allowed',
+                opacity: verifyingAll ? 0.6 : 1,
+                transition: 'all 0.2s ease',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <CheckCheck size={16} />
+              <span>
+                {verifyingAll ? 'Đang duyệt...' : `Duyệt CK tất cả${pendingCkCount > 0 ? ` (${pendingCkCount})` : ''}`}
+              </span>
+            </button>
+          )}
           {profile?.role === 'admin' && (
             <button
               type="button"
