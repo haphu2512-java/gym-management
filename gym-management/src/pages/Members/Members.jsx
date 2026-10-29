@@ -2,11 +2,9 @@ import { useMemo, useState, useEffect } from 'react';
 import { CheckCheck } from 'lucide-react';
 import { useMembers } from '../../hooks/useMembers';
 import { memberService } from '../../services/memberService';
-import { paymentService } from '../../services/paymentService';
 import { staffLogService } from '../../services/staffLogService';
 import { shiftService } from '../../services/shiftService';
 import { memberLogService } from '../../services/memberLogService';
-import supabase from '../../config/supabase';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useUIStore } from '../../store/useUIStore';
 import { getLocalISODate, addMonths } from '../../utils/formatters';
@@ -55,6 +53,8 @@ export default function Members() {
   const [editingMember, setEditingMember] = useState(null);
   const [form, setForm] = useState(getInitialForm);
   const [submitting, setSubmitting] = useState(false);
+  // Sinh khi mở modal (không phải khi bấm Lưu) để bấm lại sau lỗi mạng không tạo trùng giao dịch
+  const [idempotencyKey, setIdempotencyKey] = useState(null);
 
   const [showRenewModal, setShowRenewModal] = useState(false);
   const [renewingMember, setRenewingMember] = useState(null);
@@ -134,7 +134,7 @@ export default function Members() {
       message: `Xác nhận đã nhận đủ ${Number(log.fee || 0).toLocaleString()}đ chuyển khoản cho lần gia hạn này?`,
       onConfirm: async () => {
         try {
-          await memberService.verifyLogPayment(log.id, user?.id, activeStaff?.id);
+          await memberService.verifyLogPayment(log.id, activeStaff?.id);
 
           setHistoryLogs(prevLogs =>
             prevLogs.map(l => l.id === log.id ? { ...l, is_payment_verified: true } : l)
@@ -143,11 +143,7 @@ export default function Members() {
           await fetchMembers();
 
           if (editingMember && editingMember.id === log.member_id) {
-            const { data: freshMember } = await supabase
-              .from('member_current_status')
-              .select('*')
-              .eq('id', log.member_id)
-              .single();
+            const freshMember = await memberService.getMember(log.member_id);
             if (freshMember) setEditingMember(freshMember);
           }
 
@@ -184,7 +180,7 @@ export default function Members() {
         setVerifyingAll(true);
         setError('');
         try {
-          const result = await memberService.verifyAllPendingPayments(user?.id, activeStaff?.id);
+          const result = await memberService.verifyAllPendingPayments(activeStaff?.id);
 
           await staffLogService.logAction({
             staffId: user?.id,
@@ -207,24 +203,25 @@ export default function Members() {
     });
   };
 
-  // Xử lý xóa hội viên
-  const handleConfirmDelete = async () => {
+  // Xử lý xóa hội viên. Khoản thu cũ giữ nguyên; nếu hoàn tiền thì ghi vào ca đang mở.
+  const handleConfirmDelete = async ({ refundAmount = 0, refundMethod = 'TM', note = '' } = {}) => {
     if (!deletingMember) return;
+    if (refundAmount > 0 && !activeShift?.id) {
+      setError('Vui lòng mở ca trước khi xóa hội viên có hoàn tiền.');
+      return;
+    }
     try {
-      const effectiveStaffId = activeStaff?.id || user?.id;
-      await memberService.deleteMember(deletingMember.id);
-
-      await staffLogService.logAction({
-        staffId: user?.id,
-        staffMemberId: activeStaff?.id,
-        action: 'Xoa hoi vien',
-        targetItem: deletingMember.full_name,
-        details: { member_id: deletingMember.id, member_code: deletingMember.member_code },
-        note: 'Admin thuc hien xoa hoi vien (soft delete)',
+      await memberService.deleteMember(deletingMember.id, {
+        shiftId: activeShift?.id,
+        staffId: activeStaff?.id,
+        refundAmount,
+        refundMethod,
+        note,
       });
 
       await fetchMembers();
       setDeletingMember(null);
+      addToast(refundAmount > 0 ? `Đã xóa hội viên và ghi hoàn tiền ${Number(refundAmount).toLocaleString()}đ` : 'Đã xóa hội viên');
     } catch (err) {
       setError("Lỗi xóa hội viên: " + err.message);
     }
@@ -234,6 +231,7 @@ export default function Members() {
   const openCreateModal = () => {
     setEditingMember(null);
     setForm(getInitialForm());
+    setIdempotencyKey(crypto.randomUUID());
     setError('');
     setShowModal(true);
   };
@@ -308,8 +306,6 @@ export default function Members() {
       const startObj = new Date(startDate);
       const endDate = getLocalISODate(addMonths(startObj, Number(form.package_type || 1)));
 
-      const idempotencyKey = crypto.randomUUID();
-
       const payload = {
         member_code: form.member_code?.trim() || null,
         full_name: form.full_name,
@@ -323,7 +319,7 @@ export default function Members() {
         fingerprint_status: Boolean(form.fingerprint_status),
         note: form.note,
         shift_id: activeShift.id,
-        staff_id: activeStaff?.id || user?.id,
+        staff_id: activeStaff?.id,
         idempotencyKey,
       };
 
@@ -336,15 +332,6 @@ export default function Members() {
           end_date: form.end_date,
         };
         const updated = await updateMember(editingMember.id, updatePayload);
-
-        await memberLogService.logAction({
-          memberId: editingMember.id,
-          staffId: user?.id,
-          staffMemberId: activeStaff?.id,
-          action: 'UPDATE',
-          details: { before: editingMember, after: updated },
-          note: 'Cập nhật thông tin hội viên'
-        });
 
         await staffLogService.logAction({
           staffId: user?.id,
@@ -361,15 +348,6 @@ export default function Members() {
           return;
         }
         await addMember(payload);
-        
-        await staffLogService.logAction({
-          staffId: user?.id,
-          staffMemberId: activeStaff?.id,
-          action: 'Thêm hội viên mới',
-          targetItem: payload.full_name,
-          details: { member_code: payload.member_code, package: payload.package_type, idempotency_key: idempotencyKey },
-          note: 'Admin/Staff tạo hội viên mới',
-        });
       }
 
       setShowModal(false);
@@ -395,6 +373,7 @@ export default function Members() {
       custom_renew_date: member.end_date ? new Date(member.end_date).toISOString().slice(0, 10) : getLocalISODate(),
       note: ''
     });
+    setIdempotencyKey(crypto.randomUUID());
     setError('');
     setShowRenewModal(true);
   };
@@ -415,39 +394,22 @@ export default function Members() {
     try {
       const packageType = Number(renewForm.package_type || 0);
       if (packageType < 1 || packageType > 36) {
-        setError('Goi tap tu 1 den 36 thang.');
+        setError('Gói tập từ 1 đến 36 tháng.');
         setSubmitting(false);
         return;
       }
-
-      const idempotencyKey = crypto.randomUUID();
 
       await memberService.renewMember(renewingMember.id, {
         packageType,
         membershipCategory: renewForm.membership_category,
         fee: Number(renewForm.fee || 0),
         paymentMethod: renewForm.payment_method,
-        staffId: activeStaff?.id || user?.id,
+        staffId: activeStaff?.id,
         shiftId: activeShift.id,
         renewFrom: renewForm.renew_from,
         customRenewDate: renewForm.custom_renew_date,
         note: renewForm.note,
         idempotencyKey,
-      });
-
-      await staffLogService.logAction({
-        staffId: user?.id,
-        staffMemberId: activeStaff?.id,
-        action: 'Gia hạn hội viên',
-        targetItem: renewingMember.full_name,
-        details: { 
-          member_id: renewingMember.id, 
-          package: packageType, 
-          fee: Number(renewForm.fee || 0),
-          note: renewForm.note,
-          idempotency_key: idempotencyKey
-        },
-        note: renewForm.note || 'Admin/Staff thực hiện gia hạn học phí',
       });
 
       // Làm mới danh sách để cập nhật ngày hết hạn mới
@@ -497,16 +459,8 @@ export default function Members() {
 
     setSubmitting(true);
     try {
-      await suspendMember(suspendingMember.id, activeStaff?.id || user?.id, activeShift.id);
-      
-      await staffLogService.logAction({
-        staffId: user?.id,
-        staffMemberId: activeStaff?.id,
-        action: 'Bảo lưu hội viên',
-        targetItem: suspendingMember.full_name,
-        details: { member_id: suspendingMember.id },
-        note: 'Admin/Staff thực hiện bảo lưu (tạm dừng)',
-      });
+      await suspendMember(suspendingMember.id, activeStaff?.id, activeShift.id);
+
 
       setShowSuspendModal(false);
       setSuspendingMember(null);
@@ -533,16 +487,8 @@ export default function Members() {
         if (submitting) return;
         setSubmitting(true);
         try {
-          await reactivateMember(member.id, activeStaff?.id || user?.id, activeShift.id);
-          
-          await staffLogService.logAction({
-            staffId: user?.id,
-            staffMemberId: activeStaff?.id,
-            action: 'Kích hoạt lại hội viên',
-            targetItem: member.full_name,
-            details: { member_id: member.id },
-            note: 'Admin/Staff kích hoạt lại từ trạng thái bảo lưu',
-          });
+          await reactivateMember(member.id, activeStaff?.id, activeShift.id);
+
 
           addToast("Đã kích hoạt lại hội viên thành công!");
         } catch (err) {
@@ -693,6 +639,7 @@ export default function Members() {
       {deletingMember && (
         <DeleteConfirmModal
           member={deletingMember}
+          hasActiveShift={Boolean(activeShift?.id)}
           onConfirm={handleConfirmDelete}
           onCancel={() => setDeletingMember(null)}
         />

@@ -17,7 +17,7 @@ export const statisticsService = {
         .from('payment_logs')
         .select('amount, payment_type, created_at, shifts(shift_name), staff_members:staff_member_id(full_name)')
         .eq('is_verified', true)
-        .in('payment_type', ['new', 'renew']);
+        .in('payment_type', ['new', 'renew', 'refund']);
       if (filters.startDate) query = query.gte('created_at', filters.startDate);
       if (filters.endDate) query = query.lte('created_at', filters.endDate);
       return query.order('id');
@@ -49,36 +49,21 @@ export const statisticsService = {
         type: p.payment_type,
         revenue: Number(p.amount || 0)
       };
-    }).filter(p => p.revenue > 0);
+    }).filter(p => p.revenue !== 0); // giữ cả khoản hoàn tiền (số âm)
 
     return { waterSales, memberships };
   },
 
+  // Tổng doanh thu tính bằng SQL. Doanh thu dịch vụ gộp vào doanh thu hội viên.
   async getOverallStats(filters = {}) {
-    // This could be expanded to fetch all stats for the page
-    // For now, let's focus on what's needed for the dashboard summary
-    
-    const withRange = (query, dateColumn) => {
-      if (filters.startDate) query = query.gte(dateColumn, filters.startDate);
-      if (filters.endDate) query = query.lte(dateColumn, filters.endDate);
-      return query.order('id');
-    };
+    const { data, error } = await supabase.rpc('get_revenue_summary', {
+      p_start: filters.startDate || null,
+      p_end: filters.endDate || null,
+    });
+    if (error) throw new Error(error.message);
 
-    const [salesRows, paymentRows, serviceRows] = await Promise.all([
-      // Revenue from sales_logs
-      fetchAllRows(() => withRange(supabase.from('sales_logs').select('total_price, sold_at'), 'sold_at')),
-      // Revenue from payment_logs
-      fetchAllRows(() => withRange(supabase.from('payment_logs').select('amount, created_at').eq('is_verified', true), 'created_at')),
-      // Revenue from service_sales
-      fetchAllRows(() => withRange(supabase.from('service_sales').select('total_price, sold_at'), 'sold_at')),
-    ]);
-
-    const waterRevenue = salesRows.reduce((sum, item) => sum + Number(item.total_price || 0), 0);
-    const memberRevenueBase = paymentRows.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    const serviceRevenue = serviceRows.reduce((sum, item) => sum + Number(item.total_price || 0), 0);
-    
-    // Gộp doanh thu dịch vụ vào doanh thu hội viên
-    const memberRevenue = memberRevenueBase + serviceRevenue;
+    const waterRevenue = Number(data?.water || 0);
+    const memberRevenue = Number(data?.member || 0) + Number(data?.service || 0);
 
     return {
       waterRevenue,

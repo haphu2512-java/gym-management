@@ -39,9 +39,9 @@ export const additionalService = {
       p_auth_id: authId,
       p_staff_id: staffId,
       p_quantity: qty,
-      p_total_price: Number(service.price || 0) * qty,
+      p_total_price: null, // server tự tính từ giá dịch vụ
       p_payment_method: paymentMethod,
-      p_sold_at: new Date().toISOString()
+      p_sold_at: null
     });
 
     if (error) throw new Error('Bán dịch vụ thất bại: ' + error.message);
@@ -126,48 +126,13 @@ export const additionalService = {
     return data || [];
   },
 
-  async rollbackServiceSale(saleId, authId, staffId, activeShiftId) {
-    // 1. Lấy thông tin bản ghi bán dịch vụ kèm theo trạng thái ca làm
-    const { data: sale, error: fetchError } = await supabase
-      .from('service_sales')
-      .select('*, shifts(status)')
-      .eq('id', saleId)
-      .single();
-
-    if (fetchError || !sale) {
-      throw new Error('Không tìm thấy giao dịch hoặc lỗi: ' + (fetchError?.message || 'Unknown'));
-    }
-
-    // Lấy thông tin role của người dùng thực hiện
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', authId)
-      .single();
-
-    const isAdmin = profile?.role === 'admin';
-
-    // 2. Kiểm tra điều kiện bảo mật/quyền hạn
-    if (!isAdmin) {
-      const isShiftOpen = sale.shifts?.status === 'open';
-      const isOwnSale = sale.sold_by === authId || (staffId && sale.sold_by_member === staffId);
-      const isInActiveShift = activeShiftId && sale.shift_id === activeShiftId;
-
-      if (!isShiftOpen || !isInActiveShift || !isOwnSale) {
-        throw new Error('Bạn không có quyền hoàn tác giao dịch này (chỉ được hoàn tác giao dịch do chính bạn bán trong ca đang mở của bạn).');
-      }
-    }
-
-    // 3. Xóa nhật ký bán dịch vụ trong service_sales
-    const { error: deleteError } = await supabase
-      .from('service_sales')
-      .delete()
-      .eq('id', saleId);
-
-    if (deleteError) {
-      throw new Error('Xóa lịch sử bán dịch vụ thất bại: ' + deleteError.message);
-    }
-
+  // Hoàn tác bán dịch vụ (server kiểm tra quyền như hoàn tác bán nước)
+  async rollbackServiceSale(saleId, staffId) {
+    const { error } = await supabase.rpc('rollback_service_sale', {
+      p_sale_id: saleId,
+      p_staff_id: staffId || null,
+    });
+    if (error) throw new Error(error.message);
     return { success: true };
   },
 };

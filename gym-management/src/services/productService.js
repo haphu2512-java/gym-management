@@ -1,5 +1,4 @@
 import supabase from '../config/supabase';
-import { fetchAllRows } from '../utils/fetchAllRows';
 
 const PRODUCT_TABLE = 'products';
 
@@ -40,9 +39,9 @@ export const productService = {
       p_auth_id: authId,
       p_staff_id: staffId,
       p_quantity: qty,
-      p_total_price: Number(product.price || 0) * qty,
+      p_total_price: null, // server tự tính từ giá sản phẩm
       p_payment_method: paymentMethod,
-      p_sold_at: new Date().toISOString()
+      p_sold_at: null
     });
 
     if (error) throw new Error('Bán hàng thất bại: ' + error.message);
@@ -76,21 +75,14 @@ export const productService = {
     return data.reduce((sum, item) => sum + Number(item.total_price || 0), 0);
   },
 
+  // Tổng doanh thu nước, tính bằng SQL
   async getTotalDrinkRevenue(filters = {}) {
-    const data = await fetchAllRows(() => {
-      let query = supabase
-        .from('sales_logs')
-        .select('total_price');
-
-      if (filters.startDate) {
-        query = query.gte('sold_at', filters.startDate);
-      }
-      if (filters.endDate) {
-        query = query.lte('sold_at', filters.endDate);
-      }
-      return query.order('id');
+    const { data, error } = await supabase.rpc('get_revenue_summary', {
+      p_start: filters.startDate || null,
+      p_end: filters.endDate || null,
     });
-    return data.reduce((sum, item) => sum + Number(item.total_price || 0), 0);
+    if (error) throw new Error(error.message);
+    return Number(data?.water || 0);
   },
 
   async getFilteredSalesLogs(filters = {}) {
@@ -129,74 +121,14 @@ export const productService = {
     return data || [];
   },
 
-  async rollbackSale(saleId, authId, staffId, activeShiftId) {
-    // 1. Lấy thông tin bản ghi bán hàng kèm theo trạng thái ca làm
-    const { data: sale, error: fetchError } = await supabase
-      .from('sales_logs')
-      .select('*, shifts(status)')
-      .eq('id', saleId)
-      .single();
-
-    if (fetchError || !sale) {
-      throw new Error('Không tìm thấy giao dịch hoặc lỗi: ' + (fetchError?.message || 'Unknown'));
-    }
-
-    // Lấy thông tin role của người dùng thực hiện
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', authId)
-      .single();
-
-    const isAdmin = profile?.role === 'admin';
-
-    // 2. Kiểm tra điều kiện bảo mật/quyền hạn
-    if (!isAdmin) {
-      const isShiftOpen = sale.shifts?.status === 'open';
-      const isOwnSale = sale.sold_by === authId || (staffId && sale.sold_by_member === staffId);
-      const isInActiveShift = activeShiftId && sale.shift_id === activeShiftId;
-
-      if (!isShiftOpen || !isInActiveShift || !isOwnSale) {
-        throw new Error('Bạn không có quyền hoàn tác giao dịch này (chỉ được hoàn tác giao dịch do chính bạn bán trong ca đang mở của bạn).');
-      }
-    }
-
-    // 3. Lấy tồn kho hiện tại của sản phẩm để cộng dồn chính xác
-    const { data: product, error: prodError } = await supabase
-      .from('products')
-      .select('stock_quantity')
-      .eq('id', sale.product_id)
-      .single();
-
-    if (prodError || !product) {
-      throw new Error('Không lấy được thông tin tồn kho sản phẩm: ' + (prodError?.message || 'Unknown'));
-    }
-
-    // 4. Cộng trả lại số lượng vào kho
-    const { error: stockUpdateError } = await supabase
-      .from('products')
-      .update({ stock_quantity: Number(product.stock_quantity || 0) + Number(sale.quantity || 1) })
-      .eq('id', sale.product_id);
-
-    if (stockUpdateError) {
-      throw new Error('Cập nhật tồn kho thất bại: ' + stockUpdateError.message);
-    }
-
-    // 5. Xóa nhật ký bán hàng trong sales_logs
-    const { error: deleteError } = await supabase
-      .from('sales_logs')
-      .delete()
-      .eq('id', saleId);
-
-    if (deleteError) {
-      // Revert lại số lượng tồn kho nếu xóa nhật ký thất bại
-      await supabase
-        .from('products')
-        .update({ stock_quantity: product.stock_quantity })
-        .eq('id', sale.product_id);
-      throw new Error('Xóa lịch sử bán hàng thất bại: ' + deleteError.message);
-    }
-
+  // Hoàn tác bán nước: xóa giao dịch và cộng lại kho trong một transaction ở server.
+  // Server kiểm tra quyền: admin, hoặc người bán trong ca còn mở.
+  async rollbackSale(saleId, staffId) {
+    const { error } = await supabase.rpc('rollback_sale', {
+      p_sale_id: saleId,
+      p_staff_id: staffId || null,
+    });
+    if (error) throw new Error(error.message);
     return { success: true };
   },
 };

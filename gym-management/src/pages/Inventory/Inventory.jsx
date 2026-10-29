@@ -292,22 +292,8 @@ export default function Inventory() {
     setLoading(true);
     setError('');
     try {
-      await productService.rollbackSale(
-        log.id,
-        user?.id,
-        activeStaff?.id,
-        activeShift?.id
-      );
-
-      // Ghi log hành động rollback
-      await staffLogService.logAction({
-        staffId: user?.id,
-        staffMemberId: activeStaff?.id,
-        action: 'Rollback bán hàng',
-        targetItem: log.products?.name || 'N/A',
-        details: { qty: log.quantity, total: Number(log.total_price || 0), method: log.payment_method },
-        note: 'Nhân viên hoàn tác giao dịch nước uống bán nhầm',
-      });
+      // Server ghi luôn nhật ký hoàn tác
+      await productService.rollbackSale(log.id, activeStaff?.id);
 
       // Tải lại danh sách sản phẩm (để cập nhật số lượng tồn kho trên giao diện bán hàng)
       await loadProducts();

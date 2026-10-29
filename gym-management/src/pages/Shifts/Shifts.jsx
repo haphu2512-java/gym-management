@@ -236,6 +236,7 @@ export default function Shifts() {
       return (Number(shift.starting_cash) || 0) + totalMemberCash + totalServiceCash + totalDrinkCash - shiftExpense;
     } catch (error) {
       console.error('Error calculating handover cash:', error);
+      setError('Không tính được tiền dự kiến cuối ca (lỗi mạng?). Vui lòng tải lại trang trước khi chốt ca: ' + error.message);
       return 0;
     }
   };
@@ -384,9 +385,7 @@ export default function Shifts() {
           shiftId: activeShift.id,
           endingCash: Number(form.ending_cash),
           note: form.note,
-          authId: user?.id,
           staffId: activeStaff?.id,
-          shiftName: activeShift.shift_name,
         });
 
         // Reset nhân viên đang trực sau khi chốt ca
@@ -403,7 +402,6 @@ export default function Shifts() {
           shiftName: form.shift_name,
           startingCash: Number(form.starting_cash),
           note: form.note,
-          authId: user?.id,
           staffId: activeStaff.id,
           skipTimeCheck: profile?.role === 'admin' && skipTimeCheck,
         });

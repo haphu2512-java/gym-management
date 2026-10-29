@@ -244,7 +244,7 @@ export default function Dashboard() {
 
     try {
       setLoadingRecent(true);
-      await memberService.revertRenewTransaction(log.id, profile?.id);
+      await memberService.revertRenewTransaction(log.id);
       alert('Hoàn tác gia hạn thành công!');
       
       // Tải lại các số liệu thống kê doanh thu và danh sách hội viên
