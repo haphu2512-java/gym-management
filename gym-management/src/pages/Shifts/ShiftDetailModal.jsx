@@ -30,17 +30,17 @@ export default function ShiftDetailModal({ summary, loading, onClose }) {
         ) : summary ? (
           <div className="modern-stack" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-              <div className="modern-card" style={{ padding: '12px', background: '#f8fafc' }}>
+              <div className="modern-card" style={{ padding: '12px', background: 'var(--surface-2)' }}>
                 <p className="cell-sub">Nhân viên trực ca</p>
                 <p className="cell-main">{summary.shift?.staff_members?.full_name || summary.shift?.profiles?.full_name || 'N/A'}</p>
               </div>
-              <div className="modern-card" style={{ padding: '12px', background: '#f8fafc' }}>
+              <div className="modern-card" style={{ padding: '12px', background: 'var(--surface-2)' }}>
                 <p className="cell-sub">Doanh thu dự kiến (TM)</p>
                 <p className="cell-main">
                   {expectedCash(summary).toLocaleString()}đ
                 </p>
               </div>
-              <div className="modern-card" style={{ padding: '12px', background: '#f8fafc' }}>
+              <div className="modern-card" style={{ padding: '12px', background: 'var(--surface-2)' }}>
                 <p className="cell-sub">Doanh thu thực tế (TM)</p>
                 <p className="cell-main">
                   {summary.shift?.status === 'closed'
@@ -51,7 +51,7 @@ export default function ShiftDetailModal({ summary, loading, onClose }) {
             </div>
 
             <div style={{ marginTop: '16px' }}>
-              <h4 style={{ marginBottom: '8px', borderBottom: '1px solid #eee', paddingBottom: '4px' }}>Hội viên mới & Gia hạn ({summary.payments.length})</h4>
+              <h4 style={{ marginBottom: '8px', borderBottom: '1px solid var(--line)', paddingBottom: '4px' }}>Hội viên mới & Gia hạn ({summary.payments.length})</h4>
               <table className="modern-table" style={{ fontSize: '13px' }}>
                 <thead>
                   <tr>
@@ -76,7 +76,7 @@ export default function ShiftDetailModal({ summary, loading, onClose }) {
             </div>
 
             <div style={{ marginTop: '16px' }}>
-              <h4 style={{ marginBottom: '8px', borderBottom: '1px solid #eee', paddingBottom: '4px' }}>Bán Dịch vụ ({summary.serviceSales?.length || 0})</h4>
+              <h4 style={{ marginBottom: '8px', borderBottom: '1px solid var(--line)', paddingBottom: '4px' }}>Bán Dịch vụ ({summary.serviceSales?.length || 0})</h4>
               <table className="modern-table" style={{ fontSize: '13px' }}>
                 <thead>
                   <tr>
@@ -103,7 +103,7 @@ export default function ShiftDetailModal({ summary, loading, onClose }) {
             </div>
 
             <div style={{ marginTop: '16px' }}>
-              <h4 style={{ marginBottom: '8px', borderBottom: '1px solid #eee', paddingBottom: '4px' }}>Bán nước ({summary.sales.length})</h4>
+              <h4 style={{ marginBottom: '8px', borderBottom: '1px solid var(--line)', paddingBottom: '4px' }}>Bán nước ({summary.sales.length})</h4>
               <table className="modern-table" style={{ fontSize: '13px' }}>
                 <thead>
                   <tr>
@@ -130,7 +130,7 @@ export default function ShiftDetailModal({ summary, loading, onClose }) {
             </div>
 
             <div style={{ marginTop: '16px' }}>
-              <h4 style={{ marginBottom: '8px', borderBottom: '1px solid #eee', paddingBottom: '4px' }}>Khoản chi ({summary.expenses.length})</h4>
+              <h4 style={{ marginBottom: '8px', borderBottom: '1px solid var(--line)', paddingBottom: '4px' }}>Khoản chi ({summary.expenses.length})</h4>
               <table className="modern-table" style={{ fontSize: '13px' }}>
                 <thead>
                   <tr>
@@ -153,7 +153,7 @@ export default function ShiftDetailModal({ summary, loading, onClose }) {
             </div>
 
             {summary.shift?.note && (
-              <div style={{ marginTop: '16px', padding: '12px', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fef3c7' }}>
+              <div style={{ marginTop: '16px', padding: '12px', background: 'var(--warn-soft)', borderRadius: 'var(--radius)', border: '1px solid var(--warn-soft)' }}>
                 <p className="cell-sub">Ghi chú ca:</p>
                 <p style={{ margin: 0, fontSize: '14px' }}>{summary.shift.note}</p>
               </div>

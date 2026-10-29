@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/useAuthStore';
-import logo from '../../assets/logo.png';
+import logo from '../../assets/logo-wide.png';
 import ChangePasswordModal from '../../components/auth/ChangePasswordModal';
 
 export default function Login() {
@@ -26,52 +26,58 @@ export default function Login() {
 
   return (
     <div className="login-modern">
-      <div className="login-card-modern">
-        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-          <img src={logo} alt="Logo" style={{ width: '120px', height: 'auto', borderRadius: '16px' }} />
+      <section className="login-brand-panel">
+        <img src={logo} alt="Max Power Gym Center" />
+        <p className="login-slogan">Mạnh hơn<span>mỗi ngày</span></p>
+        <p className="login-brand-foot">Hệ thống quản lý hội viên, ca trực và quầy nước.</p>
+      </section>
+
+      <section className="login-form-panel">
+        <div className="login-card-modern">
+          <h1>Đăng nhập</h1>
+          <p>Dành cho quản lý và nhân viên quầy.</p>
+
+          {error && <div className="modern-error" style={{ marginBottom: '14px' }}>{error}</div>}
+
+          <form onSubmit={handleSubmit} className="modern-form">
+            <label htmlFor="login-email">Email</label>
+            <input
+              id="login-email"
+              type="email"
+              placeholder="ten@maxpower.vn"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              required
+            />
+
+            <label htmlFor="login-password">Mật khẩu</label>
+            <input
+              id="login-password"
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+
+            <button type="submit" className="primary-btn large" disabled={loading}>
+              {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
+            </button>
+          </form>
+
+          <div className="login-help">
+            <button
+              type="button"
+              className="link-btn"
+              onClick={() => setShowPasswordModal(true)}
+            >
+              Đổi mật khẩu
+            </button>
+          </div>
         </div>
-        <h1>GymMax Power Center</h1>
-        <p>Đăng nhập vào hệ thống quản lý phòng tập</p>
-
-        {error && <div className="modern-error">{error}</div>}
-
-        <form onSubmit={handleSubmit} className="modern-form">
-          <label>Email</label>
-          <input
-            type="email"
-            placeholder="Nhập email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-            required
-          />
-
-          <label>Mật khẩu</label>
-          <input
-            type="password"
-            placeholder="Nhập mật khẩu"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-            required
-          />
-
-          <button type="submit" className="primary-btn large" disabled={loading}>
-            {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
-          </button>
-        </form>
-
-        <div style={{ marginTop: '24px', textAlign: 'center' }}>
-          <button 
-            type="button" 
-            className="link-btn" 
-            onClick={() => setShowPasswordModal(true)}
-            style={{ fontSize: '14px', color: '#64748b', fontWeight: '500' }}
-          >
-            Thay đổi mật khẩu?
-          </button>
-        </div>
-      </div>
+      </section>
 
       <ChangePasswordModal 
         isOpen={showPasswordModal} 

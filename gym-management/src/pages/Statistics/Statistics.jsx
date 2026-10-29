@@ -3,6 +3,14 @@ import { TrendingUp, Users, Droplets, Calendar, Download } from 'lucide-react';
 import { statisticsService } from '../../services/statisticsService';
 import { exportRevenueToExcel } from '../../utils/excelExport';
 
+const RANGE_LABELS = {
+  today: 'Hôm nay',
+  week: 'Tuần này',
+  month: 'Tháng này',
+  custom: 'Khoảng tùy chọn',
+  all: 'Từ trước đến nay',
+};
+
 export default function Statistics() {
   const [dateRange, setDateRange] = useState('week');
   const [customStartDate, setCustomStartDate] = useState('');
@@ -127,15 +135,13 @@ export default function Statistics() {
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginRight: '10px' }}>
               <input
                 type="date"
-                className="ghost-btn"
                 style={{ padding: '6px 10px', fontSize: '13px' }}
                 value={customStartDate}
                 onChange={(e) => setCustomStartDate(e.target.value)}
               />
-              <span style={{ fontSize: '12px', color: '#64748b' }}>đến</span>
+              <span style={{ fontSize: '12px', color: 'var(--muted)' }}>đến</span>
               <input
                 type="date"
-                className="ghost-btn"
                 style={{ padding: '6px 10px', fontSize: '13px' }}
                 value={customEndDate}
                 onChange={(e) => setCustomEndDate(e.target.value)}
@@ -143,7 +149,6 @@ export default function Statistics() {
             </div>
           )}
           <select
-            className="ghost-btn"
             style={{ padding: '8px 12px' }}
             value={dateRange}
             onChange={(e) => setDateRange(e.target.value)}
@@ -169,48 +174,44 @@ export default function Statistics() {
       </div>
 
       {/* Summary Stats */}
-      <div className="dashboard-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
-        <div className="modern-card stat-card-modern">
-          <div className="stat-icon-wrap blue"><TrendingUp size={22} /></div>
-          <div>
+      <div className="stats-strip" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+        <div className="stat-card-modern is-brand">
+          <div className="stat-head">
             <p className="stat-label-modern">Tổng doanh thu</p>
-            <p className="stat-value-modern">{totals.combined.toLocaleString('vi-VN')}đ</p>
-            <p className="cell-sub">Dữ liệu {dateRange === 'all' ? 'từ trước đến nay' : `trong ${dateRange}`}</p>
+            <TrendingUp size={18} />
           </div>
+          <p className="stat-value-modern money">{totals.combined.toLocaleString('vi-VN')}<span className="unit">đ</span></p>
+          <p className="stat-foot">{RANGE_LABELS[dateRange] || 'Khoảng đã chọn'}</p>
         </div>
-        <div className="modern-card stat-card-modern">
-          <div className="stat-icon-wrap green"><Users size={22} /></div>
-          <div>
-            <p className="stat-label-modern">Doanh thu học phí</p>
-            <p className="stat-value-modern">{totals.memberTotal.toLocaleString('vi-VN')}đ</p>
-            <p className="cell-sub">{totals.combined > 0 ? Math.round((totals.memberTotal / totals.combined) * 100) : 0}% tổng doanh thu</p>
+        <div className="stat-card-modern">
+          <div className="stat-head">
+            <p className="stat-label-modern">Học phí</p>
+            <Users size={18} />
           </div>
+          <p className="stat-value-modern money">{totals.memberTotal.toLocaleString('vi-VN')}<span className="unit">đ</span></p>
+          <p className="stat-foot">{totals.combined > 0 ? Math.round((totals.memberTotal / totals.combined) * 100) : 0}% tổng doanh thu</p>
         </div>
-        <div className="modern-card stat-card-modern">
-          <div className="stat-icon-wrap" style={{ background: '#ecfdf5', color: '#059669' }}>
-            <Droplets size={22} />
+        <div className="stat-card-modern">
+          <div className="stat-head">
+            <p className="stat-label-modern">Quầy nước</p>
+            <Droplets size={18} />
           </div>
-          <div>
-            <p className="stat-label-modern">Doanh thu nước</p>
-            <p className="stat-value-modern">{totals.waterTotal.toLocaleString('vi-VN')}đ</p>
-            <p className="cell-sub">{totals.combined > 0 ? Math.round((totals.waterTotal / totals.combined) * 100) : 0}% tổng doanh thu</p>
-          </div>
+          <p className="stat-value-modern money">{totals.waterTotal.toLocaleString('vi-VN')}<span className="unit">đ</span></p>
+          <p className="stat-foot">{totals.combined > 0 ? Math.round((totals.waterTotal / totals.combined) * 100) : 0}% tổng doanh thu</p>
         </div>
       </div>
-
-
 
       {/* Pivot Statistics Section */}
       <div className="modern-card">
         <div className="flex-row" style={{ justifyContent: 'space-between', marginBottom: '20px' }}>
           <h4 className="modern-title"><Calendar size={18} /> Thống kê theo đối tượng</h4>
           <div className="flex-row" style={{ gap: '12px' }}>
-            <select style={{margin:'10px'}} className="ghost-btn" value={pivotSubject} onChange={(e) => setPivotSubject(e.target.value)}>
+            <select value={pivotSubject} onChange={(e) => setPivotSubject(e.target.value)}>
               <option value="water">Đối tượng: Nước</option>
               <option value="membership">Đối tượng: Hội viên</option>
             </select>
             
-            <select className="ghost-btn" value={pivotBy} onChange={(e) => setPivotBy(e.target.value)}>
+            <select value={pivotBy} onChange={(e) => setPivotBy(e.target.value)}>
               <option value="date">Nhóm theo: Ngày</option>
               <option value="shift">Nhóm theo: Ca làm</option>
               <option value="staff">Nhóm theo: Nhân viên</option>
@@ -241,8 +242,8 @@ export default function Statistics() {
             <tbody>
               {pivotData.map((row, idx) => (
                 <tr key={idx}>
-                  <td style={{ fontWeight: '600', color: '#1e293b' }}>{row.key}</td>
-                  <td style={{ color: '#059669', fontWeight: 'bold' }}>{row.revenue.toLocaleString('vi-VN')}đ</td>
+                  <td style={{ fontWeight: '600', color: 'var(--text)' }}>{row.key}</td>
+                  <td style={{ color: 'var(--ok)', fontWeight: 'bold' }}>{row.revenue.toLocaleString('vi-VN')}đ</td>
 
                   {pivotSubject === 'water' ? (
                     <>
@@ -250,7 +251,7 @@ export default function Statistics() {
                       <td>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                           {Object.entries(row.products).map(([prod, qty]) => (
-                            <span key={prod} style={{ background: '#f1f5f9', padding: '2px 8px', borderRadius: '4px', fontSize: '12px' }}>
+                            <span key={prod} style={{ background: 'var(--surface-3)', padding: '2px 8px', borderRadius: '4px', fontSize: '12px' }}>
                               {prod}: <b>{qty}</b>
                             </span>
                           ))}
@@ -259,8 +260,8 @@ export default function Statistics() {
                     </>
                   ) : (
                     <>
-                      <td>{row.newCount > 0 ? <span style={{ color: '#2563eb', fontWeight: 'bold' }}>{row.newCount} thẻ</span> : '-'}</td>
-                      <td>{row.renewCount > 0 ? <span style={{ color: '#ea580c', fontWeight: 'bold' }}>{row.renewCount} lượt</span> : '-'}</td>
+                      <td>{row.newCount > 0 ? <span style={{ color: 'var(--brand-ink)', fontWeight: 'bold' }}>{row.newCount} thẻ</span> : '-'}</td>
+                      <td>{row.renewCount > 0 ? <span style={{ color: 'var(--warn)', fontWeight: 'bold' }}>{row.renewCount} lượt</span> : '-'}</td>
                     </>
                   )}
                 </tr>

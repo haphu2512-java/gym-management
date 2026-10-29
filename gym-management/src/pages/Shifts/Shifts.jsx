@@ -441,9 +441,9 @@ export default function Shifts() {
           <h3 className="modern-title flex-row"><Clock size={18} /> Bàn giao ca trực</h3>
 
           {!isTrusted ? (
-            <div className="modern-card" style={{ background: '#fff7ed', border: '1px solid #ffedd5', padding: '20px', textAlign: 'center' }}>
-              <p style={{ color: '#9a3412', fontWeight: '600', marginBottom: '12px' }}>
-                ⚠️ Thiết bị này chưa được kích hoạt để thực hiện các thao tác quan trọng.
+            <div className="modern-card" style={{ background: 'var(--warn-soft)', border: '1px solid var(--warn-soft)', padding: '20px', textAlign: 'center' }}>
+              <p style={{ color: 'var(--warn-ink)', fontWeight: '600', marginBottom: '12px' }}>
+                Thiết bị này chưa được kích hoạt để thực hiện các thao tác quan trọng.
               </p>
               <div className="modern-form">
                 <input
@@ -475,8 +475,8 @@ export default function Shifts() {
                   {/* Dropdown chọn nhân viên trực */}
                   <label className="field-label">Nhân viên trực</label>
                   {activeShift ? (
-                    <div style={{ padding: '10px 14px', background: '#eff6ff', borderRadius: '10px', border: '1px solid #bfdbfe', fontWeight: '600', color: '#1d4ed8', marginBottom: '4px' }}>
-                      👤 {activeStaff?.full_name || activeShift.staff_members?.full_name || 'Không xác định'}
+                    <div style={{ padding: '10px 14px', background: 'var(--brand-soft)', borderRadius: 'var(--radius)', border: '1px solid var(--brand-line)', fontWeight: '600', color: 'var(--brand-ink)', marginBottom: '4px' }}>
+                      {activeStaff?.full_name || activeShift.staff_members?.full_name || 'Không xác định'}
                     </div>
                   ) : (
                     <select
@@ -567,9 +567,9 @@ export default function Shifts() {
                       gap: '12px',
                       marginBottom: '20px',
                       padding: '12px 20px',
-                      background: '#eff6ff',
-                      borderRadius: '12px',
-                      border: '1px solid #bfdbfe',
+                      background: 'var(--brand-soft)',
+                      borderRadius: 'var(--radius)',
+                      border: '1px solid var(--brand-line)',
                       width: 'fit-content',
                       margin: '0 auto 20px auto'
                     }}>
@@ -578,14 +578,14 @@ export default function Shifts() {
                         id="skipTimeCheck"
                         checked={skipTimeCheck}
                         onChange={(e) => setSkipTimeCheck(e.target.checked)}
-                        style={{ width: '22px', height: '22px', cursor: 'pointer', accentColor: '#2563eb' }}
+                        style={{ width: '22px', height: '22px', cursor: 'pointer', accentColor: 'var(--brand-ink)' }}
                       />
                       <label
                         htmlFor="skipTimeCheck"
                         style={{
                           fontSize: '14px',
                           fontWeight: '700',
-                          color: '#1e40af',
+                          color: 'var(--brand-ink)',
                           cursor: 'pointer',
                           userSelect: 'none'
                         }}

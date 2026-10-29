@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Droplets, TrendingUp, UserCheck, UserX, AlertTriangle, AlertCircle, Download, RotateCcw } from 'lucide-react';
+import { Droplets, TrendingUp, UserCheck, UserX, AlertTriangle, AlertCircle, Clock, Download, RotateCcw } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { memberService } from '../../services/memberService';
 import { productService } from '../../services/productService';
@@ -272,103 +272,97 @@ export default function Dashboard() {
       {loading && <div className="modern-info">Đang tải dữ liệu...</div>}
 
       {/* Thông báo nhắc nhở */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {stats.pendingCkCount > 0 && (
-          <div className="modern-info">
-            ⚠️ Có <strong>{stats.pendingCkCount}</strong> hội viên thanh toán CK đang chờ duyệt.
-          </div>
-        )}
-
-        {stats.expiringSoon.length > 0 && (
-          <div className="modern-error" style={{ background: '#fffbeb', border: '1px solid #fef3c7', color: '#92400e', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <AlertTriangle size={18} />
-            <div>
-              Có <strong>{stats.expiringSoon.length}</strong> hội viên sắp hết hạn trong 7 ngày tới.
+      {(stats.pendingCkCount > 0 || stats.expiringSoon.length > 0 || stats.missingCodeCount > 0 || stats.lowStock.length > 0) && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {stats.pendingCkCount > 0 && (
+            <div className="modern-info alert-row">
+              <Clock size={18} />
+              <div>Có <strong>{stats.pendingCkCount}</strong> hội viên thanh toán CK đang chờ duyệt.</div>
             </div>
-          </div>
-        )}
+          )}
 
-        {stats.missingCodeCount > 0 && (
-          <div className="modern-error" style={{ background: '#fff1f2', border: '1px solid #ffe4e6', color: '#be123c', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <AlertTriangle size={18} />
-            <div>
-              Có <strong>{stats.missingCodeCount}</strong> hội viên chưa gắn Mã HV sau 7 ngày đăng ký.
+          {stats.expiringSoon.length > 0 && (
+            <div className="modern-warn alert-row">
+              <AlertTriangle size={18} />
+              <div>Có <strong>{stats.expiringSoon.length}</strong> hội viên sắp hết hạn trong 7 ngày tới.</div>
             </div>
-          </div>
-        )}
+          )}
 
-        {stats.lowStock.length > 0 && (
-          <div className="modern-error" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <AlertCircle size={18} />
-            <div>
-              Có <strong>{stats.lowStock.length}</strong> loại nước sắp hết hàng (tồn kho &lt; 10).
+          {stats.missingCodeCount > 0 && (
+            <div className="modern-warn alert-row">
+              <AlertTriangle size={18} />
+              <div>Có <strong>{stats.missingCodeCount}</strong> hội viên chưa gắn Mã HV sau 7 ngày đăng ký.</div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
 
-      {/* Stats grid — 4 thẻ */}
-      <div className="dashboard-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '14px' }}>
-        <div className="modern-card stat-card-modern">
-          <div className="stat-icon-wrap blue"><UserCheck size={22} /></div>
-          <div>
-            <p className="stat-label-modern">Hội viên hoạt động</p>
-            <p className="stat-value-modern">{stats.activeCount}</p>
+          {stats.lowStock.length > 0 && (
+            <div className="modern-error alert-row">
+              <AlertCircle size={18} />
+              <div>Có <strong>{stats.lowStock.length}</strong> loại nước sắp hết hàng (tồn kho &lt; 10).</div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Số liệu chính */}
+      <div className="stats-strip">
+        <div className="stat-card-modern is-ok">
+          <div className="stat-head">
+            <p className="stat-label-modern">Đang tập</p>
+            <UserCheck size={18} />
           </div>
+          <p className="stat-value-modern">{stats.activeCount}</p>
+          <p className="stat-foot">hội viên còn hạn</p>
         </div>
 
-        <div className="modern-card stat-card-modern">
-          <div className="stat-icon-wrap red"><UserX size={22} /></div>
-          <div>
-            <p className="stat-label-modern">Hội viên hết hạn</p>
-            <p className="stat-value-modern">{stats.expiredCount}</p>
+        <div className="stat-card-modern is-danger">
+          <div className="stat-head">
+            <p className="stat-label-modern">Hết hạn</p>
+            <UserX size={18} />
           </div>
+          <p className="stat-value-modern">{stats.expiredCount}</p>
+          <p className="stat-foot">cần nhắc gia hạn</p>
         </div>
 
-        <div className="modern-card stat-card-modern">
-          <div className="stat-icon-wrap green"><TrendingUp size={22} /></div>
-          <div>
-            <p className="stat-label-modern">Doanh thu hội viên (Tháng này)</p>
-            <p className="stat-value-modern" style={{ fontSize: '20px' }}>
-              {stats.memberRevenue.toLocaleString('vi-VN')}đ
-            </p>
-            <p className="cell-sub">(Đã xác nhận)</p>
+        <div className="stat-card-modern is-brand">
+          <div className="stat-head">
+            <p className="stat-label-modern">Thu hội viên</p>
+            <TrendingUp size={18} />
           </div>
+          <p className="stat-value-modern money">
+            {stats.memberRevenue.toLocaleString('vi-VN')}<span className="unit">đ</span>
+          </p>
+          <p className="stat-foot">tháng này · đã xác nhận</p>
         </div>
 
-        <div className="modern-card stat-card-modern">
-          <div className="stat-icon-wrap" style={{ background: '#ecfdf5', color: '#059669' }}>
-            <Droplets size={22} />
+        <div className="stat-card-modern is-brand">
+          <div className="stat-head">
+            <p className="stat-label-modern">Thu quầy nước</p>
+            <Droplets size={18} />
           </div>
-          <div>
-            <p className="stat-label-modern">
-              Doanh thu nước (Tháng này)
-            </p>
-            <p className="stat-value-modern" style={{ fontSize: '20px', color: '#059669' }}>
-              {drinkRevenue.toLocaleString('vi-VN')}đ
-            </p>
-            <p className="cell-sub">(Đã xác nhận)</p>
-          </div>
+          <p className="stat-value-modern money">
+            {drinkRevenue.toLocaleString('vi-VN')}<span className="unit">đ</span>
+          </p>
+          <p className="stat-foot">tháng này · đã xác nhận</p>
         </div>
       </div>
 
       {/* Hội viên đăng ký gần đây */}
       <div className="modern-card">
-        <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 className="modern-title" style={{ margin: 0 }}>Hội viên & Khách lẻ đăng ký / gia hạn</h3>
+        <div className="section-head">
+          <h3 className="modern-title">Đăng ký & gia hạn</h3>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             <input 
               type="date" 
               className="modern-input" 
-              style={{ width: 'auto', padding: '6px 12px', fontSize: '13px' }}
+              style={{ width: 'auto', padding: '8px 10px' }}
               value={filterDate}
               onChange={(e) => setFilterDate(e.target.value)}
               title="Lọc theo ngày đăng ký/gia hạn"
             />
             <button 
               type="button"
-              className="primary-btn"
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '13px', background: '#10b981' }}
+              className="ghost-btn"
               onClick={() => setShowExportModal(true)}
               disabled={loadingRecent}
             >
@@ -408,7 +402,7 @@ export default function Dashboard() {
                       <td style={{ fontWeight: '500' }}>{m.full_name}</td>
                       <td>{m.package_type ? `${m.package_type} tháng` : ''}</td>
                       <td>{formatDate(m.end_date)}</td>
-                      <td style={{ fontWeight: '600', color: '#16a34a' }}>
+                      <td style={{ fontWeight: '600', color: 'var(--ok)' }}>
                         {Number(m.fee || 0).toLocaleString('vi-VN')}đ
                       </td>
                       <td>{formatMemberCode(m.member_code)}</td>
@@ -420,7 +414,7 @@ export default function Dashboard() {
                           <span>{m.payment_method}</span>
                           {m.payment_method === 'CK' && !m.is_payment_verified && (
                             <span style={{
-                              background: '#fef08a', color: '#854d0e',
+                              background: 'var(--warn-soft)', color: 'var(--warn-ink)',
                               borderRadius: '4px', padding: '2px 6px', fontSize: '10px', fontWeight: 'bold'
                             }}>Chờ duyệt</span>
                           )}
@@ -433,14 +427,14 @@ export default function Dashboard() {
                               type="button"
                               className="ghost-btn-sm"
                               style={{ 
-                                color: '#dc2626', 
+                                color: 'var(--danger)', 
                                 display: 'inline-flex', 
                                 alignItems: 'center', 
                                 gap: '4px', 
                                 padding: '4px 8px',
-                                border: '1px solid #fee2e2',
+                                border: '1px solid var(--danger-soft)',
                                 borderRadius: '4px',
-                                background: '#fef2f2',
+                                background: 'var(--danger-soft)',
                                 cursor: 'pointer',
                                 fontSize: '12px',
                                 fontWeight: '500'
@@ -451,7 +445,7 @@ export default function Dashboard() {
                               <RotateCcw size={13} /> Hoàn tác
                             </button>
                           ) : (
-                            <span style={{ color: '#94a3b8', fontSize: '12px' }}>-</span>
+                            <span style={{ color: 'var(--subtle)', fontSize: '12px' }}>-</span>
                           )}
                         </td>
                       )}
@@ -471,7 +465,7 @@ export default function Dashboard() {
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#475569', marginBottom: '6px', fontWeight: '500' }}>Từ ngày</label>
+                <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-2)', marginBottom: '6px', fontWeight: '500' }}>Từ ngày</label>
                 <input
                   type="date"
                   className="modern-input"
@@ -481,7 +475,7 @@ export default function Dashboard() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#475569', marginBottom: '6px', fontWeight: '500' }}>Đến ngày</label>
+                <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-2)', marginBottom: '6px', fontWeight: '500' }}>Đến ngày</label>
                 <input
                   type="date"
                   className="modern-input"
@@ -503,7 +497,6 @@ export default function Dashboard() {
               <button
                 type="button"
                 className="primary-btn"
-                style={{ background: '#10b981' }}
                 onClick={handleExportRange}
                 disabled={exportLoading}
               >

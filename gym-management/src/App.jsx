@@ -22,7 +22,8 @@ import { useAuthStore } from './store/useAuthStore';
 import supabase from './config/supabase';
 
 function App() {
-  const [isSidebarOpen, setSidebarOpen] = useState(false);
+  // Màn hình rộng mở sẵn menu; điện thoại thì ẩn
+  const [isSidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 768);
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
   const profile = useAuthStore((state) => state.profile);
 

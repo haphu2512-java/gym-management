@@ -32,10 +32,10 @@ export default function StockTable({
                     <img
                       src={item.image_url}
                       alt={item.name}
-                      style={{ width: '36px', height: '36px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                      style={{ width: '36px', height: '36px', objectFit: 'cover', borderRadius: 'var(--radius)', border: '1px solid var(--line-strong)' }}
                     />
                   ) : (
-                    <div style={{ width: '36px', height: '36px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', fontSize: '14px', fontWeight: 'bold', color: '#94a3b8' }}>
+                    <div style={{ width: '36px', height: '36px', background: 'var(--surface-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--radius)', fontSize: '14px', fontWeight: 'bold', color: 'var(--subtle)' }}>
                       N/A
                     </div>
                   )}
@@ -65,7 +65,7 @@ export default function StockTable({
                   <button
                     type="button"
                     className="ghost-btn"
-                    style={{ color: '#dc2626', background: '#fef2f2' }}
+                    style={{ color: 'var(--danger)', background: 'var(--danger-soft)' }}
                     onClick={() => setDeletingProduct(item)}
                   >
                     <Trash2 size={14} />

@@ -6,15 +6,15 @@ export default function ShiftHistory({ shifts, filterDate, onFilterDateChange, o
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '24px', marginBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
         <h3 className="modern-title" style={{ margin: 0 }}>Lịch sử ca làm</h3>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '500' }}>Lọc theo ngày:</span>
+          <span style={{ fontSize: '13px', color: 'var(--muted)', fontWeight: '500' }}>Lọc theo ngày:</span>
           <input
             type="date"
             value={filterDate}
             onChange={(e) => onFilterDateChange(e.target.value)}
             style={{
               padding: '6px 12px',
-              borderRadius: '8px',
-              border: '1px solid #cbd5e1',
+              borderRadius: 'var(--radius)',
+              border: '1px solid var(--line-strong)',
               fontSize: '13px',
               outline: 'none',
               cursor: 'pointer'
