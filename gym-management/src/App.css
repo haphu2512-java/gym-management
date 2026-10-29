@@ -1592,6 +1592,15 @@ h1, h2, h3, h4 {
 }
 
 @media (max-width: 767px) {
+  /* Bảng cuộn ngang trên điện thoại: giữ ngày, tên trên một dòng cho dễ đọc */
+  .modern-table td {
+    white-space: nowrap;
+  }
+
+  .modern-table td p {
+    white-space: normal;
+  }
+
   .desktop-title-row h2 {
     font-size: 22px;
   }
