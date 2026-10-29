@@ -11,6 +11,8 @@ import { staffLogService } from '../../services/staffLogService';
 import { getLocalISODate } from '../../utils/formatters';
 import { deviceSecurity } from '../../utils/deviceSecurity';
 import { computeHandoverCash } from '../../utils/handoverCash';
+import { compactDenominations, sumDenominations } from '../../utils/cashDenominations';
+import CashCountPanel from './CashCountPanel';
 import ExpensePanel from './ExpensePanel';
 import HandoverNotesPanel from './HandoverNotesPanel';
 import ShiftDetailModal from './ShiftDetailModal';
@@ -92,6 +94,32 @@ export default function Shifts() {
   useEffect(() => {
     localStorage.setItem('gym_shift_form', JSON.stringify(form));
   }, [form]);
+
+  // Đếm tiền theo mệnh giá khi kết ca: lưu tạm để tải lại trang không mất số đã đếm
+  const [cashCount, setCashCount] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('gym_cash_count'));
+      if (saved && typeof saved === 'object') return { enabled: !!saved.enabled, counts: saved.counts || {} };
+    } catch {
+      // Dữ liệu cũ trong localStorage bị hỏng thì bỏ qua
+    }
+    return { enabled: false, counts: {} };
+  });
+  const countedTotal = useMemo(() => sumDenominations(cashCount.counts), [cashCount.counts]);
+
+  useEffect(() => {
+    localStorage.setItem('gym_cash_count', JSON.stringify(cashCount));
+  }, [cashCount]);
+
+  const handleCashCountChange = (counts) => {
+    setCashCount((prev) => ({ ...prev, counts }));
+    setForm((prev) => ({ ...prev, ending_cash: String(sumDenominations(counts)) }));
+  };
+
+  const handleToggleCashCount = (enabled) => {
+    setCashCount((prev) => ({ ...prev, enabled }));
+    if (enabled) setForm((prev) => ({ ...prev, ending_cash: String(sumDenominations(cashCount.counts)) }));
+  };
 
   useEffect(() => {
     localStorage.setItem('gym_expense_form', JSON.stringify(expenseForm));
@@ -391,12 +419,33 @@ export default function Shifts() {
           throw new Error('Vui lòng nhập tiền kết ca trước khi chốt ca.');
         }
 
+        const endingCash = Number(form.ending_cash);
         await shiftService.closeShift({
           shiftId: activeShift.id,
-          endingCash: Number(form.ending_cash),
+          endingCash,
           note: form.note,
           staffId: activeStaff?.id,
         });
+
+        // Lưu chi tiết số tờ từng mệnh giá vào nhật ký (không cần thêm cột trong DB)
+        if (cashCount.enabled) {
+          await staffLogService.logAction({
+            staffId: user?.id,
+            staffMemberId: activeStaff?.id,
+            action: 'Đếm tiền kết ca',
+            targetItem: activeShift.shift_name,
+            details: {
+              shiftId: activeShift.id,
+              denominations: compactDenominations(cashCount.counts),
+              countedTotal,
+              endingCash,
+              expectedCash: suggestedEndingCash,
+              difference: endingCash - suggestedEndingCash,
+            },
+            note: 'Đếm theo mệnh giá',
+          });
+        }
+        setCashCount({ enabled: false, counts: {} });
 
         // Reset nhân viên đang trực sau khi chốt ca
         setActiveStaff(null);
@@ -535,18 +584,39 @@ export default function Shifts() {
                       </div>
                     ) : (
                       <div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0', cursor: 'pointer', fontWeight: 600 }}>
+                          <input
+                            type="checkbox"
+                            checked={cashCount.enabled}
+                            onChange={(e) => handleToggleCashCount(e.target.checked)}
+                            style={{ width: '18px', height: '18px', margin: 0 }}
+                          />
+                          Đếm theo mệnh giá
+                        </label>
+                        {cashCount.enabled && (
+                          <CashCountPanel counts={cashCount.counts} onChange={handleCashCountChange} total={countedTotal} />
+                        )}
                         <label className="field-label">Tiền kết ca (TM)</label>
                         <input
                           type="number"
                           value={form.ending_cash}
                           onChange={(e) => setForm({ ...form, ending_cash: e.target.value })}
                           placeholder={`Gợi ý: ${suggestedEndingCash.toLocaleString('vi-VN')}`}
+                          readOnly={cashCount.enabled}
                         />
                         {suggestedEndingCash > 0 && (
                           <small className="field-hint">
                             Dự kiến: {suggestedEndingCash.toLocaleString('vi-VN')}đ (Tiền đầu ca + TM hội viên/dịch vụ + TM nước - chi)
                           </small>
                         )}
+                        {form.ending_cash !== '' && (() => {
+                          const diff = Number(form.ending_cash) - suggestedEndingCash;
+                          const color = diff === 0 ? '#16a34a' : '#dc2626';
+                          const text = diff === 0
+                            ? 'Khớp với tiền dự kiến'
+                            : `${diff > 0 ? 'Thừa' : 'Thiếu'} ${Math.abs(diff).toLocaleString('vi-VN')}đ so với dự kiến`;
+                          return <small className="field-hint" style={{ display: 'block', color, fontWeight: 700 }}>{text}</small>;
+                        })()}
                         <br></br>
                         <label className="field-label">Ghi chú bàn giao</label>
                         <textarea
