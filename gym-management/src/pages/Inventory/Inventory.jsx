@@ -331,34 +331,20 @@ export default function Inventory() {
   return (
     <div className="modern-stack">
       <div className="modern-toolbar" style={{ flexWrap: 'wrap', gap: '16px' }}>
-        <div>
-          <h3 className="modern-title">Kho nước &amp; bán hàng</h3>
-          <p className="muted-text">Bấm chọn số lượng và nhấn Bán hàng.</p>
-        </div>
+        <p className="muted-text">Chọn số lượng rồi bấm Bán.</p>
 
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginLeft: 'auto' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginLeft: 'auto', flexWrap: 'wrap' }}>
           {/* Doanh thu nước ca hiện tại */}
-          <div style={{
-            background: '#f0f9ff',
-            border: '1px solid #bae6fd',
-            borderRadius: '12px',
-            padding: '8px 14px',
-            fontSize: '13px',
-            fontWeight: '800',
-            color: '#0369a1',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
+          <div className="revenue-chip">
             <ShoppingCart size={16} />
-            DT Nước: {drinkRevenue.toLocaleString('vi-VN')}đ
+            <small>Ca này</small>
+            <strong>{drinkRevenue.toLocaleString('vi-VN')}đ</strong>
           </div>
 
-          <div className="tab-group" style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '8px' }}>
+          <div className="tab-group">
             <button
               className={`tab-btn ${viewMode === 'sales' ? 'active' : ''}`}
               onClick={() => setViewMode('sales')}
-              style={{ padding: '6px 12px', border: 'none', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', background: viewMode === 'sales' ? '#fff' : 'transparent', fontWeight: viewMode === 'sales' ? '600' : 'normal', boxShadow: viewMode === 'sales' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
             >
               Bán hàng
             </button>
@@ -366,7 +352,6 @@ export default function Inventory() {
               <button
                 className={`tab-btn ${viewMode === 'admin' ? 'active' : ''}`}
                 onClick={() => setViewMode('admin')}
-                style={{ padding: '6px 12px', border: 'none', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', background: viewMode === 'admin' ? '#fff' : 'transparent', fontWeight: viewMode === 'admin' ? '600' : 'normal', boxShadow: viewMode === 'admin' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
               >
                 Quản lý kho
               </button>
@@ -374,7 +359,6 @@ export default function Inventory() {
             <button
               className={`tab-btn ${viewMode === 'stats' ? 'active' : ''}`}
               onClick={() => setViewMode('stats')}
-              style={{ padding: '6px 12px', border: 'none', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', background: viewMode === 'stats' ? '#fff' : 'transparent', fontWeight: viewMode === 'stats' ? '600' : 'normal', boxShadow: viewMode === 'stats' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
             >
               Thống kê
             </button>

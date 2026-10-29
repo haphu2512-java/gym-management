@@ -18,49 +18,22 @@ export default function MembersToolbar({
 }) {
   return (
     <>
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+      <div className="tab-bar">
         <button
           className={`tab-btn ${activeTab === 'active' ? 'active' : ''}`}
           onClick={() => setActiveTab('active')}
-          style={{
-            padding: '8px 16px',
-            borderRadius: '8px',
-            border: 'none',
-            background: activeTab === 'active' ? '#2563eb' : '#f1f5f9',
-            color: activeTab === 'active' ? 'white' : '#64748b',
-            fontWeight: '600',
-            cursor: 'pointer'
-          }}
         >
           Hội viên đang tập
         </button>
         <button
           className={`tab-btn ${activeTab === 'suspended' ? 'active' : ''}`}
           onClick={() => setActiveTab('suspended')}
-          style={{
-            padding: '8px 16px',
-            borderRadius: '8px',
-            border: 'none',
-            background: activeTab === 'suspended' ? '#2563eb' : '#f1f5f9',
-            color: activeTab === 'suspended' ? 'white' : '#64748b',
-            fontWeight: '600',
-            cursor: 'pointer'
-          }}
         >
           Danh sách bảo lưu
         </button>
         <button
           className={`tab-btn ${activeTab === 'services' ? 'active' : ''}`}
           onClick={() => setActiveTab('services')}
-          style={{
-            padding: '8px 16px',
-            borderRadius: '8px',
-            border: 'none',
-            background: activeTab === 'services' ? '#2563eb' : '#f1f5f9',
-            color: activeTab === 'services' ? 'white' : '#64748b',
-            fontWeight: '600',
-            cursor: 'pointer'
-          }}
         >
           Dịch vụ (Tập ngày, PT...)
         </button>
@@ -82,14 +55,14 @@ export default function MembersToolbar({
             type="date"
             value={filterDate}
             onChange={(e) => setFilterDate(e.target.value)}
-            style={{ padding: '8px', borderRadius: '6px', border: '1px solid #ddd', minWidth: '130px' }}
+            style={{ padding: '8px', borderRadius: 'var(--radius)', border: '1px solid var(--line)', minWidth: '130px' }}
             title="Lọc theo ngày đăng ký hoặc hết hạn"
           />
 
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            style={{ padding: '8px', borderRadius: '6px', border: '1px solid #ddd' }}
+            style={{ padding: '8px', borderRadius: 'var(--radius)', border: '1px solid var(--line)' }}
           >
             <option value="all">Tất cả</option>
             {profile?.role === 'admin' && <option value="pending_ck">Chờ duyệt CK</option>}
@@ -111,9 +84,9 @@ export default function MembersToolbar({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                color: pendingCkCount > 0 ? '#15803d' : '#94a3b8',
-                background: pendingCkCount > 0 ? '#dcfce7' : '#f8fafc',
-                border: `1px solid ${pendingCkCount > 0 ? '#86efac' : '#cbd5e1'}`,
+                color: pendingCkCount > 0 ? 'var(--ok)' : 'var(--subtle)',
+                background: pendingCkCount > 0 ? 'var(--ok-soft)' : 'var(--surface-2)',
+                border: `1px solid ${pendingCkCount > 0 ? 'var(--ok-line)' : 'var(--line-strong)'}`,
                 fontWeight: '600',
                 cursor: pendingCkCount > 0 && !verifyingAll ? 'pointer' : 'not-allowed',
                 opacity: verifyingAll ? 0.6 : 1,
@@ -133,12 +106,12 @@ export default function MembersToolbar({
               className="ghost-btn"
               onClick={onExportExcel}
               title="Xuất danh sách hội viên ra Excel"
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#16a34a', border: '1px solid #16a34a' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--ok)', border: '1px solid var(--ok)' }}
             >
               <FileSpreadsheet size={16} /> Xuất Excel
             </button>
           )}
-          <button type="button" className="primary-btn" onClick={onAddMember}>
+          <button type="button" className="primary-btn" onClick={onAddMember} style={{ marginLeft: 'auto' }}>
             <Plus size={16} /> Thêm hội viên
           </button>
         </div>

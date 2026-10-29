@@ -5,7 +5,7 @@ import { formatDateTime } from '../../utils/formatters';
 export default function HandoverNotesPanel({ shifts, isAdmin, onDeleteNote }) {
   return (
     <div className="modern-card notes-panel">
-      <h3 className="modern-title flex-row" style={{ color: '#92400e' }}>📜 Nhật ký bàn giao</h3>
+      <h3 className="modern-title">Nhật ký bàn giao</h3>
       <div className="notes-list">
         {shifts.filter(s => s.note).map((s) => (
           <div key={s.id} className="note-item">
@@ -20,7 +20,7 @@ export default function HandoverNotesPanel({ shifts, isAdmin, onDeleteNote }) {
                     style={{
                       background: 'none',
                       border: 'none',
-                      color: '#dc2626',
+                      color: 'var(--danger)',
                       cursor: 'pointer',
                       padding: '2px',
                       display: 'flex',
@@ -38,7 +38,7 @@ export default function HandoverNotesPanel({ shifts, isAdmin, onDeleteNote }) {
               </div>
             </div>
             <div className="note-staff">
-              👤 {s.staff_members?.full_name || 'Hệ thống'} {s.status === 'open' && <span className="status-badge active">Đang trực</span>}
+              {s.staff_members?.full_name || 'Hệ thống'} {s.status === 'open' && <span className="status-badge active">Đang trực</span>}
             </div>
             <p className="note-content">{s.note}</p>
           </div>

@@ -7,7 +7,7 @@ export default function DeleteProductModal({
   return (
     <div className="modal-backdrop" onClick={() => setDeletingProduct(null)}>
       <div className="modal-panel" style={{ maxWidth: '380px' }} onClick={(e) => e.stopPropagation()}>
-        <h3 style={{ color: '#dc2626' }}>Xác nhận xóa sản phẩm</h3>
+        <h3 style={{ color: 'var(--danger)' }}>Xác nhận xóa sản phẩm</h3>
         <p>
           Bạn có chắc muốn xóa sản phẩm <strong>{deletingProduct.name}</strong> khỏi kho?
           Hành động này sẽ xóa toàn bộ dữ liệu liên quan.
@@ -17,7 +17,7 @@ export default function DeleteProductModal({
           <button
             type="button"
             className="primary-btn"
-            style={{ background: '#dc2626' }}
+            style={{ background: 'var(--danger)' }}
             onClick={handleConfirmDelete}
           >
             Xóa sản phẩm

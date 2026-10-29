@@ -1,29 +1,27 @@
-import { LayoutDashboard } from 'lucide-react';
+import { Menu, PanelLeft } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useState, useEffect } from 'react';
 import { shiftService } from '../../services/shiftService';
 import { formatDate } from '../../utils/formatters';
-import logo from '../../assets/logo.png';
+import logo from '../../assets/logo-wide.png';
 
 const titleMap = {
-  '/dashboard': 'Tổng quan hệ thống',
-  '/members': 'Danh sách hội viên',
-  '/inventory': 'Kho & Bán hàng',
-  '/shifts': 'Quản lý ca trực',
-  '/staff': 'Nhân viên & tính lương',
+  '/dashboard': 'Tổng quan',
+  '/members': 'Hội viên',
+  '/inventory': 'Bán nước & kho',
+  '/shifts': 'Ca trực & bàn giao',
+  '/notes': 'Sổ ghi chú',
+  '/staff': 'Nhân viên & lương',
+  '/logs': 'Nhật ký hoạt động',
+  '/statistics': 'Thống kê',
 };
 
-function getGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Chào buổi sáng!';
-  if (hour < 18) return 'Chào buổi chiều!';
-  return 'Chào buổi tối!';
-}
+const weekdays = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
 
 export default function Header({ onMenuToggle }) {
   const location = useLocation();
-  const title = titleMap[location.pathname] || 'Gym Management';
+  const title = titleMap[location.pathname] || 'Max Power Gym';
   const { profile, activeStaff } = useAuthStore();
 
   const [activeShift, setActiveShift] = useState(null);
@@ -40,51 +38,42 @@ export default function Header({ onMenuToggle }) {
     fetchInfo();
   }, [location.pathname]);
 
-  // Tên hiển thị: "Trâm Anh — Ca 3" hoặc tên tài khoản nếu chưa chọn nhân viên
-  const displayName = activeStaff
-    ? activeShift
-      ? `${activeStaff.full_name} — ${activeShift.shift_name}`
-      : activeStaff.full_name
-    : (profile?.full_name || 'Đang tải...');
+  const now = new Date();
+  const personName = activeStaff ? activeStaff.full_name : (profile?.full_name || 'Đang tải...');
 
   return (
     <header className="modern-header">
       <div className="mobile-topbar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <img src={logo} alt="Logo" style={{ width: '32px', height: 'auto', borderRadius: '6px' }} />
-          <h1 style={{ fontSize: '18px' }}>MAX POWER</h1>
-        </div>
-        <button type="button" onClick={onMenuToggle}>
-          <LayoutDashboard size={18} />
+        <img src={logo} alt="Max Power Gym" />
+        <button type="button" onClick={onMenuToggle} aria-label="Mở menu">
+          <Menu size={20} />
         </button>
       </div>
 
       <div className="desktop-title-row">
-        <div>
-          <h2>
-            <button className="desktop-toggle" onClick={onMenuToggle} title="Bật/Ẩn Sidebar">
-              <LayoutDashboard size={24} />
-            </button>
-            {title}
-          </h2>
-          <p>{getGreeting()} Hôm nay là ngày {formatDate(new Date())}</p>
-        </div>
-        <div className="system-status" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span className="status-dot" />
-            <span>{displayName}</span>
+        <div className="title-block">
+          <button className="desktop-toggle" onClick={onMenuToggle} title="Ẩn/hiện menu" aria-label="Ẩn/hiện menu">
+            <PanelLeft size={18} />
+          </button>
+          <div>
+            <p className="page-eyebrow">{weekdays[now.getDay()]} · {formatDate(now)}</p>
+            <h2>{title}</h2>
           </div>
-          {!activeStaff && (
-            <div style={{ borderLeft: '1px solid #ddd', paddingLeft: '12px' }}>
-              <span>Ca: {activeShift ? activeShift.shift_name : 'Chưa mở ca'}</span>
-            </div>
-          )}
+        </div>
+        <div className="system-status">
+          <div>
+            <small>{activeStaff ? 'Người trực' : 'Tài khoản'}</small>
+            <strong>{personName}</strong>
+          </div>
+          <div>
+            <small>Ca hiện tại</small>
+            <strong>
+              <span className={`status-dot ${activeShift ? '' : 'off'}`} />
+              {activeShift ? activeShift.shift_name : 'Chưa mở ca'}
+            </strong>
+          </div>
         </div>
       </div>
     </header>
   );
 }
-
-
-
-

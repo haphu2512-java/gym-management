@@ -29,8 +29,8 @@ export default function ConfirmDialog() {
         }}
       >
         <div style={{ 
-          background: type === 'danger' ? '#fee2e2' : '#eff6ff',
-          color: type === 'danger' ? '#dc2626' : '#2563eb',
+          background: type === 'danger' ? 'var(--danger-soft)' : 'var(--brand-soft)',
+          color: type === 'danger' ? 'var(--danger)' : 'var(--brand-ink)',
           width: '56px',
           height: '56px',
           borderRadius: '50%',
@@ -43,7 +43,7 @@ export default function ConfirmDialog() {
         </div>
         
         <h3 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: '800' }}>{title || 'Xác nhận'}</h3>
-        <p style={{ margin: '0 0 24px', color: '#64748b', lineHeight: '1.5' }}>{message}</p>
+        <p style={{ margin: '0 0 24px', color: 'var(--muted)', lineHeight: '1.5' }}>{message}</p>
         
         <div style={{ display: 'flex', gap: '12px' }}>
           <button 
@@ -57,7 +57,7 @@ export default function ConfirmDialog() {
             className="primary-btn" 
             style={{ 
               flex: 1, 
-              background: type === 'danger' ? '#dc2626' : '#2563eb' 
+              background: type === 'danger' ? 'var(--danger)' : 'var(--brand-ink)' 
             }} 
             onClick={handleConfirm}
           >

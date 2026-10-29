@@ -20,7 +20,7 @@ export default function MemberFormModal({
       <div className="modal-panel" style={{ width: 'min(900px, 96vw)', maxWidth: '900px' }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <img src={logo} alt="Logo" style={{ width: '40px', height: 'auto', borderRadius: '8px' }} />
+            <img src={logo} alt="Logo" style={{ width: '40px', height: 'auto', borderRadius: 'var(--radius)' }} />
             <h3 style={{ margin: 0 }}>Chi tiết hội viên: {editingMember?.full_name || 'Mới'}</h3>
           </div>
           <button className="ghost-btn" onClick={onCancel} disabled={submitting}>Đóng</button>
@@ -28,7 +28,7 @@ export default function MemberFormModal({
 
         <div className="form-grid-2" style={{ gap: '24px', alignItems: 'start' }}>
           {/* Cột 1: Thông tin hội viên */}
-          <div className="modern-card" style={{ padding: '20px', border: '1px solid #e2e8f0' }}>
+          <div className="modern-card" style={{ padding: '20px', border: '1px solid var(--line)' }}>
             <h4 style={{ marginTop: 0, marginBottom: '16px', fontSize: '16px' }}>Thông tin cơ bản</h4>
             <form className="modern-form" onSubmit={onSubmit}>
               <div className="form-grid-2">
@@ -114,9 +114,9 @@ export default function MemberFormModal({
               <div style={{
                 marginTop: '12px',
                 padding: '10px 14px',
-                background: '#f8fafc',
-                borderRadius: '10px',
-                border: '1px solid #e2e8f0',
+                background: 'var(--surface-2)',
+                borderRadius: 'var(--radius)',
+                border: '1px solid var(--line)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px'
@@ -127,14 +127,14 @@ export default function MemberFormModal({
                   checked={form.fingerprint_status}
                   onChange={(e) => onFormChange('fingerprint_status', e.target.checked)}
                   disabled={editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true')}
-                  style={{ width: '20px', height: '20px', cursor: (editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true')) ? 'not-allowed' : 'pointer', accentColor: '#2563eb' }}
+                  style={{ width: '20px', height: '20px', cursor: (editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true')) ? 'not-allowed' : 'pointer', accentColor: 'var(--brand-ink)' }}
                 />
                 <label
                   htmlFor="fingerprint_status"
                   style={{
                     fontSize: '14px',
                     fontWeight: '600',
-                    color: (editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true')) ? '#94a3b8' : '#334155',
+                    color: (editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true')) ? 'var(--subtle)' : 'var(--text)',
                     cursor: (editingMember && (editingMember.fingerprint_status === true || editingMember.fingerprint_status === 'true')) ? 'not-allowed' : 'pointer',
                     userSelect: 'none',
                     margin: 0
@@ -178,7 +178,7 @@ export default function MemberFormModal({
           </div>
 
           {/* Cột 2: Lịch sử gia hạn */}
-          <div className="modern-card" style={{ padding: '20px', border: '1px solid #e2e8f0', flex: 1 }}>
+          <div className="modern-card" style={{ padding: '20px', border: '1px solid var(--line)', flex: 1 }}>
             <h4 style={{ marginTop: 0, marginBottom: '16px', fontSize: '16px' }}>Lịch sử gia hạn & Hoạt động</h4>
 
             <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
@@ -203,11 +203,11 @@ export default function MemberFormModal({
                         <tr key={log.id} style={{ fontSize: '12px' }}>
                           <td>{formatDate(log.created_at)}</td>
                           <td>
-                            <strong style={{ color: '#0f172a' }}>
-                              {log.action === 'CREATE' && '🆕 Đăng ký'}
-                              {log.action === 'RENEW' && '⏳ Gia hạn'}
-                              {log.action === 'UPDATE' && '📝 Sửa'}
-                              {log.action === 'VERIFY_PAYMENT' && '✅ Duyệt'}
+                            <strong style={{ color: 'var(--text)' }}>
+                              {log.action === 'CREATE' && 'Đăng ký'}
+                              {log.action === 'RENEW' && 'Gia hạn'}
+                              {log.action === 'UPDATE' && 'Sửa'}
+                              {log.action === 'VERIFY_PAYMENT' && 'Duyệt'}
                             </strong>
                           </td>
                           <td>
@@ -224,15 +224,15 @@ export default function MemberFormModal({
                               {log.payment_method === 'CK' && !log.is_payment_verified ? (
                                 <button
                                   className="primary-btn"
-                                  style={{ background: '#f59e0b', padding: '6px 10px', fontSize: '11px' }}
+                                  style={{ background: 'var(--warn)', padding: '6px 10px', fontSize: '11px' }}
                                   onClick={() => onLogVerification(log)}
                                 >
                                   Duyệt CK
                                 </button>
                               ) : log.payment_method === 'CK' ? (
-                                <span style={{ color: '#16a34a', fontWeight: 'bold' }}>✓ Đã duyệt</span>
+                                <span style={{ color: 'var(--ok)', fontWeight: 'bold' }}>✓ Đã duyệt</span>
                               ) : log.payment_method === 'TM' ? (
-                                <span style={{ color: '#64748b' }}>Tiền mặt</span>
+                                <span style={{ color: 'var(--muted)' }}>Tiền mặt</span>
                               ) : null}
                             </td>
                           )}

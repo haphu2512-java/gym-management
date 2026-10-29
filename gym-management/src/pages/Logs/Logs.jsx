@@ -50,7 +50,7 @@ export default function Logs() {
               setFilterDate(e.target.value);
               setCurrentPage(1);
             }}
-            style={{ padding: '8px', borderRadius: '6px', border: '1px solid #ddd', minWidth: '130px' }}
+            style={{ padding: '8px', borderRadius: 'var(--radius)', border: '1px solid var(--line)', minWidth: '130px' }}
             title="Lọc theo ngày"
           />
           <button type="button" className="ghost-btn" onClick={() => loadLogs(currentPage, filterDate)}>
@@ -94,7 +94,7 @@ export default function Logs() {
                 <td>
                   <p>{log.note}</p>
                   {log.details && Object.keys(log.details).length > 0 && (
-                    <pre style={{ fontSize: '11px', background: '#f1f5f9', padding: '4px', borderRadius: '4px', marginTop: '4px', maxWidth: '300px', overflowX: 'auto' }}>
+                    <pre style={{ fontSize: '11px', background: 'var(--surface-3)', padding: '4px', borderRadius: '4px', marginTop: '4px', maxWidth: '300px', overflowX: 'auto' }}>
                       {JSON.stringify(log.details, null, 2)}
                     </pre>
                   )}
@@ -105,7 +105,7 @@ export default function Logs() {
         </table>
 
         {totalPages > 1 && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', marginTop: 'auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderTop: '1px solid var(--line)', background: 'var(--surface-2)', marginTop: 'auto' }}>
             <span className="muted-text" style={{ fontSize: '13px' }}>
               Hiển thị {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, totalCount)} / {totalCount} nhật ký
             </span>

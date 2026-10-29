@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
+import { Info, Trash2 } from 'lucide-react';
 import { staffService } from '../../services/staffService';
 import { staffLogService } from '../../services/staffLogService';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -366,7 +367,7 @@ export default function Staff() {
     return <div className="modern-error">Chỉ admin được truy cập mục quản lý nhân viên.</div>;
   }
 
-  const inputStyle = { width: '100%', padding: '6px', border: '1px solid #e2e8f0', borderRadius: '4px', outline: 'none' };
+  const inputStyle = { width: '100%', padding: '6px', border: '1px solid var(--line)', borderRadius: '4px', outline: 'none' };
 
   return (
     <div className="modern-stack max-width-full" style={{ maxWidth: '100%' }}>
@@ -382,7 +383,7 @@ export default function Staff() {
             type="date"
             value={weekStart}
             onChange={(e) => setWeekStart(getMonday(e.target.value))}
-            style={{ padding: '6px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
+            style={{ padding: '6px', borderRadius: '4px', border: '1px solid var(--line-strong)' }}
           />
           <button className="ghost-btn" onClick={() => {
             showConfirm({
@@ -409,14 +410,14 @@ export default function Staff() {
               }
             });
           }}>Xóa lịch tuần</button>
-          <button className="modern-btn" onClick={() => setShowAddForm(!showAddForm)}>
+          <button className="primary-btn" onClick={() => setShowAddForm(!showAddForm)}>
             {showAddForm ? 'Hủy' : '+ Thêm nhân viên'}
           </button>
         </div>
       </div>
 
       {showAddForm && (
-        <div className="modern-card" style={{ padding: '20px', marginBottom: '20px', border: '2px solid #3b82f6', background: '#eff6ff' }}>
+        <div className="modern-card" style={{ padding: '20px', marginBottom: '20px', border: '2px solid var(--brand-ink)', background: 'var(--brand-soft)' }}>
           <h4 style={{ marginBottom: '15px' }}>Thêm nhân viên mới</h4>
           <form onSubmit={handleAddStaff} style={{ display: 'flex', gap: '10px' }}>
             <input
@@ -424,10 +425,10 @@ export default function Staff() {
               placeholder="Nhập họ tên đầy đủ..."
               value={newStaffName}
               onChange={e => setNewStaffName(e.target.value)}
-              style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+              style={{ flex: 1, padding: '10px', borderRadius: 'var(--radius)', border: '1px solid var(--line-strong)' }}
               required
             />
-            <button type="submit" className="modern-btn">Xác nhận thêm</button>
+            <button type="submit" className="primary-btn">Xác nhận thêm</button>
           </form>
         </div>
       )}
@@ -436,22 +437,22 @@ export default function Staff() {
 
       {/* 1. Schedule Table */}
       <div className="modern-card" style={{ overflowX: 'auto', padding: '16px' }}>
-        <h4 style={{ marginBottom: '16px', color: '#0f172a', fontWeight: 600 }}>1. Bảng Xếp Ca Tuần</h4>
-        <table className="modern-table" style={{ minWidth: '800px', border: '1px solid #e2e8f0' }}>
+        <h4 style={{ marginBottom: '16px', color: 'var(--text)', fontWeight: 600 }}>1. Bảng Xếp Ca Tuần</h4>
+        <table className="modern-table" style={{ minWidth: '800px', border: '1px solid var(--line)' }}>
           <thead>
             <tr>
-              <th style={{ width: '80px', background: '#f8fafc', borderRight: '1px solid #e2e8f0' }}>Ca \ Thứ</th>
-              {DAYS.map(d => <th key={d} style={{ textAlign: 'center', background: '#f1f5f9', borderRight: '1px solid #e2e8f0' }}>{d}</th>)}
+              <th style={{ width: '80px', borderRight: '1px solid var(--ink-line)' }}>Ca \ Thứ</th>
+              {DAYS.map(d => <th key={d} style={{ textAlign: 'center', borderRight: '1px solid var(--ink-line)' }}>{d}</th>)}
             </tr>
           </thead>
           <tbody>
             {SHIFTS.map(shift => (
               <tr key={shift}>
-                <td style={{ fontWeight: 'bold', background: '#f8fafc', borderRight: '1px solid #e2e8f0' }}>{shift}</td>
+                <td style={{ fontWeight: 'bold', background: 'var(--surface-2)', borderRight: '1px solid var(--line)' }}>{shift}</td>
                 {DAYS.map(day => (
-                  <td key={day} style={{ padding: '0', borderRight: '1px solid #e2e8f0' }}>
+                  <td key={day} style={{ padding: '0', borderRight: '1px solid var(--line)' }}>
                     <select
-                      style={{ width: '100%', padding: '8px', border: 'none', background: schedule[`${shift}-${day}`] ? '#eff6ff' : 'transparent', outline: 'none', fontWeight: schedule[`${shift}-${day}`] ? 'bold' : 'normal', color: schedule[`${shift}-${day}`] ? '#1d4ed8' : '#64748b' }}
+                      style={{ width: '100%', padding: '8px', border: 'none', background: schedule[`${shift}-${day}`] ? 'var(--brand-soft)' : 'transparent', outline: 'none', fontWeight: schedule[`${shift}-${day}`] ? 'bold' : 'normal', color: schedule[`${shift}-${day}`] ? 'var(--brand-ink)' : 'var(--muted)' }}
                       value={schedule[`${shift}-${day}`] || ''}
                       onChange={(e) => updateSchedule(shift, day, e.target.value)}
                     >
@@ -467,9 +468,9 @@ export default function Staff() {
       </div>
 
       {/* Cấu hình khoảng tính lương */}
-      <div className="modern-card" style={{ padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', flexWrap: 'wrap', gap: '15px', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="modern-card" style={{ padding: '16px', background: 'var(--surface-2)', border: '1px solid var(--line)', display: 'flex', flexWrap: 'wrap', gap: '15px', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h4 style={{ margin: 0, color: '#0f172a', fontWeight: 600 }}>Cấu hình Kỳ Tính Lương</h4>
+          <h4 style={{ margin: 0, color: 'var(--text)', fontWeight: 600 }}>Cấu hình Kỳ Tính Lương</h4>
           <p className="muted-text" style={{ margin: 0, fontSize: '12px', marginTop: '4px' }}>
             Tính lương gộp từ thứ 2 ngày <strong>{formatDate(salaryStartWeek)}</strong> đến chủ nhật ngày <strong>{formatDate(getNextWeeks(salaryEndWeek, 0))}</strong> (Tổng cộng: <strong>{Math.round((new Date(salaryEndWeek) - new Date(salaryStartWeek)) / (7 * 24 * 60 * 60 * 1000)) + 1} tuần</strong>)
           </p>
@@ -481,7 +482,7 @@ export default function Staff() {
               type="date"
               value={salaryStartWeek}
               onChange={(e) => setSalaryStartWeek(getMonday(e.target.value))}
-              style={{ padding: '6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+              style={{ padding: '6px', borderRadius: '4px', border: '1px solid var(--line-strong)', fontSize: '13px' }}
             />
           </div>
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -490,13 +491,13 @@ export default function Staff() {
               type="date"
               value={salaryEndWeek}
               onChange={(e) => setSalaryEndWeek(getMonday(e.target.value))}
-              style={{ padding: '6px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+              style={{ padding: '6px', borderRadius: '4px', border: '1px solid var(--line-strong)', fontSize: '13px' }}
             />
           </div>
           <div style={{ display: 'flex', gap: '6px' }}>
             <button
               className="ghost-btn"
-              style={{ padding: '6px 12px', fontSize: '12px', background: salaryStartWeek === salaryEndWeek ? '#eff6ff' : '#ffffff', borderColor: salaryStartWeek === salaryEndWeek ? '#3b82f6' : '#cbd5e1', color: salaryStartWeek === salaryEndWeek ? '#2563eb' : '#475569', cursor: 'pointer', borderRadius: '4px' }}
+              style={{ padding: '6px 12px', fontSize: '12px', background: salaryStartWeek === salaryEndWeek ? 'var(--brand-soft)' : 'var(--surface)', borderColor: salaryStartWeek === salaryEndWeek ? 'var(--brand-ink)' : 'var(--line-strong)', color: salaryStartWeek === salaryEndWeek ? 'var(--brand-ink)' : 'var(--text-2)', cursor: 'pointer', borderRadius: '4px' }}
               onClick={() => {
                 setSalaryStartWeek(weekStart);
                 setSalaryEndWeek(weekStart);
@@ -506,7 +507,7 @@ export default function Staff() {
             </button>
             <button
               className="ghost-btn"
-              style={{ padding: '6px 12px', fontSize: '12px', background: salaryEndWeek === getNextWeeks(salaryStartWeek, 3) ? '#eff6ff' : '#ffffff', borderColor: salaryEndWeek === getNextWeeks(salaryStartWeek, 3) ? '#3b82f6' : '#cbd5e1', color: salaryEndWeek === getNextWeeks(salaryStartWeek, 3) ? '#2563eb' : '#475569', cursor: 'pointer', borderRadius: '4px' }}
+              style={{ padding: '6px 12px', fontSize: '12px', background: salaryEndWeek === getNextWeeks(salaryStartWeek, 3) ? 'var(--brand-soft)' : 'var(--surface)', borderColor: salaryEndWeek === getNextWeeks(salaryStartWeek, 3) ? 'var(--brand-ink)' : 'var(--line-strong)', color: salaryEndWeek === getNextWeeks(salaryStartWeek, 3) ? 'var(--brand-ink)' : 'var(--text-2)', cursor: 'pointer', borderRadius: '4px' }}
               onClick={() => {
                 setSalaryEndWeek(getNextWeeks(salaryStartWeek, 3));
               }}
@@ -515,7 +516,7 @@ export default function Staff() {
             </button>
             <button
               className="ghost-btn"
-              style={{ padding: '6px 12px', fontSize: '12px', background: salaryEndWeek === getNextWeeks(salaryStartWeek, 7) ? '#eff6ff' : '#ffffff', borderColor: salaryEndWeek === getNextWeeks(salaryStartWeek, 7) ? '#3b82f6' : '#cbd5e1', color: salaryEndWeek === getNextWeeks(salaryStartWeek, 7) ? '#2563eb' : '#475569', cursor: 'pointer', borderRadius: '4px' }}
+              style={{ padding: '6px 12px', fontSize: '12px', background: salaryEndWeek === getNextWeeks(salaryStartWeek, 7) ? 'var(--brand-soft)' : 'var(--surface)', borderColor: salaryEndWeek === getNextWeeks(salaryStartWeek, 7) ? 'var(--brand-ink)' : 'var(--line-strong)', color: salaryEndWeek === getNextWeeks(salaryStartWeek, 7) ? 'var(--brand-ink)' : 'var(--text-2)', cursor: 'pointer', borderRadius: '4px' }}
               onClick={() => {
                 setSalaryEndWeek(getNextWeeks(salaryStartWeek, 7));
               }}
@@ -528,35 +529,35 @@ export default function Staff() {
 
       {/* 2. Rates Config Table */}
       <div className="modern-card" style={{ overflowX: 'auto', padding: '16px' }}>
-        <h4 style={{ marginBottom: '16px', color: '#0f172a', fontWeight: 600 }}>2. Bảng Chấm Công & Khai Báo Đơn Giá</h4>
-        <table className="modern-table" style={{ minWidth: '1100px', fontSize: '13px', border: '1px solid #e2e8f0' }}>
+        <h4 style={{ marginBottom: '16px', color: 'var(--text)', fontWeight: 600 }}>2. Bảng Chấm Công & Khai Báo Đơn Giá</h4>
+        <table className="modern-table" style={{ minWidth: '1100px', fontSize: '13px', border: '1px solid var(--line)' }}>
           <thead>
             <tr>
-              <th rowSpan={2} style={{ background: '#f8fafc', borderRight: '1px solid #e2e8f0' }}>Nhân viên</th>
-              <th rowSpan={2} style={{ background: '#f8fafc', width: '110px', borderRight: '1px solid #e2e8f0' }}>Loại</th>
+              <th rowSpan={2} style={{ borderRight: '1px solid var(--ink-line)' }}>Nhân viên</th>
+              <th rowSpan={2} style={{ width: '110px', borderRight: '1px solid var(--ink-line)' }}>Loại</th>
               {SHIFTS.map(s => (
-                <th colSpan={2} key={s} style={{ textAlign: 'center', borderRight: '2px solid #cbd5e1', background: '#f8fafc' }}>{s}</th>
+                <th colSpan={2} key={s} style={{ textAlign: 'center', borderRight: '2px solid var(--ink-line)' }}>{s}</th>
               ))}
-              <th rowSpan={2} style={{ background: '#f8fafc', textAlign: 'right' }}>Tiền Ca (VND)</th>
+              <th rowSpan={2} style={{ textAlign: 'right' }}>Tiền Ca (VND)</th>
             </tr>
             <tr>
               {SHIFTS.map(s => (
-                <td colSpan={2} key={s} style={{ padding: 0, borderRight: '2px solid #cbd5e1' }}>
+                <td colSpan={2} key={s} style={{ padding: 0, borderRight: '2px solid var(--line-strong)' }}>
                   <div style={{ display: 'flex' }}>
-                    <div style={{ flex: 1, padding: '4px', background: '#f1f5f9', borderRight: '1px solid #e2e8f0' }}>
-                      <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>CT</div>
+                    <div style={{ flex: 1, padding: '4px', background: 'var(--surface-3)', borderRight: '1px solid var(--line)' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '2px' }}>CT</div>
                       <input
                         type="number"
-                        style={{ width: '100%', padding: '4px', fontSize: '12px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                        style={{ width: '100%', padding: '4px', fontSize: '12px', border: '1px solid var(--line-strong)', borderRadius: '4px' }}
                         value={salaryConfigs.find(c => c.shift_name === s && c.staff_type === 'CT')?.rate_per_shift || 0}
                         onChange={e => updateRate(s, 'CT', e.target.value)}
                       />
                     </div>
-                    <div style={{ flex: 1, padding: '4px', background: '#f1f5f9' }}>
-                      <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '2px' }}>TV</div>
+                    <div style={{ flex: 1, padding: '4px', background: 'var(--surface-3)' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '2px' }}>TV</div>
                       <input
                         type="number"
-                        style={{ width: '100%', padding: '4px', fontSize: '12px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
+                        style={{ width: '100%', padding: '4px', fontSize: '12px', border: '1px solid var(--line-strong)', borderRadius: '4px' }}
                         value={salaryConfigs.find(c => c.shift_name === s && c.staff_type === 'TV')?.rate_per_shift || 0}
                         onChange={e => updateRate(s, 'TV', e.target.value)}
                       />
@@ -569,28 +570,28 @@ export default function Staff() {
           <tbody>
             {singleWeekCalculations.map(calc => (
               <tr key={calc.id}>
-                <td style={{ fontWeight: 'bold', borderRight: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px' }}>
+                <td style={{ fontWeight: 'bold', borderRight: '1px solid var(--line)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px' }}>
                   <span>{calc.full_name}</span>
                   <button
                     onClick={() => handleDeleteStaff(calc.id, calc.full_name)}
-                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '16px', padding: '4px' }}
+                    style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '16px', padding: '4px' }}
                     title="Xóa nhân viên"
                   >
-                    🗑️
+                    <Trash2 size={16} />
                   </button>
                 </td>
-                <td style={{ borderRight: '1px solid #e2e8f0' }}>
-                  <select value={calc.type} onChange={e => updateStaffType(calc.id, e.target.value)} style={{ padding: '4px', width: '100%', borderRadius: '4px', border: '1px solid #cbd5e1' }}>
+                <td style={{ borderRight: '1px solid var(--line)' }}>
+                  <select value={calc.type} onChange={e => updateStaffType(calc.id, e.target.value)} style={{ padding: '4px', width: '100%', borderRadius: '4px', border: '1px solid var(--line-strong)' }}>
                     <option value="CT">Chính thức</option>
                     <option value="TV">Thử việc</option>
                   </select>
                 </td>
                 {SHIFTS.map(s => (
-                  <td colSpan={2} key={s} style={{ borderRight: '2px solid #cbd5e1', textAlign: 'center', background: (calc.counts?.[s] || 0) > 0 ? '#e0f2fe' : 'transparent', fontWeight: (calc.counts?.[s] || 0) > 0 ? 'bold' : 'normal' }}>
+                  <td colSpan={2} key={s} style={{ borderRight: '2px solid var(--line-strong)', textAlign: 'center', background: (calc.counts?.[s] || 0) > 0 ? 'var(--brand-soft)' : 'transparent', fontWeight: (calc.counts?.[s] || 0) > 0 ? 'bold' : 'normal' }}>
                     {(calc.counts?.[s] || 0) > 0 ? calc.counts[s] : '-'}
                   </td>
                 ))}
-                <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#0ea5e9', fontSize: '14px' }}>
+                <td style={{ textAlign: 'right', fontWeight: 'bold', color: 'var(--brand-ink)', fontSize: '14px' }}>
                   {calc.baseSalary.toLocaleString('vi-VN')}
                 </td>
               </tr>
@@ -602,39 +603,39 @@ export default function Staff() {
       {/* 3. Final Salary Table */}
       <div className="modern-card" style={{ overflowX: 'auto', padding: '16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-          <h4 style={{ margin: 0, color: '#0f172a', fontWeight: 600 }}>3. Bảng Kết Lương</h4>
+          <h4 style={{ margin: 0, color: 'var(--text)', fontWeight: 600 }}>3. Bảng Kết Lương</h4>
           {salaryStartWeek !== salaryEndWeek && (
-            <span style={{ fontSize: '12px', color: '#1e293b', background: '#fef3c7', border: '1px solid #fde68a', padding: '4px 10px', borderRadius: '12px', fontWeight: 600 }}>
+            <span style={{ fontSize: '12px', color: 'var(--text)', background: 'var(--warn-soft)', border: '1px solid var(--warn-line)', padding: '4px 10px', borderRadius: 'var(--radius)', fontWeight: 600 }}>
               Đang tính gộp {Math.round((new Date(salaryEndWeek) - new Date(salaryStartWeek)) / (7 * 24 * 60 * 60 * 1000)) + 1} tuần: {formatDate(salaryStartWeek)} → {formatDate(salaryEndWeek)}
             </span>
           )}
         </div>
 
         {salaryStartWeek !== salaryEndWeek && (
-          <div style={{ marginBottom: '16px', background: '#eff6ff', border: '1px solid #bfdbfe', color: '#1e40af', display: 'flex', gap: '8px', alignItems: 'flex-start', padding: '10px 14px', borderRadius: '6px', fontSize: '13px' }}>
-            <span style={{ fontSize: '16px' }}>💡</span>
+          <div style={{ marginBottom: '16px', background: 'var(--brand-soft)', border: '1px solid var(--brand-line)', color: 'var(--brand-ink)', display: 'flex', gap: '8px', alignItems: 'flex-start', padding: '10px 14px', borderRadius: 'var(--radius)', fontSize: '13px' }}>
+            <Info size={16} style={{ flexShrink: 0, marginTop: '1px' }} />
             <div>
               <strong>Chế độ Xem Tổng Hợp (Nhiều tuần):</strong> Phụ cấp, phạt, hoa hồng và khoản khác được tự động cộng dồn và hiển thị ở chế độ chỉ đọc. Để chỉnh sửa/nhập các khoản này, vui lòng chọn khoảng tính lương là <strong>1 tuần duy nhất</strong> (hoặc bấm nút "Tuần này" ở trên).
             </div>
           </div>
         )}
 
-        <table className="modern-table" style={{ width: '100%', border: '1px solid #e2e8f0' }}>
+        <table className="modern-table" style={{ width: '100%', border: '1px solid var(--line)' }}>
           <thead>
             <tr>
-              <th style={{ background: '#fef3c7', borderRight: '1px solid #e2e8f0' }}>Nhân viên</th>
-              <th style={{ background: '#fef3c7', borderRight: '1px solid #e2e8f0' }}>Hoa hồng</th>
-              <th style={{ background: '#fef3c7', borderRight: '1px solid #e2e8f0' }}>Khoản khác</th>
-              <th style={{ background: '#fef3c7', borderRight: '1px solid #e2e8f0' }}>Hao hụt</th>
-              <th style={{ background: '#fef3c7', borderRight: '1px solid #e2e8f0' }}>Khoản phạt</th>
-              <th style={{ background: '#fef3c7', textAlign: 'right' }}>Thực Lãnh</th>
+              <th style={{ borderRight: '1px solid var(--ink-line)' }}>Nhân viên</th>
+              <th style={{ borderRight: '1px solid var(--ink-line)' }}>Hoa hồng</th>
+              <th style={{ borderRight: '1px solid var(--ink-line)' }}>Khoản khác</th>
+              <th style={{ borderRight: '1px solid var(--ink-line)' }}>Hao hụt</th>
+              <th style={{ borderRight: '1px solid var(--ink-line)' }}>Khoản phạt</th>
+              <th style={{ textAlign: 'right' }}>Thực Lãnh</th>
             </tr>
           </thead>
           <tbody>
             {calculations.map(calc => (
               <tr key={calc.id}>
-                <td style={{ fontWeight: 'bold', borderRight: '1px solid #e2e8f0' }}>{calc.full_name}</td>
-                <td style={{ borderRight: '1px solid #e2e8f0' }}>
+                <td style={{ fontWeight: 'bold', borderRight: '1px solid var(--line)' }}>{calc.full_name}</td>
+                <td style={{ borderRight: '1px solid var(--line)' }}>
                   <input
                     type="number"
                     style={inputStyle}
@@ -645,7 +646,7 @@ export default function Staff() {
                     title={salaryStartWeek !== salaryEndWeek ? "Vui lòng chọn tính lương 1 tuần duy nhất để chỉnh sửa" : ""}
                   />
                 </td>
-                <td style={{ borderRight: '1px solid #e2e8f0' }}>
+                <td style={{ borderRight: '1px solid var(--line)' }}>
                   <input
                     type="number"
                     style={inputStyle}
@@ -656,7 +657,7 @@ export default function Staff() {
                     title={salaryStartWeek !== salaryEndWeek ? "Vui lòng chọn tính lương 1 tuần duy nhất để chỉnh sửa" : ""}
                   />
                 </td>
-                <td style={{ borderRight: '1px solid #e2e8f0' }}>
+                <td style={{ borderRight: '1px solid var(--line)' }}>
                   <input
                     type="number"
                     style={inputStyle}
@@ -667,7 +668,7 @@ export default function Staff() {
                     title={salaryStartWeek !== salaryEndWeek ? "Vui lòng chọn tính lương 1 tuần duy nhất để chỉnh sửa" : ""}
                   />
                 </td>
-                <td style={{ borderRight: '1px solid #e2e8f0' }}>
+                <td style={{ borderRight: '1px solid var(--line)' }}>
                   <input
                     type="number"
                     style={inputStyle}
@@ -678,7 +679,7 @@ export default function Staff() {
                     title={salaryStartWeek !== salaryEndWeek ? "Vui lòng chọn tính lương 1 tuần duy nhất để chỉnh sửa" : ""}
                   />
                 </td>
-                <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#16a34a', fontSize: '16px', background: '#f0fdf4' }}>
+                <td style={{ textAlign: 'right', fontWeight: 'bold', color: 'var(--ok)', fontSize: '16px', background: 'var(--ok-soft)' }}>
                   {calc.finalSalary.toLocaleString('vi-VN')}đ
                 </td>
               </tr>

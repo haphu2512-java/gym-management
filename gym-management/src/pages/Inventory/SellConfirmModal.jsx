@@ -10,12 +10,12 @@ export default function SellConfirmModal({
     <div className="modal-backdrop" onClick={() => setSellingItem(null)}>
       <div className="modal-panel" style={{ maxWidth: '400px' }} onClick={(e) => e.stopPropagation()}>
         <h3 style={{ marginBottom: '8px' }}>Xác nhận bán hàng</h3>
-        <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', marginBottom: '16px' }}>
-          <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>Sản phẩm:</p>
+        <div style={{ background: 'var(--surface-2)', padding: '16px', borderRadius: 'var(--radius)', marginBottom: '16px' }}>
+          <p style={{ margin: 0, fontSize: '14px', color: 'var(--muted)' }}>Sản phẩm:</p>
           <p style={{ margin: '4px 0', fontSize: '18px', fontWeight: 'bold' }}>{sellingItem.name}</p>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed #cbd5e1' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed var(--line-strong)' }}>
             <span>Số lượng: <strong>x{sellQuantities[sellingItem.id]}</strong></span>
-            <span style={{ color: '#2563eb', fontWeight: '800' }}>
+            <span style={{ color: 'var(--brand-ink)', fontWeight: '800' }}>
               Tổng: {(Number(sellingItem.price || 0) * (sellQuantities[sellingItem.id] || 1)).toLocaleString('vi-VN')}đ
             </span>
           </div>
@@ -26,7 +26,7 @@ export default function SellConfirmModal({
           <button
             type="button"
             className="primary-btn"
-            style={{ background: '#0f172a', height: '48px' }}
+            style={{ background: 'var(--text)', height: '48px' }}
             onClick={() => handleSell(sellingItem, 'TM')}
             disabled={submitting}
           >
@@ -35,7 +35,7 @@ export default function SellConfirmModal({
           <button
             type="button"
             className="primary-btn"
-            style={{ background: '#2563eb', height: '48px' }}
+            style={{ background: 'var(--brand-ink)', height: '48px' }}
             onClick={() => handleSell(sellingItem, 'CK')}
             disabled={submitting}
           >

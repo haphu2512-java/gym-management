@@ -71,7 +71,7 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
         </div>
 
         {error && <div className="modern-error" style={{ marginBottom: '16px' }}>{error}</div>}
-        {success && <div className="modern-success" style={{ marginBottom: '16px', color: '#059669', background: '#d1fae5' }}>{success}</div>}
+        {success && <div className="modern-success" style={{ marginBottom: '16px', color: 'var(--ok)', background: 'var(--ok-soft)' }}>{success}</div>}
 
         <form onSubmit={handleSubmit} className="modern-form">
           <div style={{ marginBottom: '12px' }}>
@@ -99,7 +99,7 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
               <button 
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 0 }}
+                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', padding: 0 }}
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
@@ -121,7 +121,7 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
           </div>
 
           <div style={{ marginBottom: '24px' }}>
-            <label className="field-label" style={{ color: '#dc2626' }}>Mã Master (Admin Secret)</label>
+            <label className="field-label" style={{ color: 'var(--danger)' }}>Mã Master (Admin Secret)</label>
             <input
               type="password"
               value={adminSecret}

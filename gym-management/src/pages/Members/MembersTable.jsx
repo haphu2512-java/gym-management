@@ -62,17 +62,17 @@ export default function MembersTable({
                     {m.member_code ? (
                       <p className="cell-sub">ID : {m.member_code}</p>
                     ) : (
-                      <p className="cell-sub" style={{ color: '#94a3b8', fontStyle: 'italic' }}>Chưa có mã</p>
+                      <p className="cell-sub" style={{ color: 'var(--subtle)', fontStyle: 'italic' }}>Chưa có mã</p>
                     )}
                     {showWarning && (
                       <span 
                         className="pay-badge" 
                         style={{ 
-                          background: '#fef2f2', 
-                          color: '#991b1b', 
-                          border: '1px solid #fca5a5', 
+                          background: 'var(--danger-soft)', 
+                          color: 'var(--danger-ink)', 
+                          border: '1px solid var(--danger-line)', 
                           padding: '2px 6px',
-                          borderRadius: '6px',
+                          borderRadius: 'var(--radius)',
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: '4px',
@@ -80,7 +80,7 @@ export default function MembersTable({
                         }}
                         title="Tài khoản đăng ký hơn 7 ngày nhưng chưa có mã hội viên"
                       >
-                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#dc2626', display: 'inline-block' }}></span>
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--danger)', display: 'inline-block' }}></span>
                         Chưa gắn mã &gt; 7 ngày
                       </span>
                     )}
@@ -96,12 +96,12 @@ export default function MembersTable({
                 <td>
                   <span
                     className={`status-badge ${status === 'Active' ? 'active' : status === 'Suspended' ? 'suspended' : 'expired'}`}
-                    style={status === 'Suspended' ? { background: '#fef3c7', color: '#92400e' } : {}}
+                    style={status === 'Suspended' ? { background: 'var(--warn-soft)', color: 'var(--warn-ink)' } : {}}
                   >
                     {status === 'Active' ? 'Đang tập' : status === 'Suspended' ? 'Bảo lưu' : 'Hết hạn'}
                   </span>
                   {m.payment_method === 'CK' && !m.is_payment_verified && (
-                    <span className="pay-badge" style={{ background: '#fef08a', color: '#854d0e', marginLeft: '4px' }}>Chờ duyệt</span>
+                    <span className="pay-badge" style={{ background: 'var(--warn-soft)', color: 'var(--warn-ink)', marginLeft: '4px' }}>Chờ duyệt</span>
                   )}
                 </td>
                 {activeTab === 'suspended' && (
@@ -117,7 +117,7 @@ export default function MembersTable({
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                       fontSize: '12px',
-                      color: '#64748b'
+                      color: 'var(--muted)'
                     }}
                     title={m.note}
                   >
@@ -131,7 +131,7 @@ export default function MembersTable({
                       className="ghost-btn-sm"
                       onClick={() => onEditMember(m)}
                       title="Xem chi tiết & Sửa"
-                      style={{ padding: '6px', color: '#2563eb' }}
+                      style={{ padding: '6px' }}
                     >
                       <Eye size={18} />
                     </button>
@@ -141,7 +141,7 @@ export default function MembersTable({
                         className="ghost-btn-sm"
                         onClick={() => onRenewMember(m)}
                         title="Gia hạn gói tập"
-                        style={{ padding: '6px', color: '#10b981' }}
+                        style={{ padding: '6px' }}
                       >
                         <RefreshCcw size={18} />
                       </button>
@@ -152,7 +152,7 @@ export default function MembersTable({
                         className="ghost-btn-sm"
                         onClick={() => onReactivateMember(m)}
                         title="Kích hoạt lại"
-                        style={{ padding: '6px', color: '#8b5cf6' }}
+                        style={{ padding: '6px' }}
                       >
                         <Plus size={18} />
                       </button>
@@ -162,7 +162,7 @@ export default function MembersTable({
                         className="ghost-btn-sm"
                         onClick={() => onSuspendMember(m)}
                         title="Bảo lưu gói tập"
-                        style={{ padding: '6px', color: '#f59e0b' }}
+                        style={{ padding: '6px' }}
                       >
                         <PauseCircle size={18} />
                       </button>
@@ -171,7 +171,7 @@ export default function MembersTable({
                       <button
                         type="button"
                         className="ghost-btn-sm"
-                        style={{ color: '#dc2626', padding: '6px' }}
+                        style={{ color: 'var(--danger)', padding: '6px' }}
                         onClick={() => onDeleteMember(m)}
                         title="Xóa hội viên"
                       >
@@ -187,7 +187,7 @@ export default function MembersTable({
       </table>
 
       {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', marginTop: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderTop: '1px solid var(--line)', background: 'var(--surface-2)', marginTop: 'auto' }}>
           <span className="muted-text" style={{ fontSize: '13px' }}>
             Hiển thị {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filtered.length)} / {filtered.length} hội viên
           </span>

@@ -8,9 +8,9 @@ const icons = {
 };
 
 const colors = {
-  success: '#10b981',
-  error: '#ef4444',
-  info: '#3b82f6',
+  success: 'var(--ok)',
+  error: 'var(--danger)',
+  info: 'var(--brand-ink)',
 };
 
 export default function ToastContainer() {
@@ -34,10 +34,10 @@ export default function ToastContainer() {
             key={toast.id}
             style={{
               pointerEvents: 'auto',
-              background: '#ffffff',
-              color: '#1f2937',
+              background: 'var(--surface)',
+              color: 'var(--text)',
               padding: '12px 16px',
-              borderRadius: '12px',
+              borderRadius: 'var(--radius)',
               boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
               display: 'flex',
               alignItems: 'center',
@@ -56,7 +56,7 @@ export default function ToastContainer() {
               style={{
                 border: 'none',
                 background: 'transparent',
-                color: '#9ca3af',
+                color: 'var(--subtle)',
                 cursor: 'pointer',
                 padding: '4px',
                 display: 'flex',

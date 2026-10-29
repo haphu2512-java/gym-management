@@ -115,10 +115,10 @@ export default function Notes() {
           {loading && <p className="muted-text">Đang tải dữ liệu...</p>}
           {!loading && sharedNotes.length === 0 && <p className="muted-text">Chưa có ghi chú nào.</p>}
           {sharedNotes.map(note => (
-            <div key={note.id} className="modern-card" style={{ padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+            <div key={note.id} className="modern-card" style={{ padding: '16px', background: 'var(--surface-2)', border: '1px solid var(--line)' }}>
               <div className="flex-row" style={{ justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontSize: '13px', fontWeight: '600', color: '#1e40af' }}>
-                  👤 {note.staff_members?.full_name || 'Hệ thống'}
+                <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--brand-ink)' }}>
+                  {note.staff_members?.full_name || 'Hệ thống'}
                 </span>
                 <span className="muted-text" style={{ fontSize: '12px' }}>
                   {formatDateTime(note.created_at)}
@@ -129,7 +129,7 @@ export default function Notes() {
                 <button
                   type="button"
                   className="link-btn"
-                  style={{ fontSize: '12px', color: '#2563eb' }}
+                  style={{ fontSize: '12px', color: 'var(--brand-ink)' }}
                   onClick={() => {
                     setEditingNote(note);
                     setNoteForm(note.content);
@@ -138,7 +138,7 @@ export default function Notes() {
                 <button
                   type="button"
                   className="link-btn"
-                  style={{ fontSize: '12px', color: '#dc2626' }}
+                  style={{ fontSize: '12px', color: 'var(--danger)' }}
                   onClick={() => handleDeleteSharedNote(note.id)}
                 >Xóa</button>
               </div>

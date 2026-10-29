@@ -69,23 +69,23 @@ export default function RenewModal({
           {isExpired && (
             <div style={{ marginTop: '14px' }}>
               <label className="cell-sub" style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>Phương thức gia hạn (Hội viên đã hết hạn)</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: '#f8fafc', padding: '12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer', fontWeight: '500', color: '#334155' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'var(--surface-2)', padding: '12px', borderRadius: 'var(--radius)', border: '1px solid var(--line)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer', fontWeight: '500', color: 'var(--text)' }}>
                   <input
                     type="checkbox"
                     checked={renewForm.renew_from === 'today'}
                     onChange={() => onFormChange('renew_from', 'today')}
-                    style={{ width: '16px', height: '16px', accentColor: '#2563eb', cursor: 'pointer' }}
+                    style={{ width: '16px', height: '16px', accentColor: 'var(--brand-ink)', cursor: 'pointer' }}
                   />
                   Gia hạn từ ngày gia hạn (Hôm nay: {formatDate(todayStr)})
                 </label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer', fontWeight: '500', color: '#334155' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer', fontWeight: '500', color: 'var(--text)' }}>
                     <input
                       type="checkbox"
                       checked={renewForm.renew_from === 'expired'}
                       onChange={() => onFormChange('renew_from', 'expired')}
-                      style={{ width: '16px', height: '16px', accentColor: '#2563eb', cursor: 'pointer' }}
+                      style={{ width: '16px', height: '16px', accentColor: 'var(--brand-ink)', cursor: 'pointer' }}
                     />
                     Gia hạn từ ngày hết hạn (Ngày hết hạn: {formatDate(member.end_date)})
                   </label>
@@ -98,8 +98,8 @@ export default function RenewModal({
                         onChange={(e) => onFormChange('custom_renew_date', e.target.value)}
                         style={{
                           padding: '6px 10px',
-                          borderRadius: '6px',
-                          border: '1px solid #cbd5e1',
+                          borderRadius: 'var(--radius)',
+                          border: '1px solid var(--line-strong)',
                           fontSize: '13px',
                           outline: 'none',
                           width: '100%',
@@ -124,8 +124,8 @@ export default function RenewModal({
               style={{
                 width: '100%',
                 padding: '8px 12px',
-                borderRadius: '8px',
-                border: '1px solid #cbd5e1',
+                borderRadius: 'var(--radius)',
+                border: '1px solid var(--line-strong)',
                 fontSize: '13px',
                 outline: 'none',
                 resize: 'vertical'

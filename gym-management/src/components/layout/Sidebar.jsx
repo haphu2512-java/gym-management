@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Clock, Droplets, LayoutDashboard, LogOut, Users, WalletCards, ScrollText, TrendingUp, BookOpen, MoreVertical } from 'lucide-react';
+import { Clock, Droplets, LayoutDashboard, LogOut, Users, WalletCards, ScrollText, TrendingUp, BookOpen, ChevronUp } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
-import logo from '../../assets/logo.png';
+import logo from '../../assets/logo-wide.png';
 
 const icons = {
   dashboard: LayoutDashboard,
@@ -15,83 +15,92 @@ const icons = {
   statistics: TrendingUp,
 };
 
+function NavItem({ item, active, onNavigate }) {
+  const Icon = icons[item.key];
+  return (
+    <Link
+      to={item.path}
+      onClick={onNavigate}
+      className={`side-nav-item ${active ? 'active' : ''}`}
+    >
+      <Icon size={18} />
+      <span>{item.label}</span>
+    </Link>
+  );
+}
+
 export default function Sidebar({ isOpen, onClose }) {
   const [showLogout, setShowLogout] = useState(false);
   const location = useLocation();
   const { profile, activeStaff, logout } = useAuthStore();
 
   const baseItems = [
-    { key: 'dashboard', path: '/dashboard', label: 'Báo Cáo Chung' },
-    { key: 'members', path: '/members', label: 'Quản Lý Hội Viên' },
-    { key: 'inventory', path: '/inventory', label: 'Quản Lý Nước' },
-    { key: 'shifts', path: '/shifts', label: 'Ca Làm & Bàn Giao' },
-    { key: 'notes', path: '/notes', label: 'Sổ Nhật Ký (Ghi Chú)' },
+    { key: 'dashboard', path: '/dashboard', label: 'Tổng quan' },
+    { key: 'members', path: '/members', label: 'Hội viên' },
+    { key: 'inventory', path: '/inventory', label: 'Bán nước & kho' },
+    { key: 'shifts', path: '/shifts', label: 'Ca trực & bàn giao' },
+    { key: 'notes', path: '/notes', label: 'Sổ ghi chú' },
   ];
 
-  const menuItems = profile?.role === 'admin'
-    ? [
-      ...baseItems,
-      { key: 'statistics', path: '/statistics', label: 'Thống Kê Chi Tiết' },
-      { key: 'staff', path: '/staff', label: 'Nhân Viên & Lương' },
-      { key: 'logs', path: '/logs', label: 'Nhật Ký Hoạt Động' }
-    ]
-    : baseItems.filter((item) => item.key !== 'dashboard');
+  const adminItems = [
+    { key: 'statistics', path: '/statistics', label: 'Thống kê' },
+    { key: 'staff', path: '/staff', label: 'Nhân viên & lương' },
+    { key: 'logs', path: '/logs', label: 'Nhật ký hoạt động' },
+  ];
+
+  const isAdmin = profile?.role === 'admin';
+  const dailyItems = isAdmin ? baseItems : baseItems.filter((item) => item.key !== 'dashboard');
+
+  const handleNavigate = () => {
+    if (window.innerWidth < 768) onClose();
+  };
+
+  const displayName = activeStaff ? activeStaff.full_name : (profile?.full_name || 'User');
 
   return (
     <aside className={`modern-sidebar ${isOpen ? 'open' : ''}`}>
       <div className="sidebar-brand">
-        <img src={logo} alt="Max Power Gym" style={{ width: '80px', height: 'auto', marginBottom: '12px', display: 'block', borderRadius: '12px' }} />
-        <h1>MAX POWER GYM</h1>
-        <p>Management System</p>
+        <img src={logo} alt="Max Power Gym Center" />
+        <p>Quầy lễ tân</p>
       </div>
 
       <nav className="sidebar-nav-modern">
-        {menuItems.map((item) => {
-          const Icon = icons[item.key];
-          const active = location.pathname === item.path;
+        <div className="sidebar-section-label">Hằng ngày</div>
+        {dailyItems.map((item) => (
+          <NavItem key={item.path} item={item} active={location.pathname === item.path} onNavigate={handleNavigate} />
+        ))}
 
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              onClick={() => {
-                if (window.innerWidth < 768) onClose();
-              }}
-              className={`side-nav-item ${active ? 'active' : ''}`}
-            >
-              <Icon size={18} />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
+        {isAdmin && (
+          <>
+            <div className="sidebar-section-label">Quản lý</div>
+            {adminItems.map((item) => (
+              <NavItem key={item.path} item={item} active={location.pathname === item.path} onNavigate={handleNavigate} />
+            ))}
+          </>
+        )}
       </nav>
 
-      <div className="sidebar-footer" style={{ position: 'relative' }}>
+      <div className="sidebar-footer">
         {showLogout && (
-          <div style={{ position: 'absolute', bottom: '100%', left: '16px', right: '16px', marginBottom: '8px', background: '#ffffff', borderRadius: '12px', padding: '8px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', zIndex: 50, border: '1px solid #e2e8f0' }}>
-            <button type="button" className="logout-btn-modern" onClick={logout} style={{ width: '100%', margin: 0, justifyContent: 'flex-start', background: '#fee2e2', color: '#dc2626' }}>
-              <LogOut size={18} /> Đăng xuất hệ thống
+          <div className="user-menu">
+            <button type="button" className="logout-btn-modern" onClick={logout}>
+              <LogOut size={18} /> Đăng xuất
             </button>
           </div>
         )}
-        <div
-          className="user-box"
+        <button
+          type="button"
+          className={`user-box ${showLogout ? 'open' : ''}`}
           onClick={() => setShowLogout(!showLogout)}
-          style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', background: showLogout ? '#e2e8f0' : 'transparent', borderRadius: '12px', transition: 'background 0.2s', margin: '0 8px' }}
         >
-          <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-            <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>{activeStaff ? 'Đang trực' : 'Đang đăng nhập'}</p>
-            <strong style={{ fontSize: '14px', color: '#0f172a', display: 'block', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-              {activeStaff
-                ? `${activeStaff.full_name}`
-                : `${profile?.full_name || 'User'}`
-              }
-            </strong>
-          </div>
-          <MoreVertical size={16} color="#64748b" style={{ flexShrink: 0 }} />
-        </div>
+          <span className="user-initial">{displayName.trim().split(/\s+/).pop()?.charAt(0).toUpperCase()}</span>
+          <span className="user-meta">
+            <p>{activeStaff ? 'Đang trực' : 'Đang đăng nhập'}</p>
+            <strong>{displayName}</strong>
+          </span>
+          <ChevronUp size={16} color="#a3a3a8" style={{ flexShrink: 0, transform: showLogout ? 'none' : 'rotate(180deg)' }} />
+        </button>
       </div>
     </aside>
   );
 }
-

@@ -284,13 +284,13 @@ export default function ServiceTab() {
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginLeft: 'auto' }}>
           {/* Doanh thu nước ca hiện tại */}
           <div style={{
-            background: '#f0f9ff',
-            border: '1px solid #bae6fd',
-            borderRadius: '12px',
+            background: 'var(--brand-soft)',
+            border: '1px solid var(--brand-line)',
+            borderRadius: 'var(--radius)',
             padding: '8px 14px',
             fontSize: '13px',
             fontWeight: '800',
-            color: '#0369a1',
+            color: 'var(--brand-ink)',
             display: 'flex',
             alignItems: 'center',
             gap: '8px'
@@ -299,11 +299,11 @@ export default function ServiceTab() {
             DT Dịch vụ: {drinkRevenue.toLocaleString('vi-VN')}đ
           </div>
 
-          <div className="tab-group" style={{ display: 'flex', background: '#f1f5f9', padding: '4px', borderRadius: '8px' }}>
+          <div className="tab-group" style={{ display: 'flex', background: 'var(--surface-3)', padding: '4px', borderRadius: 'var(--radius)' }}>
             <button 
               className={`tab-btn ${viewMode === 'sales' ? 'active' : ''}`}
               onClick={() => setViewMode('sales')}
-              style={{ padding: '6px 12px', border: 'none', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', background: viewMode === 'sales' ? '#fff' : 'transparent', fontWeight: viewMode === 'sales' ? '600' : 'normal', boxShadow: viewMode === 'sales' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+              style={{ padding: '6px 12px', border: 'none', borderRadius: 'var(--radius)', fontSize: '13px', cursor: 'pointer', background: viewMode === 'sales' ? 'var(--surface)' : 'transparent', fontWeight: viewMode === 'sales' ? '600' : 'normal', boxShadow: viewMode === 'sales' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
             >
               Bán hàng
             </button>
@@ -311,7 +311,7 @@ export default function ServiceTab() {
               <button 
                 className={`tab-btn ${viewMode === 'admin' ? 'active' : ''}`}
                 onClick={() => setViewMode('admin')}
-                style={{ padding: '6px 12px', border: 'none', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', background: viewMode === 'admin' ? '#fff' : 'transparent', fontWeight: viewMode === 'admin' ? '600' : 'normal', boxShadow: viewMode === 'admin' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+                style={{ padding: '6px 12px', border: 'none', borderRadius: 'var(--radius)', fontSize: '13px', cursor: 'pointer', background: viewMode === 'admin' ? 'var(--surface)' : 'transparent', fontWeight: viewMode === 'admin' ? '600' : 'normal', boxShadow: viewMode === 'admin' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
               >
                 Quản lý kho
               </button>
@@ -319,7 +319,7 @@ export default function ServiceTab() {
             <button 
               className={`tab-btn ${viewMode === 'stats' ? 'active' : ''}`}
               onClick={() => setViewMode('stats')}
-              style={{ padding: '6px 12px', border: 'none', borderRadius: '6px', fontSize: '13px', cursor: 'pointer', background: viewMode === 'stats' ? '#fff' : 'transparent', fontWeight: viewMode === 'stats' ? '600' : 'normal', boxShadow: viewMode === 'stats' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+              style={{ padding: '6px 12px', border: 'none', borderRadius: 'var(--radius)', fontSize: '13px', cursor: 'pointer', background: viewMode === 'stats' ? 'var(--surface)' : 'transparent', fontWeight: viewMode === 'stats' ? '600' : 'normal', boxShadow: viewMode === 'stats' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
             >
               Thống kê
             </button>
@@ -343,9 +343,9 @@ export default function ServiceTab() {
             const qty = sellQuantities[item.id] || 1;
 
             return (
-              <div key={item.id} className="pos-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', transition: 'all 0.2s', opacity: 1 }}>
+              <div key={item.id} className="pos-card" style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--radius)', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', transition: 'all 0.2s', opacity: 1 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                  <div style={{ width: '40px', height: '40px', background: '#f8fafc', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 'bold', color: '#64748b' }}>
+                  <div style={{ width: '40px', height: '40px', background: 'var(--surface-2)', borderRadius: 'var(--radius)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 'bold', color: 'var(--muted)' }}>
                     {item.name.charAt(0).toUpperCase()}
                   </div>
                   <span style={{ 
@@ -353,31 +353,31 @@ export default function ServiceTab() {
                     padding: '2px 8px', 
                     borderRadius: '99px', 
                     fontWeight: 'bold',
-                    background: '#e0e7ff',
-                    color: '#4f46e5'
+                    background: 'var(--brand-soft)',
+                    color: 'var(--brand-ink)'
                   }}>
                     Dịch vụ
                   </span>
                 </div>
 
                 <div>
-                  <h4 style={{ margin: 0, fontSize: '15px', color: '#0f172a' }}>{item.name}</h4>
-                  <p style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#2563eb' }}>
+                  <h4 style={{ margin: 0, fontSize: '15px', color: 'var(--text)' }}>{item.name}</h4>
+                  <p style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: 'var(--brand-ink)' }}>
                     {Number(item.price || 0).toLocaleString('vi-VN')}đ
                   </p>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc', padding: '4px', borderRadius: '10px', marginTop: 'auto' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface-2)', padding: '4px', borderRadius: 'var(--radius)', marginTop: 'auto' }}>
                   <button 
                     onClick={() => handleQtyChange(item.id, -1, 999)}
-                    style={{ width: '32px', height: '32px', border: 'none', background: '#fff', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+                    style={{ width: '32px', height: '32px', border: 'none', background: 'var(--surface)', borderRadius: 'var(--radius)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
                   >
                     <Minus size={14} />
                   </button>
                   <span style={{ fontWeight: 'bold', fontSize: '14px' }}>{qty}</span>
                   <button 
                     onClick={() => handleQtyChange(item.id, 1, 999)}
-                    style={{ width: '32px', height: '32px', border: 'none', background: '#fff', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+                    style={{ width: '32px', height: '32px', border: 'none', background: 'var(--surface)', borderRadius: 'var(--radius)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
                   >
                     <Plus size={14} />
                   </button>
@@ -385,7 +385,7 @@ export default function ServiceTab() {
 
                 <button 
                   className="primary-btn" 
-                  style={{ width: '100%', borderRadius: '10px', padding: '10px' }}
+                  style={{ width: '100%', borderRadius: 'var(--radius)', padding: '10px' }}
                   onClick={() => setSellingItem(item)}
                 >
                   Bán hàng
@@ -397,22 +397,22 @@ export default function ServiceTab() {
       ) : viewMode === 'stats' ? (
         /* Thống kê bán hàng */
         <div className="modern-stack">
-          <div style={{ display: 'flex', gap: '12px', background: '#f8fafc', padding: '12px', borderRadius: '12px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '12px', background: 'var(--surface-2)', padding: '12px', borderRadius: 'var(--radius)', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569' }}>Ngày:</label>
+              <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-2)' }}>Ngày:</label>
               <input 
                 type="date" 
                 value={statsDate} 
                 onChange={(e) => setStatsDate(e.target.value)}
-                style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                style={{ padding: '6px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--line-strong)', fontSize: '13px' }}
               />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569' }}>Ca:</label>
+              <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-2)' }}>Ca:</label>
               <select 
                 value={statsShiftName} 
                 onChange={(e) => setStatsShiftName(e.target.value)}
-                style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                style={{ padding: '6px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--line-strong)', fontSize: '13px' }}
               >
                 <option value="">Tất cả các ca</option>
                 {shiftService.shiftOptions.map((item) => (
@@ -421,11 +421,11 @@ export default function ServiceTab() {
               </select>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569' }}>Thanh toán:</label>
+              <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-2)' }}>Thanh toán:</label>
               <select 
                 value={statsPaymentMethod} 
                 onChange={(e) => setStatsPaymentMethod(e.target.value)}
-                style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                style={{ padding: '6px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--line-strong)', fontSize: '13px' }}
               >
                 <option value="">Tất cả</option>
                 <option value="TM">Tiền mặt</option>
@@ -463,9 +463,9 @@ export default function ServiceTab() {
                     <td><p className="cell-main">{Number(log.total_price || 0).toLocaleString('vi-VN')}đ</p></td>
                     <td>
                       <span style={{ 
-                        padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold',
-                        background: log.payment_method === 'CK' ? '#dbeafe' : '#f1f5f9',
-                        color: log.payment_method === 'CK' ? '#1d4ed8' : '#475569'
+                        padding: '4px 8px', borderRadius: 'var(--radius)', fontSize: '12px', fontWeight: 'bold',
+                        background: log.payment_method === 'CK' ? 'var(--brand-soft)' : 'var(--surface-3)',
+                        color: log.payment_method === 'CK' ? 'var(--brand-ink)' : 'var(--text-2)'
                       }}>
                         {log.payment_method === 'CK' ? 'Chuyển khoản' : 'Tiền mặt'}
                       </span>
@@ -477,10 +477,10 @@ export default function ServiceTab() {
                           type="button"
                           className="ghost-btn"
                           style={{
-                            color: '#dc2626',
-                            background: '#fef2f2',
+                            color: 'var(--danger)',
+                            background: 'var(--danger-soft)',
                             padding: '4px 8px',
-                            borderRadius: '6px',
+                            borderRadius: 'var(--radius)',
                             fontSize: '12px',
                             fontWeight: '600'
                           }}
@@ -489,7 +489,7 @@ export default function ServiceTab() {
                           Hoàn tác
                         </button>
                       ) : (
-                        <span style={{ fontSize: '12px', color: '#94a3b8' }}>-</span>
+                        <span style={{ fontSize: '12px', color: 'var(--subtle)' }}>-</span>
                       )}
                     </td>
                   </tr>
@@ -526,7 +526,7 @@ export default function ServiceTab() {
                     <p className="cell-main">{Number(item.price || 0).toLocaleString('vi-VN')}đ</p>
                   </td>
                   <td>
-                    <span className="stock-badge ok" style={{ background: '#e0e7ff', color: '#4f46e5' }}>Dịch vụ</span>
+                    <span className="stock-badge ok" style={{ background: 'var(--brand-soft)', color: 'var(--brand-ink)' }}>Dịch vụ</span>
                   </td>
                   <td>
                     <div className="table-actions">
@@ -540,7 +540,7 @@ export default function ServiceTab() {
                       <button
                         type="button"
                         className="ghost-btn"
-                        style={{ color: '#dc2626', background: '#fef2f2' }}
+                        style={{ color: 'var(--danger)', background: 'var(--danger-soft)' }}
                         onClick={() => setDeletingProduct(item)}
                       >
                         <Trash2 size={14} />
@@ -607,12 +607,12 @@ export default function ServiceTab() {
         <div className="modal-backdrop" onClick={() => setSellingItem(null)}>
           <div className="modal-panel" style={{ maxWidth: '400px' }} onClick={(e) => e.stopPropagation()}>
             <h3 style={{ marginBottom: '8px' }}>Xác nhận bán hàng</h3>
-            <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '12px', marginBottom: '16px' }}>
-              <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>Sản phẩm:</p>
+            <div style={{ background: 'var(--surface-2)', padding: '16px', borderRadius: 'var(--radius)', marginBottom: '16px' }}>
+              <p style={{ margin: 0, fontSize: '14px', color: 'var(--muted)' }}>Sản phẩm:</p>
               <p style={{ margin: '4px 0', fontSize: '18px', fontWeight: 'bold' }}>{sellingItem.name}</p>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed #cbd5e1' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px', paddingTop: '12px', borderTop: '1px dashed var(--line-strong)' }}>
                 <span>Số lượng: <strong>x{sellQuantities[sellingItem.id]}</strong></span>
-                <span style={{ color: '#2563eb', fontWeight: '800' }}>
+                <span style={{ color: 'var(--brand-ink)', fontWeight: '800' }}>
                   Tổng: {(Number(sellingItem.price || 0) * (sellQuantities[sellingItem.id] || 1)).toLocaleString('vi-VN')}đ
                 </span>
               </div>
@@ -623,7 +623,7 @@ export default function ServiceTab() {
               <button 
                 type="button" 
                 className="primary-btn" 
-                style={{ background: '#0f172a', height: '48px' }}
+                style={{ background: 'var(--text)', height: '48px' }}
                 onClick={() => handleSell(sellingItem, 'TM')}
                 disabled={submitting}
               >
@@ -632,7 +632,7 @@ export default function ServiceTab() {
               <button 
                 type="button" 
                 className="primary-btn" 
-                style={{ background: '#2563eb', height: '48px' }}
+                style={{ background: 'var(--brand-ink)', height: '48px' }}
                 onClick={() => handleSell(sellingItem, 'CK')}
                 disabled={submitting}
               >
@@ -657,7 +657,7 @@ export default function ServiceTab() {
       {deletingProduct && (
         <div className="modal-backdrop" onClick={() => setDeletingProduct(null)}>
           <div className="modal-panel" style={{ maxWidth: '380px' }} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ color: '#dc2626' }}>Xác nhận xóa sản phẩm</h3>
+            <h3 style={{ color: 'var(--danger)' }}>Xác nhận xóa sản phẩm</h3>
             <p>
               Bạn có chắc muốn xóa sản phẩm <strong>{deletingProduct.name}</strong> khỏi kho?
               Hành động này sẽ xóa toàn bộ dữ liệu liên quan.
@@ -667,7 +667,7 @@ export default function ServiceTab() {
               <button
                 type="button"
                 className="primary-btn"
-                style={{ background: '#dc2626' }}
+                style={{ background: 'var(--danger)' }}
                 onClick={handleConfirmDelete}
               >
                 Xóa sản phẩm

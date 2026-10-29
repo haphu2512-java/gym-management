@@ -18,7 +18,7 @@ export default function DeleteConfirmModal({
   return (
     <div className="modal-backdrop" onClick={onCancel}>
       <div className="modal-panel" style={{ maxWidth: '420px' }} onClick={(e) => e.stopPropagation()}>
-        <h3 style={{ color: '#dc2626' }}>Xác nhận xóa hội viên</h3>
+        <h3 style={{ color: 'var(--danger)' }}>Xác nhận xóa hội viên</h3>
         <p>
           Bạn có chắc muốn xóa hội viên <strong>{member.full_name}</strong> ({member.member_code})?
           Hội viên sẽ bị ẩn khỏi danh sách. Các khoản đã thu trước đây vẫn giữ nguyên trong doanh thu.
@@ -63,7 +63,7 @@ export default function DeleteConfirmModal({
           <button
             type="button"
             className="primary-btn"
-            style={{ background: '#dc2626' }}
+            style={{ background: 'var(--danger)' }}
             disabled={invalidRefund}
             onClick={() => onConfirm({ refundAmount: refund, refundMethod, note })}
           >

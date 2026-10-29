@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { CheckCheck } from 'lucide-react';
+import { AlertTriangle, CheckCheck } from 'lucide-react';
 import { useMembers } from '../../hooks/useMembers';
 import { memberService } from '../../services/memberService';
 import { staffLogService } from '../../services/staffLogService';
@@ -527,16 +527,16 @@ export default function Members() {
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '12px 16px',
-          background: '#fefce8',
-          border: '1px solid #fef08a',
-          borderRadius: '8px',
-          color: '#854d0e',
+          background: 'var(--warn-soft)',
+          border: '1px solid var(--warn-soft)',
+          borderRadius: 'var(--radius)',
+          color: 'var(--warn-ink)',
           fontSize: '13px',
           gap: '12px',
           flexWrap: 'wrap'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '18px' }}>⚠️</span>
+            <AlertTriangle size={18} />
             <span>
               Có <strong>{pendingCkCount}</strong> hội viên thanh toán chuyển khoản đang <strong>chờ duyệt</strong>.
             </span>
@@ -548,9 +548,9 @@ export default function Members() {
                 onClick={() => setFilterStatus('pending_ck')}
                 style={{
                   background: 'transparent',
-                  border: '1px solid #ca8a04',
-                  color: '#854d0e',
-                  borderRadius: '6px',
+                  border: '1px solid var(--warn)',
+                  color: 'var(--warn-ink)',
+                  borderRadius: 'var(--radius)',
                   padding: '5px 12px',
                   fontSize: '12px',
                   fontWeight: '600',
@@ -565,10 +565,10 @@ export default function Members() {
               onClick={handleVerifyAllPendingCk}
               disabled={verifyingAll}
               style={{
-                background: '#16a34a',
+                background: 'var(--ok)',
                 border: 'none',
                 color: 'white',
-                borderRadius: '6px',
+                borderRadius: 'var(--radius)',
                 padding: '5px 14px',
                 fontSize: '12px',
                 fontWeight: '600',

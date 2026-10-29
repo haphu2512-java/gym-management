@@ -16,22 +16,22 @@ export default function SalesStatsView({
 }) {
   return (
     <div className="modern-stack">
-      <div style={{ display: 'flex', gap: '12px', background: '#f8fafc', padding: '12px', borderRadius: '12px', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: '12px', background: 'var(--surface-2)', padding: '12px', borderRadius: 'var(--radius)', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569' }}>Ngày:</label>
+          <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-2)' }}>Ngày:</label>
           <input
             type="date"
             value={statsDate}
             onChange={(e) => setStatsDate(e.target.value)}
-            style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+            style={{ padding: '6px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--line-strong)', fontSize: '13px' }}
           />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569' }}>Ca:</label>
+          <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-2)' }}>Ca:</label>
           <select
             value={statsShiftName}
             onChange={(e) => setStatsShiftName(e.target.value)}
-            style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+            style={{ padding: '6px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--line-strong)', fontSize: '13px' }}
           >
             <option value="">Tất cả các ca</option>
             {shiftService.shiftOptions.map((item) => (
@@ -40,11 +40,11 @@ export default function SalesStatsView({
           </select>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569' }}>Thanh toán:</label>
+          <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-2)' }}>Thanh toán:</label>
           <select
             value={statsPaymentMethod}
             onChange={(e) => setStatsPaymentMethod(e.target.value)}
-            style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+            style={{ padding: '6px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--line-strong)', fontSize: '13px' }}
           >
             <option value="">Tất cả</option>
             <option value="TM">Tiền mặt</option>
@@ -82,9 +82,9 @@ export default function SalesStatsView({
                 <td><p className="cell-main">{Number(log.total_price || 0).toLocaleString('vi-VN')}đ</p></td>
                 <td>
                   <span style={{
-                    padding: '4px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold',
-                    background: log.payment_method === 'CK' ? '#dbeafe' : '#f1f5f9',
-                    color: log.payment_method === 'CK' ? '#1d4ed8' : '#475569'
+                    padding: '4px 8px', borderRadius: 'var(--radius)', fontSize: '12px', fontWeight: 'bold',
+                    background: log.payment_method === 'CK' ? 'var(--brand-soft)' : 'var(--surface-3)',
+                    color: log.payment_method === 'CK' ? 'var(--brand-ink)' : 'var(--text-2)'
                   }}>
                     {log.payment_method === 'CK' ? 'Chuyển khoản' : 'Tiền mặt'}
                   </span>
@@ -96,10 +96,10 @@ export default function SalesStatsView({
                       type="button"
                       className="ghost-btn"
                       style={{
-                        color: '#dc2626',
-                        background: '#fef2f2',
+                        color: 'var(--danger)',
+                        background: 'var(--danger-soft)',
                         padding: '4px 8px',
-                        borderRadius: '6px',
+                        borderRadius: 'var(--radius)',
                         fontSize: '12px',
                         fontWeight: '600'
                       }}
@@ -108,7 +108,7 @@ export default function SalesStatsView({
                       Hoàn tác
                     </button>
                   ) : (
-                    <span style={{ fontSize: '12px', color: '#94a3b8' }}>-</span>
+                    <span style={{ fontSize: '12px', color: 'var(--subtle)' }}>-</span>
                   )}
                 </td>
               </tr>
