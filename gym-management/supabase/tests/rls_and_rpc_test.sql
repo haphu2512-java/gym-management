@@ -73,7 +73,10 @@ UPDATE salary_configs SET rate_per_shift = 0;
 SELECT pg_temp.expect_error($$INSERT INTO salary_configs (shift_name, staff_type, rate_per_shift) VALUES ('Ca 1', 'CT', 1)$$, '%row-level security%');
 UPDATE products SET stock_quantity = 999;
 SELECT pg_temp.check((SELECT stock_quantity = 0 FROM products), 'B1: staff không sửa được kho');
-SELECT pg_temp.expect_error($$INSERT INTO member_logs (member_id, action, is_payment_verified) SELECT id, 'UPDATE', true FROM members$$, '%row-level security%');
+-- Bản web cũ gửi kèm is_payment_verified: không lỗi, nhưng trạng thái duyệt bị bỏ (0400)
+INSERT INTO member_logs (member_id, action, is_payment_verified, note) SELECT id, 'UPDATE', true, 'web cũ true' FROM members;
+INSERT INTO member_logs (member_id, action, is_payment_verified, note) SELECT id, 'UPDATE', false, 'web cũ false' FROM members;
+SELECT pg_temp.check((SELECT bool_and(is_payment_verified IS NULL) FROM member_logs WHERE note LIKE 'web cũ%'), 'staff không tự đặt trạng thái duyệt CK');
 SELECT pg_temp.expect_error($$UPDATE members SET deleted_at = NOW()$$, '%trạng thái xóa/bảo lưu%');
 UPDATE members SET note = 'staff sửa ghi chú được';
 SELECT pg_temp.check((SELECT note = 'staff sửa ghi chú được' FROM members), 'staff sửa thông tin hội viên');
