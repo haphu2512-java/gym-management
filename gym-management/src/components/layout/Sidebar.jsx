@@ -18,7 +18,7 @@ const icons = {
 export default function Sidebar({ isOpen, onClose }) {
   const [showLogout, setShowLogout] = useState(false);
   const location = useLocation();
-  const { user, profile, activeStaff, logout } = useAuthStore();
+  const { profile, activeStaff, logout } = useAuthStore();
 
   const baseItems = [
     { key: 'dashboard', path: '/dashboard', label: 'Báo Cáo Chung' },

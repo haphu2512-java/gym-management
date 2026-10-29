@@ -1,6 +1,5 @@
 import supabase from '../config/supabase';
 import { staffLogService } from './staffLogService';
-import { getLocalISODate } from '../utils/formatters';
 
 const SHIFT_TABLE = 'shifts';
 
@@ -15,10 +14,9 @@ const SHIFT_TIME_MAP = {
   'Ca 5': { start: '19:00', end: '22:00', label: '19:00 - 22:00 tối' },
 };
 
-function validateShiftTime(shiftName, allowOverride = false) {
+export function validateShiftTime(shiftName, allowOverride = false, now = new Date()) {
   if (allowOverride) return; // Admin có thể bỏ qua nếu cần
 
-  const now = new Date();
   const currentHour = now.getHours();
   const currentMinute = now.getMinutes();
   const currentTotal = currentHour * 60 + currentMinute;
@@ -38,10 +36,6 @@ function validateShiftTime(shiftName, allowOverride = false) {
       `Không thể mở ${shiftName} lúc này. ${shiftName} chỉ được mở trong khung giờ ${schedule.label}. Giờ hiện tại: ${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}.`
     );
   }
-}
-
-function formatDateKey(date = new Date()) {
-  return getLocalISODate(date);
 }
 
 export const shiftService = {
@@ -123,89 +117,30 @@ export const shiftService = {
     return { valid: Boolean(active), shift: active || null };
   },
 
-  async openShift({ shiftName, startingCash = 0, note = '', authId = null, staffId = null, skipTimeCheck = false }) {
-    // authId: id tài khoản đăng nhập (Admin/Staff)
-    // staffId: id nhân viên thực tế chọn từ dropdown (staff_members)
-
-    // Validate thời gian mở ca
+  async openShift({ shiftName, startingCash = 0, note = '', staffId = null, skipTimeCheck = false }) {
+    // staffId: id nhân viên thực tế chọn từ dropdown (staff_members).
+    // Tài khoản mở ca và thời điểm mở do server ghi; server cũng chặn mở 2 ca cùng lúc.
     validateShiftTime(shiftName, skipTimeCheck);
 
-    // Check if there is already an open shift
-    const { data: openShifts, error: checkError } = await supabase
-      .from(SHIFT_TABLE)
-      .select('id, shift_name')
-      .eq('status', 'open');
-
-    if (checkError) throw new Error(checkError.message);
-    if (openShifts && openShifts.length > 0) {
-      throw new Error(`Đã có ca "${openShifts[0].shift_name}" đang mở. Vui lòng chốt ca cũ trước khi mở ca mới.`);
-    }
-
-    const times = SHIFT_TIME_MAP[shiftName] || { start: '00:00', end: '00:00' };
-
-    const payload = {
-      shift_name: shiftName,
-      default_start: times.start + ':00',
-      default_end: times.end + ':00',
-      start_time: new Date().toISOString(),
-      starting_cash: Number(startingCash || 0),
-      status: 'open',
-      opened_by: authId,
-      opened_by_member: staffId,
-      note,
-    };
-
-    const { data, error } = await supabase.from(SHIFT_TABLE).insert([payload]).select().single();
-    if (error) throw new Error(error.message);
-
-    await staffLogService.logAction({
-      staffId: authId,
-      staffMemberId: staffId,
-      action: 'Mở ca trực',
-      targetItem: shiftName,
-      details: { startingCash },
-      note: note || 'Mở ca mới',
-      created_at: new Date().toISOString()
+    const { data, error } = await supabase.rpc('open_shift', {
+      p_shift_name: shiftName,
+      p_starting_cash: Number(startingCash || 0),
+      p_note: note,
+      p_staff_id: staffId,
     });
-
+    if (error) throw new Error(error.message);
     return data;
   },
 
-  async closeShift({ shiftId, endingCash = 0, note = '', authId = null, staffId = null, shiftName = '' }) {
-    if (authId) {
-      const { data: shiftInfo } = await supabase.from(SHIFT_TABLE).select('opened_by').eq('id', shiftId).single();
-      if (shiftInfo && shiftInfo.opened_by !== authId) {
-        const { data: profile } = await supabase.from('profiles').select('role').eq('id', authId).single();
-        if (!profile || profile.role !== 'admin') {
-          throw new Error('Bạn không có quyền chốt ca này. Chỉ người mở ca hoặc Quản lý mới có quyền chốt ca.');
-        }
-      }
-    }
-
-    const { data, error } = await supabase
-      .from(SHIFT_TABLE)
-      .update({
-        ending_cash: Number(endingCash || 0),
-        end_time: new Date().toISOString(),
-        status: 'closed',
-        note,
-      })
-      .eq('id', shiftId)
-      .select()
-      .single();
-
-    if (error) throw new Error(error.message);
-
-    await staffLogService.logAction({
-      staffId: authId,
-      staffMemberId: staffId,
-      action: 'Chốt ca trực',
-      targetItem: shiftName || data.shift_name,
-      details: { endingCash },
-      note: note || 'Chốt ca kết thúc',
-      created_at: new Date().toISOString()
+  async closeShift({ shiftId, endingCash = 0, note = '', staffId = null }) {
+    // Server kiểm tra: ca còn mở, người chốt là người mở ca hoặc admin.
+    const { data, error } = await supabase.rpc('close_shift', {
+      p_shift_id: shiftId,
+      p_ending_cash: Number(endingCash || 0),
+      p_note: note,
+      p_staff_id: staffId,
     });
-
+    if (error) throw new Error(error.message);
     return data;
   },
 
@@ -222,10 +157,9 @@ export const shiftService = {
     await staffLogService.logAction({
       staffId: authId,
       staffMemberId: staffMemberId,
-      action: 'Xoa ghi chu ban giao ca',
+      action: 'Xóa ghi chú bàn giao ca',
       targetItem: data.shift_name,
-      note: 'Xoa ghi chu ban giao',
-      created_at: new Date().toISOString()
+      note: 'Xóa ghi chú bàn giao',
     });
 
     return data;

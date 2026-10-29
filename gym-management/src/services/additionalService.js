@@ -1,4 +1,5 @@
 import supabase from '../config/supabase';
+import { fetchAllRows } from '../utils/fetchAllRows';
 
 const SERVICE_TABLE = 'services';
 
@@ -38,9 +39,9 @@ export const additionalService = {
       p_auth_id: authId,
       p_staff_id: staffId,
       p_quantity: qty,
-      p_total_price: Number(service.price || 0) * qty,
+      p_total_price: null, // server tự tính từ giá dịch vụ
       p_payment_method: paymentMethod,
-      p_sold_at: new Date().toISOString()
+      p_sold_at: null
     });
 
     if (error) throw new Error('Bán dịch vụ thất bại: ' + error.message);
@@ -74,96 +75,64 @@ export const additionalService = {
   },
 
   async getFilteredServiceLogs(filters = {}) {
-    let query = supabase
-      .from('service_sales')
-      .select(`
-        *,
-        services (name),
-        profiles:sold_by (full_name),
-        staff_members:sold_by_member (full_name),
-        shifts!inner (id, shift_name, status)
-      `)
-      .order('sold_at', { ascending: false });
+    const buildQuery = () => {
+      let query = supabase
+        .from('service_sales')
+        .select(`
+          *,
+          services (name),
+          profiles:sold_by (full_name),
+          staff_members:sold_by_member (full_name),
+          shifts!inner (id, shift_name, status)
+        `)
+        .order('sold_at', { ascending: false });
 
-    if (filters.startDate) {
-      const start = new Date(filters.startDate);
-      start.setHours(0, 0, 0, 0);
-      query = query.gte('sold_at', start.toISOString());
-    }
-    if (filters.endDate) {
-      const end = new Date(filters.endDate);
-      end.setHours(23, 59, 59, 999);
-      query = query.lte('sold_at', end.toISOString());
-    }
-    if (filters.date && !filters.startDate && !filters.endDate) {
-      const startOfDay = new Date(filters.date);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(filters.date);
-      endOfDay.setHours(23, 59, 59, 999);
-      query = query.gte('sold_at', startOfDay.toISOString())
-                   .lte('sold_at', endOfDay.toISOString());
-    }
+      if (filters.startDate) {
+        const start = new Date(filters.startDate);
+        start.setHours(0, 0, 0, 0);
+        query = query.gte('sold_at', start.toISOString());
+      }
+      if (filters.endDate) {
+        const end = new Date(filters.endDate);
+        end.setHours(23, 59, 59, 999);
+        query = query.lte('sold_at', end.toISOString());
+      }
+      if (filters.date && !filters.startDate && !filters.endDate) {
+        const startOfDay = new Date(filters.date);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(filters.date);
+        endOfDay.setHours(23, 59, 59, 999);
+        query = query.gte('sold_at', startOfDay.toISOString())
+                     .lte('sold_at', endOfDay.toISOString());
+      }
 
-    if (filters.shiftName) {
-      query = query.eq('shifts.shift_name', filters.shiftName);
-    }
+      if (filters.shiftName) {
+        query = query.eq('shifts.shift_name', filters.shiftName);
+      }
 
-    if (filters.paymentMethod) {
-      query = query.eq('payment_method', filters.paymentMethod);
-    }
-    
+      if (filters.paymentMethod) {
+        query = query.eq('payment_method', filters.paymentMethod);
+      }
+      return query.order('id');
+    };
+
     const lim = filters.limit !== undefined ? filters.limit : (filters.startDate || filters.endDate ? null : 200);
-    if (lim) {
-      query = query.limit(lim);
+    if (!lim) {
+      return fetchAllRows(buildQuery);
     }
 
-    const { data, error } = await query;
+    const { data, error } = await buildQuery().limit(lim);
     if (error) throw new Error(error.message);
     return data || [];
   },
 
-  async rollbackServiceSale(saleId, authId, staffId, activeShiftId) {
-    // 1. Lấy thông tin bản ghi bán dịch vụ kèm theo trạng thái ca làm
-    const { data: sale, error: fetchError } = await supabase
-      .from('service_sales')
-      .select('*, shifts(status)')
-      .eq('id', saleId)
-      .single();
-
-    if (fetchError || !sale) {
-      throw new Error('Không tìm thấy giao dịch hoặc lỗi: ' + (fetchError?.message || 'Unknown'));
-    }
-
-    // Lấy thông tin role của người dùng thực hiện
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', authId)
-      .single();
-
-    const isAdmin = profile?.role === 'admin';
-
-    // 2. Kiểm tra điều kiện bảo mật/quyền hạn
-    if (!isAdmin) {
-      const isShiftOpen = sale.shifts?.status === 'open';
-      const isOwnSale = sale.sold_by === authId || (staffId && sale.sold_by_member === staffId);
-      const isInActiveShift = activeShiftId && sale.shift_id === activeShiftId;
-
-      if (!isShiftOpen || !isInActiveShift || !isOwnSale) {
-        throw new Error('Bạn không có quyền hoàn tác giao dịch này (chỉ được hoàn tác giao dịch do chính bạn bán trong ca đang mở của bạn).');
-      }
-    }
-
-    // 3. Xóa nhật ký bán dịch vụ trong service_sales
-    const { error: deleteError } = await supabase
-      .from('service_sales')
-      .delete()
-      .eq('id', saleId);
-
-    if (deleteError) {
-      throw new Error('Xóa lịch sử bán dịch vụ thất bại: ' + deleteError.message);
-    }
-
+  // Hoàn tác bán dịch vụ (server kiểm tra quyền như hoàn tác bán nước)
+  async rollbackServiceSale(saleId, staffId) {
+    const { error } = await supabase.rpc('rollback_service_sale', {
+      p_sale_id: saleId,
+      p_staff_id: staffId || null,
+    });
+    if (error) throw new Error(error.message);
     return { success: true };
   },
 };

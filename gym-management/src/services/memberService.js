@@ -1,12 +1,10 @@
 import supabase from '../config/supabase';
 import { addMonths, getLocalISODate } from '../utils/formatters';
+import { fetchAllRows } from '../utils/fetchAllRows';
+import { paymentService } from './paymentService';
 
 const TABLE_NAME = 'members';
 const VIEW_NAME = 'member_current_status';
-
-function toDateOnly(date) {
-  return getLocalISODate(date);
-}
 
 export async function validateMemberDates(startDate, packageType, allowPastEnd = false) {
   const parsedPackage = Number(packageType || 0);
@@ -17,29 +15,34 @@ export async function validateMemberDates(startDate, packageType, allowPastEnd =
     const day = String(end.getDate()).padStart(2, '0');
     const month = String(end.getMonth() + 1).padStart(2, '0');
     const year = end.getFullYear();
-    throw new Error(`Ngay ket thuc (${day}-${month}-${year}) khong duoc o qua khu`);
+    throw new Error(`Ngày kết thúc (${day}-${month}-${year}) không được ở quá khứ`);
   }
 
   if (parsedPackage > 36) {
-    throw new Error('Goi tap toi da 36 thang');
+    throw new Error('Gói tập tối đa 36 tháng');
   }
 
   if (parsedPackage < 1) {
-    throw new Error('Goi tap toi thieu 1 thang');
+    throw new Error('Gói tập tối thiểu 1 tháng');
   }
 
   return true;
 }
 
 export const memberService = {
+  async getMember(id) {
+    const { data, error } = await supabase.from(VIEW_NAME).select('*').eq('id', id).single();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+
   async getAllMembers() {
-    const { data, error } = await supabase
+    return fetchAllRows(() => supabase
       .from(VIEW_NAME)
       .select('*')
       .order('last_active_at', { ascending: false, nullsFirst: false })
-      .order('created_at', { ascending: false });
-    if (error) throw new Error(error.message);
-    return data || [];
+      .order('created_at', { ascending: false })
+      .order('id'));
   },
 
   async getRecentMembers(limit = 5, filters = {}) {
@@ -67,44 +70,49 @@ export const memberService = {
   },
 
   async getRecentTransactions(limit = 20, filters = {}) {
-    let query = supabase
-      .from('member_logs')
-      .select(`
-        *,
-        members (
-          full_name,
-          member_code,
-          note
-        )
-      `)
-      .in('action', ['CREATE', 'RENEW'])
-      .order('created_at', { ascending: false });
+    const buildQuery = () => {
+      let query = supabase
+        .from('member_logs')
+        .select(`
+          *,
+          members (
+            full_name,
+            member_code,
+            note
+          )
+        `)
+        .in('action', ['CREATE', 'RENEW'])
+        .order('created_at', { ascending: false });
 
-    if (filters.startDate) {
-      const start = new Date(filters.startDate);
-      start.setHours(0, 0, 0, 0);
-      query = query.gte('created_at', start.toISOString());
-    }
-    if (filters.endDate) {
-      const end = new Date(filters.endDate);
-      end.setHours(23, 59, 59, 999);
-      query = query.lte('created_at', end.toISOString());
-    }
-    if (filters.date && !filters.startDate && !filters.endDate) {
-      const startOfDay = new Date(filters.date);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(filters.date);
-      endOfDay.setHours(23, 59, 59, 999);
-      query = query.gte('created_at', startOfDay.toISOString())
-        .lte('created_at', endOfDay.toISOString());
-    }
+      if (filters.startDate) {
+        const start = new Date(filters.startDate);
+        start.setHours(0, 0, 0, 0);
+        query = query.gte('created_at', start.toISOString());
+      }
+      if (filters.endDate) {
+        const end = new Date(filters.endDate);
+        end.setHours(23, 59, 59, 999);
+        query = query.lte('created_at', end.toISOString());
+      }
+      if (filters.date && !filters.startDate && !filters.endDate) {
+        const startOfDay = new Date(filters.date);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(filters.date);
+        endOfDay.setHours(23, 59, 59, 999);
+        query = query.gte('created_at', startOfDay.toISOString())
+          .lte('created_at', endOfDay.toISOString());
+      }
+      return query.order('id');
+    };
 
+    let data;
     if (limit) {
-      query = query.limit(limit);
+      const { data: rows, error } = await buildQuery().limit(limit);
+      if (error) throw new Error(error.message);
+      data = rows;
+    } else {
+      data = await fetchAllRows(buildQuery);
     }
-
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
 
     return (data || []).map(log => ({
       ...log,
@@ -130,7 +138,7 @@ export const memberService = {
       p_fingerprint_status: Boolean(memberData.fingerprint_status),
       p_note: memberData.note || '',
       p_start_date: memberData.start_date || getLocalISODate(),
-      p_created_at: new Date().toISOString(),
+      p_created_at: null,
       p_idempotency_key: memberData.idempotencyKey || null
     });
 
@@ -155,7 +163,7 @@ export const memberService = {
   async updateMember(id, updates) {
     // Separate member fields and log fields
     const memberFields = ['full_name', 'member_code', 'fingerprint_status', 'note', 'deleted_at'];
-    const logFields = ['package_type', 'membership_category', 'start_date', 'end_date', 'fee', 'payment_method', 'is_payment_verified'];
+    const logFields = ['package_type', 'membership_category', 'start_date', 'end_date', 'fee', 'payment_method'];
 
     const memberUpdates = {};
     const logUpdates = {};
@@ -196,10 +204,10 @@ export const memberService = {
           end_date: logUpdates.end_date ?? current.end_date,
           fee: logUpdates.fee ?? current.fee,
           payment_method: logUpdates.payment_method ?? current.payment_method,
-          is_payment_verified: logUpdates.is_payment_verified ?? current.is_payment_verified,
+          // NULL = không đổi trạng thái duyệt CK (chỉ admin mới duyệt được, qua RPC)
+          is_payment_verified: null,
           details: { updates: changedLogUpdates },
           note: 'Cập nhật trạng thái hội viên',
-          created_at: new Date().toISOString()
         }]);
 
         if (logError) throw new Error('Lỗi lưu log cập nhật hội viên: ' + logError.message);
@@ -230,7 +238,7 @@ export const memberService = {
       .single();
 
     if (memberError) throw new Error(memberError.message);
-    if (!member) throw new Error('Khong tim thay hoi vien');
+    if (!member) throw new Error('Không tìm thấy hội viên');
 
     const todayStr = getLocalISODate();
     const currentEnd = member.end_date;
@@ -250,8 +258,6 @@ export const memberService = {
     const allowPastEnd = renewFrom === 'expired';
     await validateMemberDates(renewalStart, packageType, allowPastEnd);
 
-    const createdAt = new Date().toISOString();
-
     const { data: result, error: rpcError } = await supabase.rpc('renew_member_transaction', {
       p_member_id: memberId,
       p_package_type: packageType,
@@ -261,8 +267,8 @@ export const memberService = {
       p_shift_id: shiftId,
       p_staff_id: staffId,
       p_start_date: renewalStart,
-      p_created_at: createdAt,
-      p_idempotency_key: idempotencyKey
+      p_idempotency_key: idempotencyKey,
+      p_note: note || null
     });
 
     if (rpcError) throw new Error('Gia hạn thất bại: ' + rpcError.message);
@@ -270,26 +276,13 @@ export const memberService = {
       throw new Error(result.error || 'Gia hạn thất bại');
     }
 
-    // Lưu ghi chú nếu có
-    if (note && result.payment_id) {
-      try {
-        await Promise.all([
-          supabase.from('payment_logs').update({ note }).eq('id', result.payment_id),
-          supabase.from('members').update({ note }).eq('id', memberId),
-          supabase.from('member_logs').update({ note }).eq('member_id', memberId).eq('action', 'RENEW').eq('created_at', createdAt)
-        ]);
-      } catch (err) {
-        console.error("Lỗi lưu ghi chú gia hạn:", err);
-      }
-    }
-
     return { member: result.member || result, payment: { id: result.payment_id } };
   },
 
-  async verifyLogPayment(logId, staffId, staffMemberId = null) {
+  async verifyLogPayment(logId, staffMemberId = null) {
     const { data: log, error: logError } = await supabase
       .from('member_logs')
-      .select('*')
+      .select('details')
       .eq('id', logId)
       .single();
 
@@ -300,134 +293,27 @@ export const memberService = {
       throw new Error('Không tìm thấy payment liên quan để xác thực.');
     }
 
-    const { data, error } = await supabase.rpc('verify_payment_atomic', {
-      p_payment_id: paymentId,
-      p_admin_id: staffId,
-      p_staff_member_id: staffMemberId,
-      p_verified_at: new Date().toISOString()
-    });
-
-    if (error) throw new Error('Xác thực thanh toán thất bại: ' + error.message);
-    if (data?.success === false) {
-      throw new Error(data.error || 'Xác thực thanh toán thất bại');
-    }
-
+    await paymentService.verifyPayment(paymentId, staffMemberId);
     return true;
   },
 
-  async verifyAllPendingPayments(adminId, staffMemberId = null) {
-    const verifiedAt = new Date().toISOString();
-
-    // 1. Thử gọi RPC atomic verify_all_payments_atomic nếu có trong DB
-    try {
-      const { data, error } = await supabase.rpc('verify_all_payments_atomic', {
-        p_admin_id: adminId,
-        p_staff_member_id: staffMemberId,
-        p_verified_at: verifiedAt
-      });
-      if (!error && data && data.success !== false) {
-        return { count: data.count || 0, success: true };
-      }
-    } catch (rpcErr) {
-      console.warn('RPC verify_all_payments_atomic chưa có sẵn, fallback sang batch:', rpcErr);
-    }
-
-    // 2. Fallback: Lấy tất cả payment_logs chuyển khoản chưa duyệt
-    const { data: pendingPayments, error: pError } = await supabase
-      .from('payment_logs')
-      .select('id, member_id, amount')
-      .eq('payment_method', 'CK')
-      .or('is_verified.is.null,is_verified.eq.false');
-
-    if (pError) throw pError;
-
-    // Lấy thêm member_logs có payment_method = 'CK' chưa duyệt
-    const { data: pendingLogs } = await supabase
-      .from('member_logs')
-      .select('id, member_id, details')
-      .eq('payment_method', 'CK')
-      .or('is_payment_verified.is.null,is_payment_verified.eq.false');
-
-    const paymentIds = new Set();
-    (pendingPayments || []).forEach(p => paymentIds.add(p.id));
-    (pendingLogs || []).forEach(l => {
-      if (l.details?.payment_id) paymentIds.add(l.details.payment_id);
-    });
-
-    let count = 0;
-    for (const paymentId of paymentIds) {
-      try {
-        const { data, error } = await supabase.rpc('verify_payment_atomic', {
-          p_payment_id: paymentId,
-          p_admin_id: adminId,
-          p_staff_member_id: staffMemberId,
-          p_verified_at: verifiedAt
-        });
-        if (!error && (data?.success || data === true)) {
-          count++;
-        }
-      } catch (err) {
-        console.error('Lỗi khi duyệt payment:', paymentId, err);
-      }
-    }
-
-    // Đồng bộ các member_logs còn lại nếu có
-    const { data: remainingLogs } = await supabase
-      .from('member_logs')
-      .select('id, member_id')
-      .eq('payment_method', 'CK')
-      .or('is_payment_verified.is.null,is_payment_verified.eq.false');
-
-    if (remainingLogs && remainingLogs.length > 0) {
-      await supabase
-        .from('member_logs')
-        .update({ is_payment_verified: true })
-        .in('id', remainingLogs.map(l => l.id));
-
-      for (const rLog of remainingLogs) {
-        await supabase.from('member_logs').insert([{
-          member_id: rLog.member_id,
-          staff_id: adminId,
-          staff_member_id: staffMemberId,
-          action: 'VERIFY_PAYMENT',
-          is_payment_verified: true,
-          note: 'Admin duyệt thanh toán hàng loạt',
-          created_at: verifiedAt
-        }]);
-      }
-    }
-
-    const totalProcessed = Math.max(count, (pendingPayments || []).length, (pendingLogs || []).length);
-    return { count: totalProcessed, success: true };
+  async verifyAllPendingPayments(staffMemberId = null) {
+    return paymentService.verifyAllPayments(staffMemberId);
   },
 
-  async deleteMember(id) {
-    const { data: member } = await supabase.from(TABLE_NAME).select('member_code, created_at').eq('id', id).single();
-    if (member) {
-      const now = new Date();
-      const newCode = `${member.member_code}_del_${Date.now()}`;
-      const { error } = await supabase
-        .from(TABLE_NAME)
-        .update({
-          deleted_at: now.toISOString(),
-          member_code: newCode
-        })
-        .eq('id', id);
-      if (error) throw new Error(error.message);
-
-      // Đặt số tiền giao dịch về 0 để không bị cộng dồn vào doanh thu ca trực
-      const { error: paymentError } = await supabase
-        .from('payment_logs')
-        .update({ amount: 0 })
-        .eq('member_id', id);
-      if (paymentError) console.error('Lỗi reset payment_logs khi xóa hội viên:', paymentError);
-
-      const { error: logError } = await supabase
-        .from('member_logs')
-        .update({ fee: 0 })
-        .eq('member_id', id);
-      if (logError) console.error('Lỗi reset member_logs khi xóa hội viên:', logError);
-    }
+  // Xóa mềm hội viên. Các khoản thu cũ giữ nguyên; nếu hoàn tiền cho khách thì
+  // ghi một khoản hoàn tiền (số âm) vào ca đang mở.
+  async deleteMember(id, { shiftId = null, staffId = null, refundAmount = 0, refundMethod = 'TM', note = '' } = {}) {
+    const { data, error } = await supabase.rpc('delete_member', {
+      p_member_id: id,
+      p_shift_id: shiftId,
+      p_staff_id: staffId,
+      p_refund_amount: Number(refundAmount || 0),
+      p_refund_method: refundMethod,
+      p_note: note || null
+    });
+    if (error) throw new Error(error.message);
+    return data;
   },
 
   async suspendMember(id, staffId, shiftId) {
@@ -453,10 +339,9 @@ export const memberService = {
     return data;
   },
 
-  async revertRenewTransaction(logId, adminId) {
+  async revertRenewTransaction(logId) {
     const { data, error } = await supabase.rpc('revert_renew_transaction', {
-      p_log_id: logId,
-      p_admin_id: adminId
+      p_log_id: logId
     });
 
     if (error) throw new Error('Hoàn tác gia hạn thất bại: ' + error.message);

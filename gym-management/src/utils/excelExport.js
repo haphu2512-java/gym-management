@@ -72,7 +72,7 @@ export function exportRevenueToExcel({ overallStats, detailedStats, dateRange })
     const memberRows = detailedStats.memberships.map((m, idx) => ({
       'STT': idx + 1,
       'Ngày': m.date || '',
-      'Loại': m.type === 'new' ? 'Đăng ký mới' : 'Gia hạn',
+      'Loại': m.type === 'new' ? 'Đăng ký mới' : m.type === 'refund' ? 'Hoàn tiền' : 'Gia hạn',
       'Doanh thu': formatCurrency(m.revenue),
       'Ca làm': m.shift || '',
       'Nhân viên': m.staff || '',

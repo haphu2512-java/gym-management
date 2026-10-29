@@ -49,7 +49,7 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
         setAdminSecret('');
         setSuccess('');
       }, 2000);
-    } catch (err) {
+    } catch {
       // Đảm bảo đã đăng xuất nếu lỡ lỗi giữa chừng
       authService.logout().catch(() => {});
       setError('Email hoặc mật khẩu cũ không đúng.');

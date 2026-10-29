@@ -13,10 +13,6 @@ export default function Notes() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    loadNotes();
-  }, []);
-
   const loadNotes = async () => {
     setLoading(true);
     try {
@@ -28,6 +24,10 @@ export default function Notes() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadNotes();
+  }, []);
 
   const handleAddSharedNote = async (e) => {
     e.preventDefault();
