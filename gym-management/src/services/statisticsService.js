@@ -1,30 +1,32 @@
 import supabase from '../config/supabase';
+import { fetchAllRows } from '../utils/fetchAllRows';
 
 export const statisticsService = {
   async getDetailedStats(filters = {}) {
-    let salesQuery = supabase
-      .from('sales_logs')
-      .select('quantity, total_price, sold_at, products(name), shifts(shift_name), staff_members:sold_by_member(full_name)');
-      
-    let paymentQuery = supabase
-      .from('payment_logs')
-      .select('amount, payment_type, created_at, shifts(shift_name), staff_members:staff_member_id(full_name)')
-      .eq('is_verified', true)
-      .in('payment_type', ['new', 'renew']);
+    const buildSalesQuery = () => {
+      let query = supabase
+        .from('sales_logs')
+        .select('quantity, total_price, sold_at, products(name), shifts(shift_name), staff_members:sold_by_member(full_name)');
+      if (filters.startDate) query = query.gte('sold_at', filters.startDate);
+      if (filters.endDate) query = query.lte('sold_at', filters.endDate);
+      return query.order('id');
+    };
 
-    if (filters.startDate) {
-      salesQuery = salesQuery.gte('sold_at', filters.startDate);
-      paymentQuery = paymentQuery.gte('created_at', filters.startDate);
-    }
-    if (filters.endDate) {
-      salesQuery = salesQuery.lte('sold_at', filters.endDate);
-      paymentQuery = paymentQuery.lte('created_at', filters.endDate);
-    }
+    const buildPaymentQuery = () => {
+      let query = supabase
+        .from('payment_logs')
+        .select('amount, payment_type, created_at, shifts(shift_name), staff_members:staff_member_id(full_name)')
+        .eq('is_verified', true)
+        .in('payment_type', ['new', 'renew']);
+      if (filters.startDate) query = query.gte('created_at', filters.startDate);
+      if (filters.endDate) query = query.lte('created_at', filters.endDate);
+      return query.order('id');
+    };
 
-    const [salesRes, paymentRes] = await Promise.all([salesQuery, paymentQuery]);
-
-    const sales = salesRes.data || [];
-    const payments = paymentRes.data || [];
+    const [sales, payments] = await Promise.all([
+      fetchAllRows(buildSalesQuery),
+      fetchAllRows(buildPaymentQuery),
+    ]);
 
     const waterSales = sales.map(s => {
       const dateObj = new Date(s.sold_at);
@@ -56,29 +58,24 @@ export const statisticsService = {
     // This could be expanded to fetch all stats for the page
     // For now, let's focus on what's needed for the dashboard summary
     
-    // Revenue from sales_logs
-    let salesQuery = supabase.from('sales_logs').select('total_price, sold_at');
-    // Revenue from payment_logs
-    let paymentQuery = supabase.from('payment_logs').select('amount, created_at').eq('is_verified', true);
-    // Revenue from service_sales
-    let serviceQuery = supabase.from('service_sales').select('total_price, sold_at');
+    const withRange = (query, dateColumn) => {
+      if (filters.startDate) query = query.gte(dateColumn, filters.startDate);
+      if (filters.endDate) query = query.lte(dateColumn, filters.endDate);
+      return query.order('id');
+    };
 
-    if (filters.startDate) {
-      salesQuery = salesQuery.gte('sold_at', filters.startDate);
-      paymentQuery = paymentQuery.gte('created_at', filters.startDate);
-      serviceQuery = serviceQuery.gte('sold_at', filters.startDate);
-    }
-    if (filters.endDate) {
-      salesQuery = salesQuery.lte('sold_at', filters.endDate);
-      paymentQuery = paymentQuery.lte('created_at', filters.endDate);
-      serviceQuery = serviceQuery.lte('sold_at', filters.endDate);
-    }
+    const [salesRows, paymentRows, serviceRows] = await Promise.all([
+      // Revenue from sales_logs
+      fetchAllRows(() => withRange(supabase.from('sales_logs').select('total_price, sold_at'), 'sold_at')),
+      // Revenue from payment_logs
+      fetchAllRows(() => withRange(supabase.from('payment_logs').select('amount, created_at').eq('is_verified', true), 'created_at')),
+      // Revenue from service_sales
+      fetchAllRows(() => withRange(supabase.from('service_sales').select('total_price, sold_at'), 'sold_at')),
+    ]);
 
-    const [salesRes, paymentRes, serviceRes] = await Promise.all([salesQuery, paymentQuery, serviceQuery]);
-
-    const waterRevenue = (salesRes.data || []).reduce((sum, item) => sum + Number(item.total_price || 0), 0);
-    const memberRevenueBase = (paymentRes.data || []).reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    const serviceRevenue = (serviceRes.data || []).reduce((sum, item) => sum + Number(item.total_price || 0), 0);
+    const waterRevenue = salesRows.reduce((sum, item) => sum + Number(item.total_price || 0), 0);
+    const memberRevenueBase = paymentRows.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const serviceRevenue = serviceRows.reduce((sum, item) => sum + Number(item.total_price || 0), 0);
     
     // Gộp doanh thu dịch vụ vào doanh thu hội viên
     const memberRevenue = memberRevenueBase + serviceRevenue;

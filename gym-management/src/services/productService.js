@@ -1,5 +1,5 @@
 import supabase from '../config/supabase';
-import { staffLogService } from './staffLogService';
+import { fetchAllRows } from '../utils/fetchAllRows';
 
 const PRODUCT_TABLE = 'products';
 
@@ -77,19 +77,19 @@ export const productService = {
   },
 
   async getTotalDrinkRevenue(filters = {}) {
-    let query = supabase
-      .from('sales_logs')
-      .select('total_price');
+    const data = await fetchAllRows(() => {
+      let query = supabase
+        .from('sales_logs')
+        .select('total_price');
 
-    if (filters.startDate) {
-      query = query.gte('sold_at', filters.startDate);
-    }
-    if (filters.endDate) {
-      query = query.lte('sold_at', filters.endDate);
-    }
-
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
+      if (filters.startDate) {
+        query = query.gte('sold_at', filters.startDate);
+      }
+      if (filters.endDate) {
+        query = query.lte('sold_at', filters.endDate);
+      }
+      return query.order('id');
+    });
     return data.reduce((sum, item) => sum + Number(item.total_price || 0), 0);
   },
 

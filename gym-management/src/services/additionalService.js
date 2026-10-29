@@ -1,4 +1,5 @@
 import supabase from '../config/supabase';
+import { fetchAllRows } from '../utils/fetchAllRows';
 
 const SERVICE_TABLE = 'services';
 
@@ -74,50 +75,53 @@ export const additionalService = {
   },
 
   async getFilteredServiceLogs(filters = {}) {
-    let query = supabase
-      .from('service_sales')
-      .select(`
-        *,
-        services (name),
-        profiles:sold_by (full_name),
-        staff_members:sold_by_member (full_name),
-        shifts!inner (id, shift_name, status)
-      `)
-      .order('sold_at', { ascending: false });
+    const buildQuery = () => {
+      let query = supabase
+        .from('service_sales')
+        .select(`
+          *,
+          services (name),
+          profiles:sold_by (full_name),
+          staff_members:sold_by_member (full_name),
+          shifts!inner (id, shift_name, status)
+        `)
+        .order('sold_at', { ascending: false });
 
-    if (filters.startDate) {
-      const start = new Date(filters.startDate);
-      start.setHours(0, 0, 0, 0);
-      query = query.gte('sold_at', start.toISOString());
-    }
-    if (filters.endDate) {
-      const end = new Date(filters.endDate);
-      end.setHours(23, 59, 59, 999);
-      query = query.lte('sold_at', end.toISOString());
-    }
-    if (filters.date && !filters.startDate && !filters.endDate) {
-      const startOfDay = new Date(filters.date);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(filters.date);
-      endOfDay.setHours(23, 59, 59, 999);
-      query = query.gte('sold_at', startOfDay.toISOString())
-                   .lte('sold_at', endOfDay.toISOString());
-    }
+      if (filters.startDate) {
+        const start = new Date(filters.startDate);
+        start.setHours(0, 0, 0, 0);
+        query = query.gte('sold_at', start.toISOString());
+      }
+      if (filters.endDate) {
+        const end = new Date(filters.endDate);
+        end.setHours(23, 59, 59, 999);
+        query = query.lte('sold_at', end.toISOString());
+      }
+      if (filters.date && !filters.startDate && !filters.endDate) {
+        const startOfDay = new Date(filters.date);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(filters.date);
+        endOfDay.setHours(23, 59, 59, 999);
+        query = query.gte('sold_at', startOfDay.toISOString())
+                     .lte('sold_at', endOfDay.toISOString());
+      }
 
-    if (filters.shiftName) {
-      query = query.eq('shifts.shift_name', filters.shiftName);
-    }
+      if (filters.shiftName) {
+        query = query.eq('shifts.shift_name', filters.shiftName);
+      }
 
-    if (filters.paymentMethod) {
-      query = query.eq('payment_method', filters.paymentMethod);
-    }
-    
+      if (filters.paymentMethod) {
+        query = query.eq('payment_method', filters.paymentMethod);
+      }
+      return query.order('id');
+    };
+
     const lim = filters.limit !== undefined ? filters.limit : (filters.startDate || filters.endDate ? null : 200);
-    if (lim) {
-      query = query.limit(lim);
+    if (!lim) {
+      return fetchAllRows(buildQuery);
     }
 
-    const { data, error } = await query;
+    const { data, error } = await buildQuery().limit(lim);
     if (error) throw new Error(error.message);
     return data || [];
   },

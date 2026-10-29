@@ -1,4 +1,5 @@
 import supabase from '../config/supabase';
+import { fetchAllRows } from '../utils/fetchAllRows';
 
 const TABLE_NAME = 'payment_logs';
 
@@ -140,20 +141,20 @@ export const paymentService = {
   },
 
   async getTotalMemberRevenue(filters = {}) {
-    let query = supabase
-      .from(TABLE_NAME)
-      .select('amount')
-      .eq('is_verified', true);
+    const data = await fetchAllRows(() => {
+      let query = supabase
+        .from(TABLE_NAME)
+        .select('amount')
+        .eq('is_verified', true);
 
-    if (filters.startDate) {
-      query = query.gte('created_at', filters.startDate);
-    }
-    if (filters.endDate) {
-      query = query.lte('created_at', filters.endDate);
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
+      if (filters.startDate) {
+        query = query.gte('created_at', filters.startDate);
+      }
+      if (filters.endDate) {
+        query = query.lte('created_at', filters.endDate);
+      }
+      return query.order('id');
+    });
     return data.reduce((sum, p) => sum + Number(p.amount), 0);
   },
 

@@ -1,5 +1,6 @@
 import supabase from '../config/supabase';
 import { addMonths, getLocalISODate } from '../utils/formatters';
+import { fetchAllRows } from '../utils/fetchAllRows';
 
 const TABLE_NAME = 'members';
 const VIEW_NAME = 'member_current_status';
@@ -33,13 +34,12 @@ export async function validateMemberDates(startDate, packageType, allowPastEnd =
 
 export const memberService = {
   async getAllMembers() {
-    const { data, error } = await supabase
+    return fetchAllRows(() => supabase
       .from(VIEW_NAME)
       .select('*')
       .order('last_active_at', { ascending: false, nullsFirst: false })
-      .order('created_at', { ascending: false });
-    if (error) throw new Error(error.message);
-    return data || [];
+      .order('created_at', { ascending: false })
+      .order('id'));
   },
 
   async getRecentMembers(limit = 5, filters = {}) {
@@ -67,44 +67,49 @@ export const memberService = {
   },
 
   async getRecentTransactions(limit = 20, filters = {}) {
-    let query = supabase
-      .from('member_logs')
-      .select(`
-        *,
-        members (
-          full_name,
-          member_code,
-          note
-        )
-      `)
-      .in('action', ['CREATE', 'RENEW'])
-      .order('created_at', { ascending: false });
+    const buildQuery = () => {
+      let query = supabase
+        .from('member_logs')
+        .select(`
+          *,
+          members (
+            full_name,
+            member_code,
+            note
+          )
+        `)
+        .in('action', ['CREATE', 'RENEW'])
+        .order('created_at', { ascending: false });
 
-    if (filters.startDate) {
-      const start = new Date(filters.startDate);
-      start.setHours(0, 0, 0, 0);
-      query = query.gte('created_at', start.toISOString());
-    }
-    if (filters.endDate) {
-      const end = new Date(filters.endDate);
-      end.setHours(23, 59, 59, 999);
-      query = query.lte('created_at', end.toISOString());
-    }
-    if (filters.date && !filters.startDate && !filters.endDate) {
-      const startOfDay = new Date(filters.date);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(filters.date);
-      endOfDay.setHours(23, 59, 59, 999);
-      query = query.gte('created_at', startOfDay.toISOString())
-        .lte('created_at', endOfDay.toISOString());
-    }
+      if (filters.startDate) {
+        const start = new Date(filters.startDate);
+        start.setHours(0, 0, 0, 0);
+        query = query.gte('created_at', start.toISOString());
+      }
+      if (filters.endDate) {
+        const end = new Date(filters.endDate);
+        end.setHours(23, 59, 59, 999);
+        query = query.lte('created_at', end.toISOString());
+      }
+      if (filters.date && !filters.startDate && !filters.endDate) {
+        const startOfDay = new Date(filters.date);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(filters.date);
+        endOfDay.setHours(23, 59, 59, 999);
+        query = query.gte('created_at', startOfDay.toISOString())
+          .lte('created_at', endOfDay.toISOString());
+      }
+      return query.order('id');
+    };
 
+    let data;
     if (limit) {
-      query = query.limit(limit);
+      const { data: rows, error } = await buildQuery().limit(limit);
+      if (error) throw new Error(error.message);
+      data = rows;
+    } else {
+      data = await fetchAllRows(buildQuery);
     }
-
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
 
     return (data || []).map(log => ({
       ...log,

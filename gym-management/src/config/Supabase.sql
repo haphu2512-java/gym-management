@@ -177,6 +177,13 @@ WITH LatestPackage AS (
     WHERE package_type IS NOT NULL
     ORDER BY member_id, created_at DESC
 ),
+LatestReactivate AS (
+    SELECT DISTINCT ON (member_id)
+      member_id, start_date, end_date, created_at
+    FROM member_logs
+    WHERE action = 'REACTIVATE'
+    ORDER BY member_id, created_at DESC
+),
 LatestStatus AS (
     SELECT DISTINCT ON (member_id)
       member_id, is_payment_verified, created_at
@@ -187,7 +194,11 @@ LatestStatus AS (
 SELECT 
   m.id, m.member_code, m.full_name, m.fingerprint_status, m.note, m.created_at, m.deleted_at,
   m.suspended_at, m.remaining_days,
-  lp.package_type, lp.membership_category, lp.start_date, lp.end_date, lp.fee, lp.payment_method,
+  lp.package_type, lp.membership_category,
+  -- Kích hoạt lại sau bảo lưu (log REACTIVATE không có package_type) thì lấy ngày mới
+  CASE WHEN lr.created_at > lp.created_at THEN lr.start_date ELSE lp.start_date END AS start_date,
+  CASE WHEN lr.created_at > lp.created_at THEN lr.end_date ELSE lp.end_date END AS end_date,
+  lp.fee, lp.payment_method,
   COALESCE(ls.is_payment_verified, FALSE) as is_payment_verified,
   (
     SELECT ml.created_at 
@@ -198,6 +209,7 @@ SELECT
   ) as last_active_at
 FROM members m
 LEFT JOIN LatestPackage lp ON m.id = lp.member_id
+LEFT JOIN LatestReactivate lr ON m.id = lr.member_id
 LEFT JOIN LatestStatus ls ON m.id = ls.member_id
 WHERE m.deleted_at IS NULL;
 
@@ -318,6 +330,7 @@ BEGIN
   SELECT opened_by INTO v_admin_id FROM shifts WHERE id = p_shift_id;
 
   SELECT (end_date - p_suspended_at) INTO v_remaining_days FROM member_current_status WHERE id = p_member_id;
+  IF v_remaining_days IS NULL THEN RAISE EXCEPTION 'Hội viên chưa có gói tập để bảo lưu'; END IF;
   IF v_remaining_days < 13 THEN RAISE EXCEPTION 'Không đủ điều kiện (tối thiểu 13 ngày)'; END IF;
   
   UPDATE members SET suspended_at = p_suspended_at, remaining_days = v_remaining_days WHERE id = p_member_id;
@@ -593,6 +606,8 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO authenticated, service_role;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO authenticated, service_role;
 GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO authenticated, service_role;
+-- Không cho anon (chưa đăng nhập) gọi hàm RPC, kể cả quyền mặc định của PUBLIC
+REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC, anon;
 
 -- Cấp quyền SELECT cho anon (để có thể thực hiện một số kiểm tra trước khi đăng nhập nếu cần)
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
@@ -603,6 +618,7 @@ GRANT ALL PRIVILEGES ON TABLE shift_notes TO authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon;
 
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO anon;
 
