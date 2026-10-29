@@ -1,48 +1,70 @@
-readme_content = """# 🏋️‍♂️ Gym Management System - Max Power Gym
+# Max Power Gym – Hệ thống quản lý phòng gym
 
-Hệ thống quản lý phòng gym hiện đại, hỗ trợ đa nền tảng (Web Responsive), được thiết kế để tối ưu hóa quy trình vận hành, quản lý học viên, kho hàng và ca làm việc của nhân viên.
+Web app quản lý hội viên, bán nước/dịch vụ, ca làm việc và lương nhân viên cho phòng gym.
 
-## 🚀 Tech Stack
-* **Frontend:** ReactJS (Vite)
-* **Styling:** Tailwind CSS (Responsive UI cho PC & Mobile)
-* **Backend & Database:** Supabase (PostgreSQL, Auth, Real-time)
-* **Icons:** Lucide React
+## Công nghệ
 
-## ✨ Tính Năng Chính (Features)
+- **Frontend:** React 19 + Vite, Zustand, React Router, CSS thuần (`src/App.css`)
+- **Backend:** Supabase (PostgreSQL, Auth, RLS, hàm RPC)
+- **Ảnh:** Cloudinary (upload trực tiếp từ trình duyệt)
+- **Deploy:** Vercel (thư mục `gym-management/`)
 
-### 1. Quản Lý Hội Viên & Gia Hạn
-* **Theo dõi danh sách:** Quản lý học viên theo gói tập (1 tháng, 3 tháng...).
-* **Quy trình Gia hạn:** Tự động tính toán ngày bắt đầu và kết thúc. Cảnh báo trạng thái hết hạn bằng màu sắc.
-* **Lịch sử thanh toán:** Lưu lại mọi lần đóng phí, hình thức thanh toán (Tiền mặt/Chuyển khoản).
-* **Ghi chú:** Mỗi học viên và mỗi lần gia hạn đều có trường `note` để lưu thông tin đặc biệt.
+## Cấu trúc thư mục
 
-### 2. Quản Lý Kho & Bán Nước
-* **Danh mục sản phẩm:** Quản lý tồn kho các loại đồ uống (Pocari, Revive, Monster...).
-* **Bán hàng nhanh:** Giao diện tối ưu cho nhân viên thực hiện bán hàng ngay tại quầy.
-* **Báo cáo doanh thu:** Tự động tổng kết tiền nước theo từng ca và từng ngày.
+```
+gym-management/              # app React
+  src/
+    pages/                   # mỗi trang một thư mục (Members, Shifts, Inventory, ...)
+    services/                # gọi Supabase (bảng + RPC)
+    store/                   # Zustand (auth, ca hiện tại, toast)
+    utils/                   # hàm thuần: định dạng, trạng thái hội viên, tiền bàn giao...
+  supabase/
+    migrations/              # toàn bộ schema + hàm SQL, chạy theo thứ tự tên file
+    tests/                   # test SQL (RLS + RPC) chạy trên Postgres thật
+    seed.sql                 # dữ liệu mẫu cho môi trường dev
+    README.md                # hướng dẫn chạy migration lên production
+docs/notes/                  # ghi chú, đề xuất cũ (tham khảo)
+.github/workflows/ci.yml     # CI: lint, test, build, test SQL
+```
 
-### 3. Quản Lý Ca Làm Việc (Shift Handover)
-* **Lịch làm việc:** Chia làm 5 ca cố định trong ngày.
-* **Bàn giao dòng tiền:** Nhân viên nhập số tiền đầu ca và chốt số tiền cuối ca.
-* **Minh bạch:** Hệ thống ghi lại người trực ca, thời gian bắt đầu/kết thúc và ghi chú bàn giao.
+## Chạy local
 
-### 4. Phân Quyền (RBAC)
-* **Admin:** Xem toàn bộ doanh thu, quản lý kho, quản lý nhân sự.
-* **Nhân viên:** Thực hiện check-in, bán nước, gia hạn và báo cáo ca làm.
+```bash
+cd gym-management
+npm install
+cp .env.example .env   # rồi điền các biến bên dưới
+npm run dev
+```
 
-## 🗄️ Database Schema
-Hệ thống sử dụng các bảng chính trong Supabase:
-* `profiles`: Thông tin nhân viên và vai trò (Admin/Staff).
-* `members`: Thông tin cơ bản của học viên.
-* `membership_renewals`: Chi tiết các lần gia hạn và đóng phí.
-* `products`: Quản lý danh mục và tồn kho nước.
-* `orders` & `order_items`: Lưu vết giao dịch bán hàng.
-* `shifts`: Quản lý log ca làm việc và bàn giao tiền.
-* *Tất cả các bảng đều tích hợp trường `note` (TEXT) để tăng tính linh hoạt.*
+Biến môi trường (`gym-management/.env`):
 
-## 🛠️ Cài Đặt (Installation)
+| Biến | Ý nghĩa |
+| --- | --- |
+| `VITE_SUPABASE_URL` | URL project Supabase |
+| `VITE_SUPABASE_ANON_KEY` | anon key của project |
+| `VITE_CLOUDINARY_CLOUD_NAME` | tên cloud Cloudinary (upload ảnh) |
+| `VITE_CLOUDINARY_UPLOAD_PRESET` | upload preset không ký |
+| `VITE_MASTER_SECRET` | mã admin dùng để kích hoạt thiết bị được phép đăng nhập và đổi mật khẩu |
 
-1. **Clone project:**
-   ```bash
-   git clone [https://github.com/haphu2512-java/gym-management.git]
-   cd gym-management
+## Kiểm thử
+
+```bash
+cd gym-management
+npm run lint
+npm test            # Vitest: hàm tiện ích, service, render component
+npm run test:sql    # cần Postgres 16 local (xem supabase/tests/run.sh)
+```
+
+CI trên GitHub Actions chạy cả hai bộ test cho mỗi pull request.
+
+## Quy tắc nghiệp vụ chính
+
+- **Tiền chỉ ghi qua hàm server.** Bán hàng, gia hạn, tạo hội viên, mở/chốt ca, hoàn tác, xóa hội viên đều là hàm RPC `SECURITY DEFINER`. Hàm tự lấy giá từ bảng `products`/`services`, thời gian từ `NOW()`, người thao tác từ `auth.uid()`; giá trị client gửi lên bị bỏ qua.
+- **Phải có ca đang mở** mới bán hàng, thu tiền hội viên hoặc ghi hoàn tiền.
+- **Xóa hội viên** (chỉ admin) không sửa các khoản đã thu. Nếu hoàn tiền, hệ thống tạo một khoản `refund` âm trong ca đang mở, nên doanh thu các ca cũ giữ nguyên.
+- **Quyền:** mọi tài khoản đăng nhập được xem dữ liệu; nhân viên ghi bảng tiền, kho, lương chỉ qua RPC; ghi trực tiếp chỉ admin. Chi tiêu trong ca sửa được khi ca còn mở.
+- **Múi giờ:** ngày "hôm nay" trên server tính theo `Asia/Ho_Chi_Minh`.
+
+## Deploy thay đổi database
+
+Xem [gym-management/supabase/README.md](gym-management/supabase/README.md). Thứ tự quan trọng: một số migration phải chạy trước khi deploy frontend, một số chạy sau.
