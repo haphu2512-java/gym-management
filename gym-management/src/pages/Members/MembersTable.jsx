@@ -1,16 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Eye, Trash2, RefreshCcw, PauseCircle, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatDate } from '../../utils/formatters';
-
-function getStatus(member) {
-  if (member.suspended_at) return 'Suspended';
-  const today = new Date();
-  const target = new Date(member.end_date);
-  return target >= new Date(today.toDateString()) ? 'Active' : 'Expired';
-}
+import { getMemberStatus as getStatus } from '../../utils/memberStatus';
 
 export default function MembersTable({
-  members,
   loading,
   filtered,
   activeTab,

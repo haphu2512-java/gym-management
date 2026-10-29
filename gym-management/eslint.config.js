@@ -17,5 +17,10 @@ export default defineConfig([
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
+    rules: {
+      // Các trang tải dữ liệu bằng useEffect(() => { loadData() }, [...]): mẫu hợp lệ cho
+      // dự án không dùng thư viện data-fetching, nên tắt luật của React Compiler này.
+      'react-hooks/set-state-in-effect': 'off',
+    },
   },
 ])

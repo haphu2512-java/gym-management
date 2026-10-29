@@ -14,10 +14,9 @@ const SHIFT_TIME_MAP = {
   'Ca 5': { start: '19:00', end: '22:00', label: '19:00 - 22:00 tối' },
 };
 
-function validateShiftTime(shiftName, allowOverride = false) {
+export function validateShiftTime(shiftName, allowOverride = false, now = new Date()) {
   if (allowOverride) return; // Admin có thể bỏ qua nếu cần
 
-  const now = new Date();
   const currentHour = now.getHours();
   const currentMinute = now.getMinutes();
   const currentTotal = currentHour * 60 + currentMinute;

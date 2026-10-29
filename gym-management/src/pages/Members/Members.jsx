@@ -9,6 +9,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useUIStore } from '../../store/useUIStore';
 import { getLocalISODate, addMonths } from '../../utils/formatters';
 import { exportMembersToExcel } from '../../utils/excelExport';
+import { getMemberStatus } from '../../utils/memberStatus';
 import MembersToolbar from './MembersToolbar';
 import MembersTable from './MembersTable';
 import MemberFormModal from './MemberFormModal';
@@ -96,14 +97,8 @@ export default function Members() {
         matchDate = (expDate === filterDate) || (actDate === filterDate);
       }
 
-      let matchStatus = true;
-      const getStatus = (member) => {
-        if (member.suspended_at) return 'Suspended';
-        const today = new Date();
-        const target = new Date(member.end_date);
-        return target >= new Date(today.toDateString()) ? 'Active' : 'Expired';
-      };
-      const status = getStatus(m);
+      let matchStatus;
+      const status = getMemberStatus(m);
       
       if (activeTab === 'suspended') {
         matchStatus = status === 'Suspended';
@@ -597,7 +592,6 @@ export default function Members() {
         <ServiceTab />
       ) : (
         <MembersTable
-          members={members}
           loading={loading}
           filtered={filtered}
           activeTab={activeTab}

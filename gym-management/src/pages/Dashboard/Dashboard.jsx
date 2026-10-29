@@ -3,7 +3,6 @@ import { Droplets, TrendingUp, UserCheck, UserX, AlertTriangle, AlertCircle, Dow
 import * as XLSX from 'xlsx';
 import { memberService } from '../../services/memberService';
 import { productService } from '../../services/productService';
-import { shiftService } from '../../services/shiftService';
 import { paymentService } from '../../services/paymentService';
 import { additionalService } from '../../services/additionalService';
 import { formatDate, formatMemberCode } from '../../utils/formatters';
@@ -24,7 +23,6 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [drinkRevenue, setDrinkRevenue] = useState(0);
   const [membershipRevenue, setMembershipRevenue] = useState(0);
-  const [activeShift, setActiveShift] = useState(null);
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
   const [loadingRecent, setLoadingRecent] = useState(false);
 
@@ -52,9 +50,6 @@ export default function Dashboard() {
         setMembershipRevenue(totalMemberRev);
         setProducts(allProducts);
         setDrinkRevenue(totalDrinkRev);
-
-        const { shift } = await shiftService.validateShiftForLogin();
-        setActiveShift(shift);
       } finally {
         setLoading(false);
       }

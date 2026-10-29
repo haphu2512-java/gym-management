@@ -92,7 +92,13 @@ export const addMonths = (dateInput, months) => {
   } else {
     d = new Date(dateInput);
   }
+  // Cộng tháng giống Postgres (date + interval 'n months'): ngày cuối tháng bị kẹp lại,
+  // ví dụ 31/01 + 1 tháng = 28/02 (JS setMonth mặc định sẽ tràn sang 03/03).
+  const day = d.getDate();
+  d.setDate(1);
   d.setMonth(d.getMonth() + Number(months || 1));
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(day, lastDay));
   return d;
 };
 

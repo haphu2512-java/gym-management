@@ -4,12 +4,14 @@ import { additionalService } from '../../services/additionalService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { staffLogService } from '../../services/staffLogService';
 import { shiftService } from '../../services/shiftService';
-import { useToast, ToastContainer } from '../../components/ui/Toast';
+import { useUIStore } from '../../store/useUIStore';
 import { formatDateTime } from '../../utils/formatters';
 
 export default function ServiceTab() {
   const { user, profile, activeStaff } = useAuthStore();
-  const { showError, showSuccess, toasts } = useToast();
+  const addToast = useUIStore((state) => state.addToast);
+  const showError = (msg) => addToast(msg, 'error');
+  const showSuccess = (msg) => addToast(msg, 'success');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -339,9 +341,6 @@ export default function ServiceTab() {
         <div className="pos-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px', marginTop: '8px' }}>
           {products.map((item) => {
             const qty = sellQuantities[item.id] || 1;
-            const isService = item.product_type === 'service';
-            const isOutOfStock = !isService && Number(item.stock_quantity || 0) <= 0;
-            const isLowStock = !isService && Number(item.stock_quantity || 0) < 10;
 
             return (
               <div key={item.id} className="pos-card" style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '16px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', transition: 'all 0.2s', opacity: 1 }}>
@@ -678,7 +677,6 @@ export default function ServiceTab() {
         </div>
       )}
 
-      <ToastContainer toasts={toasts} />
     </div>
   );
 }

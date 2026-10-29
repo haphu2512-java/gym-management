@@ -8,9 +8,9 @@ import { productService } from '../../services/productService';
 import { additionalService } from '../../services/additionalService';
 import { expenseService } from '../../services/expenseService';
 import { staffLogService } from '../../services/staffLogService';
-import { shiftNoteService } from '../../services/shiftNoteService';
 import { formatDateTime, getLocalISODate, formatMemberCode } from '../../utils/formatters';
 import { deviceSecurity } from '../../utils/deviceSecurity';
+import { computeHandoverCash } from '../../utils/handoverCash';
 
 export default function Shifts() {
   const { user, profile, activeStaff, setActiveStaff } = useAuthStore();
@@ -51,7 +51,6 @@ export default function Shifts() {
   const [deviceSecret, setDeviceSecret] = useState('');
   const [suggestedEndingCash, setSuggestedEndingCash] = useState(0);
   const [expenses, setExpenses] = useState([]);
-  const [sharedNotes, setSharedNotes] = useState([]);
   const [totalExpense, setTotalExpense] = useState(0);
   const [latestClosedShift, setLatestClosedShift] = useState(null);
   const [editingExpenseId, setEditingExpenseId] = useState(null);
@@ -62,7 +61,9 @@ export default function Shifts() {
     if (saved) {
       try {
         return JSON.parse(saved);
-      } catch (e) { }
+      } catch {
+        // Dữ liệu cũ trong localStorage bị hỏng thì bỏ qua
+      }
     }
     return { amount: '', reason: '' };
   });
@@ -72,7 +73,9 @@ export default function Shifts() {
     if (saved) {
       try {
         return JSON.parse(saved);
-      } catch (e) { }
+      } catch {
+        // Dữ liệu cũ trong localStorage bị hỏng thì bỏ qua
+      }
     }
     return {
       shift_name: shiftService.shiftOptions[0],
@@ -232,8 +235,13 @@ export default function Shifts() {
       const shiftExpense = await expenseService.getTotalByShift(shift.id);
       setTotalExpense(shiftExpense);
 
-      // Công thức: Tiền kết ca = Tiền đầu ca + TM hội viên + TM dịch vụ + TM nước - Chi
-      return (Number(shift.starting_cash) || 0) + totalMemberCash + totalServiceCash + totalDrinkCash - shiftExpense;
+      return computeHandoverCash({
+        startingCash: shift.starting_cash,
+        memberCash: totalMemberCash,
+        serviceCash: totalServiceCash,
+        drinkCash: totalDrinkCash,
+        expenses: shiftExpense,
+      });
     } catch (error) {
       console.error('Error calculating handover cash:', error);
       setError('Không tính được tiền dự kiến cuối ca (lỗi mạng?). Vui lòng tải lại trang trước khi chốt ca: ' + error.message);
@@ -253,9 +261,7 @@ export default function Shifts() {
       }
 
       // Đồng bộ tên ca đang mở vào form
-      if (form.shift_name !== activeShift.shift_name) {
-        setForm(prev => ({ ...prev, shift_name: activeShift.shift_name }));
-      }
+      setForm(prev => (prev.shift_name === activeShift.shift_name ? prev : { ...prev, shift_name: activeShift.shift_name }));
     } else {
       setSuggestedEndingCash(0);
       setTotalExpense(0);

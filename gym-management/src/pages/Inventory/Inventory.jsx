@@ -4,7 +4,7 @@ import { productService } from '../../services/productService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { staffLogService } from '../../services/staffLogService';
 import { shiftService } from '../../services/shiftService';
-import { useToast, ToastContainer } from '../../components/ui/Toast';
+import { useUIStore } from '../../store/useUIStore';
 import { formatDateTime } from '../../utils/formatters';
 
 const DRINK_THEMES = [
@@ -30,7 +30,9 @@ const getDrinkTheme = (name) => {
 
 export default function Inventory() {
   const { user, profile, activeStaff } = useAuthStore();
-  const { showError, showSuccess, toasts } = useToast();
+  const addToast = useUIStore((state) => state.addToast);
+  const showError = (msg) => addToast(msg, 'error');
+  const showSuccess = (msg) => addToast(msg, 'success');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -939,7 +941,6 @@ export default function Inventory() {
         </div>
       )}
 
-      <ToastContainer toasts={toasts} />
     </div>
   );
 }

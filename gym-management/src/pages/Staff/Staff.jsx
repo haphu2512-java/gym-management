@@ -370,6 +370,7 @@ export default function Staff() {
 
   return (
     <div className="modern-stack max-width-full" style={{ maxWidth: '100%' }}>
+      {error && <div className="modern-error">{error}</div>}
       <div className="modern-toolbar">
         <div>
           <h3 className="modern-title">Quản lý Ca làm & Bảng lương</h3>
