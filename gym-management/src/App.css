@@ -5,28 +5,28 @@
  */
 
 :root {
-  --ink: #0b0b0c;
-  --ink-2: #18181a;
-  --ink-3: #26262a;
-  --ink-line: #2e2e33;
-  --ink-text: #a3a3a8;
+  --ink: #22262b;
+  --ink-2: #2b3036;
+  --ink-3: #353b42;
+  --ink-line: #3a4047;
+  --ink-text: #b4bac1;
 
   --volt: #00ebff;
   --brand-ink: #00788a;
   --brand-soft: #e3f7fa;
   --brand-line: #9fdfe8;
 
-  --bg: #efeeea;
+  --bg: #f3f4f6;
   --surface: #ffffff;
-  --surface-2: #f7f6f3;
-  --surface-3: #e9e7e2;
-  --line: #dcd9d2;
-  --line-strong: #c4c0b7;
+  --surface-2: #f8f9fa;
+  --surface-3: #eceef1;
+  --line: #dde1e6;
+  --line-strong: #c3c9d0;
 
-  --text: #121212;
-  --text-2: #3b3833;
-  --muted: #67625a;
-  --subtle: #9a958c;
+  --text: #1c2025;
+  --text-2: #3c434b;
+  --muted: #5f6872;
+  --subtle: #949ca5;
 
   --ok: #1d7a3b;
   --ok-soft: #e4f1e7;
@@ -41,8 +41,8 @@
   --warn-line: #e9c98a;
 
   --radius: 4px;
-  --font-body: 'Barlow', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-display: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
+  --font-body: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   font-family: var(--font-body);
   font-size: 15px;
@@ -98,7 +98,6 @@ input[type='radio'] {
 
 h1, h2, h3, h4 {
   font-family: var(--font-display);
-  letter-spacing: 0.01em;
 }
 
 /* Số liệu: chữ số đều nhau để cột tiền thẳng hàng */
@@ -162,8 +161,6 @@ h1, h2, h3, h4 {
   margin: 0;
   font-family: var(--font-display);
   font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.22em;
   color: var(--ink-text);
   font-weight: 600;
 }
@@ -173,7 +170,7 @@ h1, h2, h3, h4 {
   font-family: var(--font-display);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: #6b6b72;
 }
@@ -192,10 +189,8 @@ h1, h2, h3, h4 {
   text-decoration: none;
   color: #d4d4d8;
   font-family: var(--font-display);
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .side-nav-item svg {
@@ -255,7 +250,7 @@ h1, h2, h3, h4 {
   color: var(--ink);
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 17px;
+  font-size: 15px;
   border-radius: var(--radius);
 }
 
@@ -269,8 +264,6 @@ h1, h2, h3, h4 {
   color: var(--ink-text);
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
 }
 
 .user-box strong {
@@ -399,18 +392,16 @@ h1, h2, h3, h4 {
   font-family: var(--font-display);
   font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
 .desktop-title-row h2 {
   margin: 0;
-  font-size: 30px;
+  font-size: 26px;
   line-height: 1.1;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.01em;
 }
 
 .system-status {
@@ -439,7 +430,7 @@ h1, h2, h3, h4 {
   font-family: var(--font-display);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -469,7 +460,7 @@ h1, h2, h3, h4 {
 .mobile-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(11, 11, 12, 0.55);
+  background: rgba(28, 32, 37, 0.5);
   z-index: 50;
 }
 
@@ -553,21 +544,21 @@ h1, h2, h3, h4 {
   color: var(--muted);
   font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .stat-value-modern {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 44px;
+  font-size: 34px;
   line-height: 1;
   font-weight: 700;
   color: var(--text);
 }
 
 .stat-value-modern.money {
-  font-size: 32px;
+  font-size: 24px;
 }
 
 .stat-value-modern .unit {
@@ -593,10 +584,8 @@ h1, h2, h3, h4 {
 
 .modern-title {
   margin: 0 0 14px;
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
   line-height: 1.1;
 }
 
@@ -721,10 +710,8 @@ h1, h2, h3, h4 {
   margin-bottom: -1px;
   border-bottom: 3px solid transparent;
   font-family: var(--font-display);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--muted);
   cursor: pointer;
   white-space: nowrap;
@@ -753,10 +740,8 @@ h1, h2, h3, h4 {
   color: var(--text);
   padding: 8px 14px;
   font-family: var(--font-display);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -781,10 +766,8 @@ h1, h2, h3, h4 {
   padding: 9px 16px;
   min-height: 38px;
   font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -813,7 +796,7 @@ h1, h2, h3, h4 {
 
 .primary-btn.large {
   width: 100%;
-  font-size: 18px;
+  font-size: 16px;
   padding: 12px;
   min-height: 48px;
 }
@@ -955,15 +938,13 @@ h1, h2, h3, h4 {
 }
 
 .modern-table th {
-  background: var(--ink);
-  color: #e4e4e7;
+  background: var(--surface-3);
+  color: var(--text-2);
   font-family: var(--font-display);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
   white-space: nowrap;
-  border-bottom: none;
+  border-bottom: 1px solid var(--line-strong);
 }
 
 .modern-table tbody tr:hover td {
@@ -1013,8 +994,6 @@ h1, h2, h3, h4 {
   font-family: var(--font-display);
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   padding: 3px 7px;
   border: 1px solid transparent;
   white-space: nowrap;
@@ -1132,7 +1111,7 @@ h1, h2, h3, h4 {
 .pos-price {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 700;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -1217,7 +1196,7 @@ h1, h2, h3, h4 {
   min-width: 26px;
   text-align: center;
   font-family: var(--font-display);
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -1228,10 +1207,8 @@ h1, h2, h3, h4 {
   background: var(--ink);
   color: #fff;
   font-family: var(--font-display);
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   cursor: pointer;
 }
 
@@ -1262,14 +1239,14 @@ h1, h2, h3, h4 {
   font-family: var(--font-display);
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ink-text);
 }
 
 .revenue-chip strong {
   font-family: var(--font-display);
-  font-size: 18px;
+  font-size: 15px;
   color: var(--volt);
   font-variant-numeric: tabular-nums;
 }
@@ -1379,7 +1356,7 @@ h1, h2, h3, h4 {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(11, 11, 12, 0.6);
+  background: rgba(28, 32, 37, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1400,8 +1377,7 @@ h1, h2, h3, h4 {
 .modal-panel h3 {
   margin-top: 0;
   margin-bottom: 14px;
-  font-size: 24px;
-  text-transform: uppercase;
+  font-size: 20px;
 }
 
 .modal-actions {
@@ -1441,11 +1417,9 @@ h1, h2, h3, h4 {
 .login-slogan {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 44px;
-  line-height: 1;
+  font-size: 34px;
+  line-height: 1.15;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.01em;
 }
 
 .login-slogan span {
@@ -1473,8 +1447,7 @@ h1, h2, h3, h4 {
 
 .login-card-modern h1 {
   margin: 0;
-  font-size: 34px;
-  text-transform: uppercase;
+  font-size: 28px;
   line-height: 1;
 }
 
@@ -1520,8 +1493,6 @@ h1, h2, h3, h4 {
   justify-content: center;
   color: var(--muted);
   font-family: var(--font-display);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
 }
 
 /* ---------- Responsive ---------- */
@@ -1557,7 +1528,7 @@ h1, h2, h3, h4 {
   }
 
   .desktop-title-row h2 {
-    font-size: 40px;
+    font-size: 30px;
   }
 
   .modern-content {
@@ -1600,7 +1571,7 @@ h1, h2, h3, h4 {
   }
 
   .login-slogan {
-    font-size: 88px;
+    font-size: 56px;
   }
 
   .login-brand-foot {
@@ -1622,7 +1593,7 @@ h1, h2, h3, h4 {
 
 @media (max-width: 767px) {
   .desktop-title-row h2 {
-    font-size: 28px;
+    font-size: 22px;
   }
 
   .system-status {
@@ -1630,11 +1601,11 @@ h1, h2, h3, h4 {
   }
 
   .stat-value-modern {
-    font-size: 36px;
+    font-size: 28px;
   }
 
   .stat-value-modern.money {
-    font-size: 24px;
+    font-size: 20px;
   }
 }
 
@@ -1686,9 +1657,7 @@ h1, h2, h3, h4 {
 .note-header strong {
   color: var(--text);
   font-family: var(--font-display);
-  font-size: 15px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 14px;
 }
 
 .note-header span {
