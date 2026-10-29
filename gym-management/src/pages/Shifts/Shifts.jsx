@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Clock, Banknote, FileText, Plus, Receipt, Trash2, Pencil, Check, X } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import { shiftService } from '../../services/shiftService';
 import { staffService } from '../../services/staffService';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -8,9 +8,13 @@ import { productService } from '../../services/productService';
 import { additionalService } from '../../services/additionalService';
 import { expenseService } from '../../services/expenseService';
 import { staffLogService } from '../../services/staffLogService';
-import { formatDateTime, getLocalISODate, formatMemberCode } from '../../utils/formatters';
+import { getLocalISODate } from '../../utils/formatters';
 import { deviceSecurity } from '../../utils/deviceSecurity';
 import { computeHandoverCash } from '../../utils/handoverCash';
+import ExpensePanel from './ExpensePanel';
+import HandoverNotesPanel from './HandoverNotesPanel';
+import ShiftDetailModal from './ShiftDetailModal';
+import ShiftHistory from './ShiftHistory';
 
 export default function Shifts() {
   const { user, profile, activeStaff, setActiveStaff } = useAuthStore();
@@ -278,7 +282,7 @@ export default function Shifts() {
       return;
     }
     if (!activeShift?.id) {
-      setError('Vui long mo ca truoc khi ghi nhan chi.');
+      setError('Vui lòng mở ca trước khi ghi nhận chi.');
       return;
     }
     try {
@@ -292,7 +296,7 @@ export default function Shifts() {
       await staffLogService.logAction({
         staffId: user?.id,
         staffMemberId: activeStaff?.id,
-        action: 'Them khoan chi',
+        action: 'Thêm khoản chi',
         targetItem: activeShift.shift_name,
         details: {
           shiftId: activeShift.id,
@@ -598,410 +602,49 @@ export default function Shifts() {
               )}
 
               {activeTab === 'expense' && (
-                <div className="modern-stack" style={{ maxWidth: '480px' }}>
-                  {/* Summary Card */}
-                  <div style={{ background: 'linear-gradient(135deg, #fef2f2, #fee2e2)', borderRadius: '16px', padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid #fecaca', boxShadow: '0 4px 12px rgba(220, 38, 38, 0.05)' }}>
-                    <div>
-                      <p style={{ margin: 0, color: '#991b1b', fontSize: '14px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tổng chi ca hiện tại</p>
-                      <h3 style={{ margin: '4px 0 0', fontSize: '28px', fontWeight: '700', color: '#7f1d1d' }}>
-                        {Number(totalExpense || 0).toLocaleString('vi-VN')}<span style={{ fontSize: '18px', marginLeft: '2px' }}>đ</span>
-                      </h3>
-                    </div>
-                    <div style={{ width: '48px', height: '48px', background: '#ffffff', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dc2626', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-                      <Receipt size={24} strokeWidth={2.5} />
-                    </div>
-                  </div>
-
-                  {/* Add Expense Form */}
-                  <form className="modern-form" onSubmit={handleAddExpense} style={{ background: '#ffffff', padding: '16px', borderRadius: '16px', border: '1px solid #e2e8f0', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
-                    <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: '600', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Plus size={16} /> Ghi nhận khoản chi mới
-                    </h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <div style={{ position: 'relative' }}>
-                        <div style={{ position: 'absolute', left: '12px', top: '10px', color: '#94a3b8' }}><Banknote size={16} /></div>
-                        <input
-                          type="number"
-                          value={expenseForm.amount}
-                          onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
-                          placeholder="Số tiền chi (VNĐ)"
-                          style={{ paddingLeft: '36px' }}
-                          required
-                        />
-                      </div>
-                      <div style={{ position: 'relative' }}>
-                        <div style={{ position: 'absolute', left: '12px', top: '10px', color: '#94a3b8' }}><FileText size={16} /></div>
-                        <input
-                          type="text"
-                          value={expenseForm.reason}
-                          onChange={(e) => setExpenseForm({ ...expenseForm, reason: e.target.value })}
-                          placeholder="Lý do chi (vd: Hoàn id, Clinh)"
-                          style={{ paddingLeft: '36px' }}
-                          required
-                        />
-                      </div>
-                      <button type="submit" className="primary-btn" style={{ width: '100%', marginTop: '4px' }} disabled={!activeShift}>
-                        Thêm khoản chi
-                      </button>
-                    </div>
-                  </form>
-
-                  {/* Modern List of Expenses */}
-                  <div style={{ marginTop: '4px' }}>
-                    <h4 style={{ margin: '0 0 12px 4px', fontSize: '14px', fontWeight: '700', color: '#64748b' }}>Lịch sử chi trong ca ({expenses.length})</h4>
-                    <div className="modern-list">
-                      {expenses.length === 0 && (
-                        <div style={{ textAlign: 'center', padding: '24px', background: '#f8fafc', borderRadius: '12px', color: '#94a3b8', fontSize: '14px', border: '1px dashed #cbd5e1' }}>
-                          Chưa có khoản chi nào
-                        </div>
-                      )}
-                      {expenses.map((item) => (
-                        <div key={item.id} className="modern-list-item" style={{ background: '#ffffff', border: '1px solid #f1f5f9', padding: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
-                          <div style={{ width: '40px', height: '40px', background: '#fef2f2', color: '#ef4444', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Banknote size={18} />
-                          </div>
-                          {editingExpenseId === item.id ? (
-                            <div className="flex-1" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                              <input
-                                type="number"
-                                value={editingExpenseForm.amount}
-                                onChange={(e) => setEditingExpenseForm({ ...editingExpenseForm, amount: e.target.value })}
-                                placeholder="Số tiền"
-                                style={{ width: '100px', padding: '4px 8px', fontSize: '13px' }}
-                              />
-                              <input
-                                type="text"
-                                value={editingExpenseForm.reason}
-                                onChange={(e) => setEditingExpenseForm({ ...editingExpenseForm, reason: e.target.value })}
-                                placeholder="Lý do"
-                                style={{ flex: 1, padding: '4px 8px', fontSize: '13px' }}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => handleSaveExpense(item.id)}
-                                style={{ background: '#22c55e', color: '#fff', border: 'none', borderRadius: '6px', padding: '6px', cursor: 'pointer' }}
-                                title="Lưu thay đổi"
-                              >
-                                <Check size={16} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setEditingExpenseId(null)}
-                                style={{ background: '#94a3b8', color: '#fff', border: 'none', borderRadius: '6px', padding: '6px', cursor: 'pointer' }}
-                                title="Hủy"
-                              >
-                                <X size={16} />
-                              </button>
-                            </div>
-                          ) : (
-                            <>
-                              <div className="flex-1">
-                                <p style={{ margin: 0, fontWeight: '600', color: '#0f172a', fontSize: '14px' }}>{item.reason || 'Không có lý do'}</p>
-                                <p style={{ margin: '2px 0 0', color: '#64748b', fontSize: '12px' }}>{formatDateTime(item.created_at)}</p>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <div style={{ fontWeight: '700', color: '#dc2626', fontSize: '15px' }}>
-                                  -{Number(item.amount || 0).toLocaleString('vi-VN')}đ
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleStartEditExpense(item)}
-                                  style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
-                                  title="Sửa khoản chi"
-                                >
-                                  <Pencil size={15} />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteExpense(item.id)}
-                                  style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
-                                  title="Xóa khoản chi"
-                                >
-                                  <Trash2 size={15} />
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+                <ExpensePanel
+                  activeShift={activeShift}
+                  expenses={expenses}
+                  totalExpense={totalExpense}
+                  expenseForm={expenseForm}
+                  setExpenseForm={setExpenseForm}
+                  editingExpenseId={editingExpenseId}
+                  setEditingExpenseId={setEditingExpenseId}
+                  editingExpenseForm={editingExpenseForm}
+                  setEditingExpenseForm={setEditingExpenseForm}
+                  handleAddExpense={handleAddExpense}
+                  handleStartEditExpense={handleStartEditExpense}
+                  handleSaveExpense={handleSaveExpense}
+                  handleDeleteExpense={handleDeleteExpense}
+                />
               )}
             </>
           )}
         </div>
 
-        <div className="modern-card notes-panel">
-          <h3 className="modern-title flex-row" style={{ color: '#92400e' }}>📜 Nhật ký bàn giao</h3>
-          <div className="notes-list">
-            {shifts.filter(s => s.note).map((s) => (
-              <div key={s.id} className="note-item">
-                <div className="note-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <strong>{s.shift_name}</strong>
-                  <div className="flex-row" style={{ gap: '8px', alignItems: 'center' }}>
-                    <span>{formatDateTime(s.start_time)}</span>
-                    {profile?.role === 'admin' && (
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteShiftNote(s.id)}
-                        style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#dc2626',
-                          cursor: 'pointer',
-                          padding: '2px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          opacity: 0.7,
-                          transition: 'opacity 0.2s'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
-                        onMouseLeave={(e) => e.currentTarget.style.opacity = 0.7}
-                        title="Xóa ghi chú bàn giao"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="note-staff">
-                  👤 {s.staff_members?.full_name || 'Hệ thống'} {s.status === 'open' && <span className="status-badge active">Đang trực</span>}
-                </div>
-                <p className="note-content">{s.note}</p>
-              </div>
-            ))}
-            {shifts.filter(s => s.note).length === 0 && (
-              <div className="muted-text" style={{ textAlign: 'center', padding: '20px' }}>Chưa có ghi chú nào</div>
-            )}
-          </div>
-        </div>
+        <HandoverNotesPanel
+          shifts={shifts}
+          isAdmin={profile?.role === 'admin'}
+          onDeleteNote={handleDeleteShiftNote}
+        />
       </div>
 
       {error && <div className="modern-error">{error}</div>}
       {loading && <div className="modern-info">Đang tải ca làm...</div>}
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '24px', marginBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
-        <h3 className="modern-title" style={{ margin: 0 }}>Lịch sử ca làm</h3>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <span style={{ fontSize: '13px', color: '#64748b', fontWeight: '500' }}>Lọc theo ngày:</span>
-          <input
-            type="date"
-            value={shiftFilterDate}
-            onChange={(e) => setShiftFilterDate(e.target.value)}
-            style={{
-              padding: '6px 12px',
-              borderRadius: '8px',
-              border: '1px solid #cbd5e1',
-              fontSize: '13px',
-              outline: 'none',
-              cursor: 'pointer'
-            }}
-          />
-          {shiftFilterDate && (
-            <button
-              type="button"
-              className="ghost-btn"
-              onClick={() => setShiftFilterDate('')}
-              style={{ padding: '6px 12px', fontSize: '13px', height: 'auto' }}
-            >
-              Xem tất cả
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="modern-table-wrap">
-        <table className="modern-table">
-          <thead>
-            <tr>
-              <th>Ca</th>
-              <th>Bắt đầu</th>
-              <th>Kết thúc</th>
-              <th>Tiền đầu ca</th>
-              <th>Tiền kết ca</th>
-              <th>Trạng thái</th>
-              <th>Hành động</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shifts.length === 0 && (
-              <tr>
-                <td colSpan={7} className="table-empty-cell">Chưa có dữ liệu ca làm</td>
-              </tr>
-            )}
-            {shifts.map((shift) => (
-              <tr key={shift.id}>
-                <td className="cell-main">{shift.shift_name}</td>
-                <td>{formatDateTime(shift.start_time)}</td>
-                <td>{formatDateTime(shift.end_time) || '-'}</td>
-                <td>{Number(shift.starting_cash || 0).toLocaleString('vi-VN')}đ</td>
-                <td>{shift.status === 'closed' ? `${Number(shift.ending_cash || 0).toLocaleString('vi-VN')}đ` : '---'}</td>
-                <td>
-                  <span className={`status-badge ${shift.status === 'open' ? 'active' : 'expired'}`}>
-                    {shift.status === 'open' ? 'Đang mở' : 'Đã chốt'}
-                  </span>
-                </td>
-                <td>
-                  <button className="link-btn" onClick={() => openShiftDetail(shift)}>Chi tiết</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <ShiftHistory
+        shifts={shifts}
+        filterDate={shiftFilterDate}
+        onFilterDateChange={setShiftFilterDate}
+        onOpenDetail={openShiftDetail}
+      />
 
       {showDetailModal && (
-        <div className="modal-backdrop" onClick={() => setShowDetailModal(false)}>
-          <div className="modal-panel" style={{ width: 'min(800px, 96vw)' }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ margin: 0 }}>Chi tiết: {selectedShiftSummary?.shift?.shift_name} ({formatDateTime(selectedShiftSummary?.shift?.start_time)})</h3>
-              <button className="ghost-btn" onClick={() => setShowDetailModal(false)}>Đóng</button>
-            </div>
-
-            {summaryLoading ? (
-              <div className="modern-info">Đang tải dữ liệu ca...</div>
-            ) : selectedShiftSummary ? (
-              <div className="modern-stack" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-                  <div className="modern-card" style={{ padding: '12px', background: '#f8fafc' }}>
-                    <p className="cell-sub">Nhân viên trực ca</p>
-                    <p className="cell-main">{selectedShiftSummary.shift?.staff_members?.full_name || selectedShiftSummary.shift?.profiles?.full_name || 'N/A'}</p>
-                  </div>
-                  <div className="modern-card" style={{ padding: '12px', background: '#f8fafc' }}>
-                    <p className="cell-sub">Doanh thu dự kiến (TM)</p>
-                    <p className="cell-main">
-                      {Number(
-                        (selectedShiftSummary.shift?.starting_cash || 0) +
-                        selectedShiftSummary.payments.filter(p => p.payment_method === 'TM').reduce((s, p) => s + p.amount, 0) +
-                        selectedShiftSummary.serviceSales.filter(s => s.payment_method === 'TM').reduce((s, p) => s + p.total_price, 0) +
-                        selectedShiftSummary.sales.filter(s => s.payment_method === 'TM').reduce((s, p) => s + p.total_price, 0) -
-                        selectedShiftSummary.expenses.reduce((s, e) => s + e.amount, 0)
-                      ).toLocaleString()}đ
-                    </p>
-                  </div>
-                  <div className="modern-card" style={{ padding: '12px', background: '#f8fafc' }}>
-                    <p className="cell-sub">Doanh thu thực tế (TM)</p>
-                    <p className="cell-main">
-                      {selectedShiftSummary.shift?.status === 'closed'
-                        ? `${Number(selectedShiftSummary.shift?.ending_cash || 0).toLocaleString()}đ`
-                        : 'Chưa chốt ca'}
-                    </p>
-                  </div>
-                </div>
-
-                <div style={{ marginTop: '16px' }}>
-                  <h4 style={{ marginBottom: '8px', borderBottom: '1px solid #eee', paddingBottom: '4px' }}>Hội viên mới & Gia hạn ({selectedShiftSummary.payments.length})</h4>
-                  <table className="modern-table" style={{ fontSize: '13px' }}>
-                    <thead>
-                      <tr>
-                        <th>Hội viên</th>
-                        <th>Số tiền</th>
-                        <th>HTTT</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedShiftSummary.payments.length === 0 && (
-                        <tr><td colSpan={3} className="table-empty-cell">Không có phát sinh</td></tr>
-                      )}
-                      {selectedShiftSummary.payments.map(p => (
-                        <tr key={p.id}>
-                          <td>{formatMemberCode(p.members?.member_code)} - {p.members?.full_name}</td>
-                          <td>{Number(p.amount).toLocaleString()}đ</td>
-                          <td>{p.payment_method}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div style={{ marginTop: '16px' }}>
-                  <h4 style={{ marginBottom: '8px', borderBottom: '1px solid #eee', paddingBottom: '4px' }}>Bán Dịch vụ ({selectedShiftSummary.serviceSales?.length || 0})</h4>
-                  <table className="modern-table" style={{ fontSize: '13px' }}>
-                    <thead>
-                      <tr>
-                        <th>Dịch vụ</th>
-                        <th>SL</th>
-                        <th>Tổng</th>
-                        <th>HTTT</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(!selectedShiftSummary.serviceSales || selectedShiftSummary.serviceSales.length === 0) && (
-                        <tr><td colSpan={4} className="table-empty-cell">Không có phát sinh</td></tr>
-                      )}
-                      {selectedShiftSummary.serviceSales?.map(s => (
-                        <tr key={s.id}>
-                          <td>{s.services?.name}</td>
-                          <td>{s.quantity}</td>
-                          <td>{Number(s.total_price).toLocaleString()}đ</td>
-                          <td>{s.payment_method}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div style={{ marginTop: '16px' }}>
-                  <h4 style={{ marginBottom: '8px', borderBottom: '1px solid #eee', paddingBottom: '4px' }}>Bán nước ({selectedShiftSummary.sales.length})</h4>
-                  <table className="modern-table" style={{ fontSize: '13px' }}>
-                    <thead>
-                      <tr>
-                        <th>Sản phẩm</th>
-                        <th>SL</th>
-                        <th>Tổng</th>
-                        <th>HTTT</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedShiftSummary.sales.length === 0 && (
-                        <tr><td colSpan={4} className="table-empty-cell">Không có phát sinh</td></tr>
-                      )}
-                      {selectedShiftSummary.sales.map(s => (
-                        <tr key={s.id}>
-                          <td>{s.products?.name}</td>
-                          <td>{s.quantity}</td>
-                          <td>{Number(s.total_price).toLocaleString()}đ</td>
-                          <td>{s.payment_method}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div style={{ marginTop: '16px' }}>
-                  <h4 style={{ marginBottom: '8px', borderBottom: '1px solid #eee', paddingBottom: '4px' }}>Khoản chi ({selectedShiftSummary.expenses.length})</h4>
-                  <table className="modern-table" style={{ fontSize: '13px' }}>
-                    <thead>
-                      <tr>
-                        <th>Lý do</th>
-                        <th>Số tiền</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedShiftSummary.expenses.length === 0 && (
-                        <tr><td colSpan={2} className="table-empty-cell">Không có khoản chi</td></tr>
-                      )}
-                      {selectedShiftSummary.expenses.map(e => (
-                        <tr key={e.id}>
-                          <td>{e.reason}</td>
-                          <td>{Number(e.amount).toLocaleString()}đ</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {selectedShiftSummary.shift?.note && (
-                  <div style={{ marginTop: '16px', padding: '12px', background: '#fffbeb', borderRadius: '8px', border: '1px solid #fef3c7' }}>
-                    <p className="cell-sub">Ghi chú ca:</p>
-                    <p style={{ margin: 0, fontSize: '14px' }}>{selectedShiftSummary.shift.note}</p>
-                  </div>
-                )}
-              </div>
-            ) : null}
-          </div>
-        </div>
+        <ShiftDetailModal
+          summary={selectedShiftSummary}
+          loading={summaryLoading}
+          onClose={() => setShowDetailModal(false)}
+        />
       )}
     </div>
   );
