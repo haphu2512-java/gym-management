@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { AlertTriangle, CheckCheck } from 'lucide-react';
 import { useMembers } from '../../hooks/useMembers';
 import { memberService } from '../../services/memberService';
+import { paymentService } from '../../services/paymentService';
 import { staffLogService } from '../../services/staffLogService';
 import { shiftService } from '../../services/shiftService';
 import { memberLogService } from '../../services/memberLogService';
@@ -65,6 +66,8 @@ export default function Members() {
 
   const [historyLogs, setHistoryLogs] = useState([]);
   const [deletingMember, setDeletingMember] = useState(null);
+  const [deleteShiftPayments, setDeleteShiftPayments] = useState([]);
+  const [deletePaymentsLoading, setDeletePaymentsLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [showSuspendModal, setShowSuspendModal] = useState(false);
   const [suspendingMember, setSuspendingMember] = useState(null);
@@ -198,10 +201,27 @@ export default function Members() {
     });
   };
 
-  // Xử lý xóa hội viên. Khoản thu cũ giữ nguyên; nếu hoàn tiền thì ghi vào ca đang mở.
-  const handleConfirmDelete = async ({ refundAmount = 0, refundMethod = 'TM', note = '' } = {}) => {
+  // Mở modal xóa, tải các khoản thu của hội viên trong ca đang mở (để xóa do nhập nhầm)
+  const openDeleteModal = async (member) => {
+    setDeletingMember(member);
+    setDeleteShiftPayments([]);
+    if (!activeShift?.id) return;
+    setDeletePaymentsLoading(true);
+    try {
+      setDeleteShiftPayments(await paymentService.getMemberPaymentsInShift(member.id, activeShift.id));
+    } catch (err) {
+      console.error('Lỗi tải khoản thu trong ca:', err);
+    } finally {
+      setDeletePaymentsLoading(false);
+    }
+  };
+
+  // Xử lý xóa hội viên.
+  // Nhập nhầm: server hoàn đúng các khoản đã thu trong ca đang mở.
+  // Lý do khác: khoản thu cũ giữ nguyên; nếu hoàn tiền thì ghi vào ca đang mở.
+  const handleConfirmDelete = async ({ voidCurrentShift = false, voidTotal = 0, refundAmount = 0, refundMethod = 'TM', note = '' } = {}) => {
     if (!deletingMember) return;
-    if (refundAmount > 0 && !activeShift?.id) {
+    if ((voidCurrentShift || refundAmount > 0) && !activeShift?.id) {
       setError('Vui lòng mở ca trước khi xóa hội viên có hoàn tiền.');
       return;
     }
@@ -212,14 +232,42 @@ export default function Members() {
         refundAmount,
         refundMethod,
         note,
+        voidCurrentShift,
       });
 
       await fetchMembers();
       setDeletingMember(null);
-      addToast(refundAmount > 0 ? `Đã xóa hội viên và ghi hoàn tiền ${Number(refundAmount).toLocaleString()}đ` : 'Đã xóa hội viên');
+      if (voidCurrentShift) {
+        addToast(`Đã xóa hội viên nhập nhầm và hủy ${Number(voidTotal).toLocaleString()}đ trong ca`);
+      } else {
+        addToast(refundAmount > 0 ? `Đã xóa hội viên và ghi hoàn tiền ${Number(refundAmount).toLocaleString()}đ` : 'Đã xóa hội viên');
+      }
     } catch (err) {
+      setDeletingMember(null);
       setError("Lỗi xóa hội viên: " + err.message);
     }
+  };
+
+  // Admin đổi TM <-> CK cho một lượt đăng ký/gia hạn nhân viên chọn nhầm
+  const handleChangePaymentMethod = (log) => {
+    const newMethod = log.payment_method === 'CK' ? 'TM' : 'CK';
+    showConfirm({
+      title: 'Đổi hình thức thanh toán',
+      message: `Đổi khoản ${Number(log.fee || 0).toLocaleString()}đ từ ${log.payment_method === 'CK' ? 'chuyển khoản' : 'tiền mặt'} sang ${newMethod === 'CK' ? 'chuyển khoản' : 'tiền mặt'}?`
+        + (newMethod === 'CK' ? ' Tiền mặt trong ca sẽ giảm tương ứng và khoản này chờ Admin duyệt CK.' : ' Tiền mặt trong ca sẽ tăng tương ứng.'),
+      onConfirm: async () => {
+        try {
+          await memberService.changePaymentMethod(log.id, newMethod, activeStaff?.id);
+          setHistoryLogs(prevLogs =>
+            prevLogs.map(l => l.id === log.id ? { ...l, payment_method: newMethod, is_payment_verified: newMethod === 'TM' } : l)
+          );
+          await fetchMembers();
+          addToast(`Đã đổi sang ${newMethod === 'CK' ? 'chuyển khoản' : 'tiền mặt'}`);
+        } catch (err) {
+          addToast('Lỗi đổi hình thức thanh toán: ' + err.message, 'error');
+        }
+      }
+    });
   };
 
   // Mở modal tạo hội viên mới
@@ -600,7 +648,7 @@ export default function Members() {
           onRenewMember={openRenewModal}
           onSuspendMember={openSuspendModal}
           onReactivateMember={handleReactivate}
-          onDeleteMember={setDeletingMember}
+          onDeleteMember={openDeleteModal}
         />
       )}
 
@@ -615,6 +663,7 @@ export default function Members() {
           historyLoading={historyLoading}
           profile={profile}
           onLogVerification={handleLogVerification}
+          onChangePaymentMethod={handleChangePaymentMethod}
           submitting={submitting}
         />
       )}
@@ -634,6 +683,8 @@ export default function Members() {
         <DeleteConfirmModal
           member={deletingMember}
           hasActiveShift={Boolean(activeShift?.id)}
+          shiftPayments={deleteShiftPayments}
+          paymentsLoading={deletePaymentsLoading}
           onConfirm={handleConfirmDelete}
           onCancel={() => setDeletingMember(null)}
         />

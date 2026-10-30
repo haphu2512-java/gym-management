@@ -97,9 +97,17 @@ describe('render các component đã tách', () => {
     expect(renderToStaticMarkup(<DeleteProductModal deletingProduct={product} setDeletingProduct={noop} handleConfirmDelete={noop} />)).toContain('Pocari');
   });
 
-  it('DeleteConfirmModal của hội viên', () => {
+  it('DeleteConfirmModal: không có khoản thu trong ca -> lý do khác, có ô hoàn tiền', () => {
     const html = renderToStaticMarkup(<DeleteConfirmModal member={{ full_name: 'Anh A', member_code: 'HV1' }} hasActiveShift onConfirm={noop} onCancel={noop} />);
     expect(html).toContain('Anh A');
     expect(html).toContain('hoàn lại');
+  });
+
+  it('DeleteConfirmModal: có khoản thu trong ca -> mặc định nhập nhầm, hủy đúng số tiền', () => {
+    const payments = [{ id: 'p1', amount: 350000, payment_method: 'TM' }];
+    const html = renderToStaticMarkup(<DeleteConfirmModal member={{ full_name: 'Anh A', member_code: 'HV1' }} hasActiveShift shiftPayments={payments} onConfirm={noop} onCancel={noop} />);
+    expect(html).toContain('350.000đ tiền mặt');
+    expect(html).toContain('Xóa và hủy 350.000đ');
+    expect(html).toContain('Khách nghỉ / lý do khác');
   });
 });

@@ -13,8 +13,13 @@ export default function MemberFormModal({
   historyLoading,
   profile,
   onLogVerification,
+  onChangePaymentMethod,
   submitting
 }) {
+  const isAdmin = profile?.role === 'admin';
+  // Admin sửa hình thức thanh toán nhân viên chọn nhầm
+  const canChangeMethod = (log) => Boolean(isAdmin && onChangePaymentMethod && log.payment_method);
+
   return (
     <div className="modal-backdrop">
       <div className="modal-panel" style={{ width: 'min(900px, 96vw)', maxWidth: '900px' }} onClick={(e) => e.stopPropagation()}>
@@ -190,15 +195,15 @@ export default function MemberFormModal({
                         <th>Ngày</th>
                         <th>Hành động</th>
                         <th>Chi tiết gói</th>
-                        {profile?.role === 'admin' && <th>Nhân viên</th>}
-                        {profile?.role === 'admin' && <th>Thanh toán</th>}
+                        {isAdmin && <th>Nhân viên</th>}
+                        {isAdmin && <th>Thanh toán</th>}
                       </tr>
                     </thead>
                     <tbody>
                       {historyLoading ? (
-                        <tr><td colSpan={profile?.role === 'admin' ? 5 : 3} className="table-empty-cell">Đang tải...</td></tr>
+                        <tr><td colSpan={isAdmin ? 5 : 3} className="table-empty-cell">Đang tải...</td></tr>
                       ) : historyLogs.length === 0 ? (
-                        <tr><td colSpan={profile?.role === 'admin' ? 5 : 3} className="table-empty-cell">Chưa có lịch sử</td></tr>
+                        <tr><td colSpan={isAdmin ? 5 : 3} className="table-empty-cell">Chưa có lịch sử</td></tr>
                       ) : historyLogs.map(log => (
                         <tr key={log.id} style={{ fontSize: '12px' }}>
                           <td>{formatDate(log.created_at)}</td>
@@ -219,7 +224,7 @@ export default function MemberFormModal({
                           {profile?.role === 'admin' && (
                             <td>{log.staff_members?.full_name || log.profiles?.full_name || 'Hệ thống'}</td>
                           )}
-                          {profile?.role === 'admin' && (
+                          {isAdmin && (
                             <td>
                               {log.payment_method === 'CK' && !log.is_payment_verified ? (
                                 <button
@@ -234,6 +239,17 @@ export default function MemberFormModal({
                               ) : log.payment_method === 'TM' ? (
                                 <span style={{ color: 'var(--muted)' }}>Tiền mặt</span>
                               ) : null}
+                              {canChangeMethod(log) && (
+                                <button
+                                  type="button"
+                                  className="ghost-btn-sm"
+                                  style={{ display: 'block', marginTop: '4px', padding: '4px 8px', fontSize: '11px' }}
+                                  onClick={() => onChangePaymentMethod(log)}
+                                  title="Nhân viên chọn nhầm hình thức thanh toán? Đổi lại tại đây"
+                                >
+                                  Đổi sang {log.payment_method === 'CK' ? 'TM' : 'CK'}
+                                </button>
+                              )}
                             </td>
                           )}
                         </tr>
