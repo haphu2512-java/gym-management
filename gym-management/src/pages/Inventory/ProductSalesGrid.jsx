@@ -69,7 +69,7 @@ export default function ProductSalesGrid({
                       onClick={(e) => { e.stopPropagation(); handleQtyChange(item.id, -1, item.stock_quantity); }}
                       disabled={isOutOfStock || qty <= 1}
                     >
-                      <Minus size={14} />
+                      <Minus size={18} />
                     </button>
                     <span>{qty}</span>
                     <button
@@ -78,7 +78,7 @@ export default function ProductSalesGrid({
                       onClick={(e) => { e.stopPropagation(); handleQtyChange(item.id, 1, item.stock_quantity); }}
                       disabled={isOutOfStock || qty >= item.stock_quantity}
                     >
-                      <Plus size={14} />
+                      <Plus size={18} />
                     </button>
                   </div>
                   <button
