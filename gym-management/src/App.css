@@ -1,7 +1,9 @@
 /*
  * Max Power Gym — giao diện quản lý
- * Bộ màu lấy từ logo: đen + xanh điện (#00EBFF). Xanh điện chỉ dùng làm điểm nhấn
- * trên nền đen; trên nền sáng dùng --brand-ink (đậm hơn, đủ tương phản để đọc chữ).
+ * Bộ màu lấy từ logo: đen + xanh điện (#00EBFF). Nền chính màu xám trăng (sáng, dịu mắt);
+ * chỉ sidebar, thanh trên điện thoại và panel logo ở trang đăng nhập giữ nền tối.
+ * Xanh điện chỉ dùng làm điểm nhấn trên nền tối; trên nền sáng dùng --brand-ink /
+ * --primary (đậm hơn, đủ tương phản để đọc chữ).
  */
 
 :root {
@@ -16,12 +18,17 @@
   --brand-soft: #e3f7fa;
   --brand-line: #9fdfe8;
 
-  --bg: #f3f4f6;
-  --surface: #ffffff;
-  --surface-2: #f8f9fa;
-  --surface-3: #eceef1;
-  --line: #dde1e6;
-  --line-strong: #c3c9d0;
+  /* Nút chính trên nền sáng: xanh điện đậm, chữ trắng đạt tương phản AA */
+  --primary: #00788a;
+  --primary-hover: #005f6d;
+
+  /* Xám trăng */
+  --bg: #e9ecf0;
+  --surface: #fbfcfd;
+  --surface-2: #f3f5f7;
+  --surface-3: #e4e8ec;
+  --line: #d6dbe1;
+  --line-strong: #bcc4cc;
 
   --text: #1c2025;
   --text-2: #3c434b;
@@ -93,7 +100,7 @@ textarea {
 
 input[type='checkbox'],
 input[type='radio'] {
-  accent-color: var(--ink);
+  accent-color: var(--primary);
 }
 
 h1, h2, h3, h4 {
@@ -365,9 +372,9 @@ h1, h2, h3, h4 {
 }
 
 .desktop-toggle:hover {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--volt);
+  background: var(--brand-soft);
+  border-color: var(--brand-line);
+  color: var(--brand-ink);
 }
 
 .desktop-title-row {
@@ -523,7 +530,7 @@ h1, h2, h3, h4 {
   top: 0;
   bottom: 0;
   width: 4px;
-  background: var(--stat-accent, var(--ink));
+  background: var(--stat-accent, var(--primary));
 }
 
 .stat-card-modern.is-ok { --stat-accent: var(--ok); }
@@ -626,8 +633,8 @@ h1, h2, h3, h4 {
   width: 40px;
   height: 40px;
   border-radius: var(--radius);
-  background: var(--ink);
-  color: var(--volt);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
   font-family: var(--font-display);
   font-weight: 700;
   display: flex;
@@ -677,8 +684,8 @@ h1, h2, h3, h4 {
 }
 
 .search-box:focus-within {
-  border-color: var(--ink);
-  box-shadow: inset 0 0 0 1px var(--ink);
+  border-color: var(--brand-ink);
+  box-shadow: inset 0 0 0 1px var(--brand-ink);
 }
 
 .search-box input {
@@ -722,14 +729,14 @@ h1, h2, h3, h4 {
 }
 
 .tab-bar .tab-btn.active {
-  color: var(--text);
-  border-bottom-color: var(--ink);
+  color: var(--brand-ink);
+  border-bottom-color: var(--primary);
 }
 
 /* Tab dạng nút ghép (segmented) */
 .tab-group {
   display: inline-flex;
-  border: 1px solid var(--ink);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius);
   overflow: hidden;
 }
@@ -747,12 +754,12 @@ h1, h2, h3, h4 {
 }
 
 .tab-group .tab-btn + .tab-btn {
-  border-left: 1px solid var(--ink);
+  border-left: 1px solid var(--line-strong);
 }
 
 .tab-group .tab-btn.active {
-  background: var(--ink);
-  color: var(--volt);
+  background: var(--primary);
+  color: #fff;
 }
 
 /* ---------- Nút ---------- */
@@ -778,13 +785,14 @@ h1, h2, h3, h4 {
 }
 
 .primary-btn {
-  background: var(--ink);
-  border-color: var(--ink);
+  background: var(--primary);
+  border-color: var(--primary);
   color: #fff;
 }
 
 .primary-btn:hover:not(:disabled) {
-  color: var(--volt);
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
 }
 
 .primary-btn:disabled,
@@ -803,7 +811,7 @@ h1, h2, h3, h4 {
 
 .dark-btn {
   width: 100%;
-  background: var(--ink);
+  background: var(--primary);
   color: #fff;
 }
 
@@ -820,7 +828,7 @@ h1, h2, h3, h4 {
 }
 
 .ghost-btn:hover:not(:disabled) {
-  border-color: var(--ink);
+  border-color: var(--brand-ink);
 }
 
 .danger-btn {
@@ -842,7 +850,7 @@ h1, h2, h3, h4 {
 }
 
 .ghost-btn-sm:hover:not(:disabled) {
-  border-color: var(--ink);
+  border-color: var(--brand-ink);
   color: var(--text);
 }
 
@@ -887,7 +895,7 @@ h1, h2, h3, h4 {
   background: var(--surface);
   color: var(--text-2);
   border-color: var(--line);
-  border-left-color: var(--ink);
+  border-left-color: var(--primary);
 }
 
 .modern-success {
@@ -1030,8 +1038,8 @@ h1, h2, h3, h4 {
 }
 
 .pay-badge.transfer {
-  background: var(--ink);
-  color: var(--volt);
+  background: var(--brand-soft);
+  color: var(--brand-ink);
 }
 
 .stock-badge.ok {
@@ -1054,8 +1062,8 @@ h1, h2, h3, h4 {
 
 .pos-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
 }
 
 .pos-card {
@@ -1068,7 +1076,7 @@ h1, h2, h3, h4 {
 }
 
 .pos-card:hover {
-  border-color: var(--ink);
+  border-color: var(--brand-line);
 }
 
 .pos-card.is-out {
@@ -1076,10 +1084,10 @@ h1, h2, h3, h4 {
 }
 
 .pos-card-body {
-  padding: 14px 14px 12px;
+  padding: 18px 18px 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
   flex: 1;
 }
 
@@ -1091,8 +1099,8 @@ h1, h2, h3, h4 {
 }
 
 .pos-card-top img {
-  width: 44px;
-  height: 44px;
+  width: 72px;
+  height: 72px;
   object-fit: cover;
   border-radius: var(--radius);
   border: 1px solid var(--line);
@@ -1101,7 +1109,7 @@ h1, h2, h3, h4 {
 .pos-name {
   margin: 0;
   font-family: var(--font-body);
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 600;
   line-height: 1.25;
   color: var(--text);
@@ -1111,14 +1119,14 @@ h1, h2, h3, h4 {
 .pos-price {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 22px;
+  font-size: 30px;
   font-weight: 700;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 
 .pos-price small {
-  font-size: 16px;
+  font-size: 20px;
   color: var(--muted);
   margin-left: 1px;
 }
@@ -1126,8 +1134,8 @@ h1, h2, h3, h4 {
 .stock-meter {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
+  gap: 6px;
+  font-size: 14px;
   color: var(--muted);
 }
 
@@ -1146,14 +1154,14 @@ h1, h2, h3, h4 {
 }
 
 .stock-meter-bar {
-  height: 4px;
+  height: 6px;
   background: var(--surface-3);
 }
 
 .stock-meter-bar span {
   display: block;
   height: 100%;
-  background: var(--ink);
+  background: var(--primary);
 }
 
 .stock-meter.low .stock-meter-bar span {
@@ -1172,8 +1180,8 @@ h1, h2, h3, h4 {
 }
 
 .qty-stepper button {
-  width: 38px;
-  height: 46px;
+  width: 48px;
+  height: 56px;
   border: none;
   background: var(--surface);
   cursor: pointer;
@@ -1193,10 +1201,10 @@ h1, h2, h3, h4 {
 }
 
 .qty-stepper span {
-  min-width: 26px;
+  min-width: 32px;
   text-align: center;
   font-family: var(--font-display);
-  font-size: 16px;
+  font-size: 19px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -1204,16 +1212,16 @@ h1, h2, h3, h4 {
 .btn-sell-pos {
   flex: 1;
   border: none;
-  background: var(--ink);
+  background: var(--primary);
   color: #fff;
   font-family: var(--font-display);
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 700;
   cursor: pointer;
 }
 
 .btn-sell-pos:hover:not(:disabled) {
-  color: var(--volt);
+  background: var(--primary-hover);
 }
 
 .btn-sell-pos:disabled {
@@ -1229,8 +1237,9 @@ h1, h2, h3, h4 {
   padding: 0 12px;
   min-height: 38px;
   border-radius: var(--radius);
-  background: var(--ink);
-  color: #fff;
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-line);
+  color: var(--brand-ink);
   font-size: 13px;
   white-space: nowrap;
 }
@@ -1241,13 +1250,13 @@ h1, h2, h3, h4 {
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--ink-text);
+  color: var(--brand-ink);
 }
 
 .revenue-chip strong {
   font-family: var(--font-display);
   font-size: 15px;
-  color: var(--volt);
+  color: var(--brand-ink);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1329,8 +1338,8 @@ h1, h2, h3, h4 {
 .modern-form select:focus,
 .modern-form textarea:focus,
 .modern-input:focus {
-  border-color: var(--ink);
-  box-shadow: inset 0 0 0 1px var(--ink);
+  border-color: var(--brand-ink);
+  box-shadow: inset 0 0 0 1px var(--brand-ink);
 }
 
 .field-hint {
@@ -1368,7 +1377,7 @@ h1, h2, h3, h4 {
   background: var(--surface);
   width: min(560px, 100%);
   border-radius: var(--radius);
-  border-top: 4px solid var(--ink);
+  border-top: 4px solid var(--primary);
   padding: 20px;
   max-height: 88vh;
   overflow: auto;

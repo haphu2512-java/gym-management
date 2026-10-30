@@ -441,8 +441,8 @@ export default function Staff() {
         <table className="modern-table" style={{ minWidth: '800px', border: '1px solid var(--line)' }}>
           <thead>
             <tr>
-              <th style={{ width: '80px', borderRight: '1px solid var(--ink-line)' }}>Ca \ Thứ</th>
-              {DAYS.map(d => <th key={d} style={{ textAlign: 'center', borderRight: '1px solid var(--ink-line)' }}>{d}</th>)}
+              <th style={{ width: '80px', borderRight: '1px solid var(--line-strong)' }}>Ca \ Thứ</th>
+              {DAYS.map(d => <th key={d} style={{ textAlign: 'center', borderRight: '1px solid var(--line-strong)' }}>{d}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -533,10 +533,10 @@ export default function Staff() {
         <table className="modern-table" style={{ minWidth: '1100px', fontSize: '13px', border: '1px solid var(--line)' }}>
           <thead>
             <tr>
-              <th rowSpan={2} style={{ borderRight: '1px solid var(--ink-line)' }}>Nhân viên</th>
-              <th rowSpan={2} style={{ width: '110px', borderRight: '1px solid var(--ink-line)' }}>Loại</th>
+              <th rowSpan={2} style={{ borderRight: '1px solid var(--line-strong)' }}>Nhân viên</th>
+              <th rowSpan={2} style={{ width: '110px', borderRight: '1px solid var(--line-strong)' }}>Loại</th>
               {SHIFTS.map(s => (
-                <th colSpan={2} key={s} style={{ textAlign: 'center', borderRight: '2px solid var(--ink-line)' }}>{s}</th>
+                <th colSpan={2} key={s} style={{ textAlign: 'center', borderRight: '2px solid var(--line-strong)' }}>{s}</th>
               ))}
               <th rowSpan={2} style={{ textAlign: 'right' }}>Tiền Ca (VND)</th>
             </tr>
@@ -623,11 +623,11 @@ export default function Staff() {
         <table className="modern-table" style={{ width: '100%', border: '1px solid var(--line)' }}>
           <thead>
             <tr>
-              <th style={{ borderRight: '1px solid var(--ink-line)' }}>Nhân viên</th>
-              <th style={{ borderRight: '1px solid var(--ink-line)' }}>Hoa hồng</th>
-              <th style={{ borderRight: '1px solid var(--ink-line)' }}>Khoản khác</th>
-              <th style={{ borderRight: '1px solid var(--ink-line)' }}>Hao hụt</th>
-              <th style={{ borderRight: '1px solid var(--ink-line)' }}>Khoản phạt</th>
+              <th style={{ borderRight: '1px solid var(--line-strong)' }}>Nhân viên</th>
+              <th style={{ borderRight: '1px solid var(--line-strong)' }}>Hoa hồng</th>
+              <th style={{ borderRight: '1px solid var(--line-strong)' }}>Khoản khác</th>
+              <th style={{ borderRight: '1px solid var(--line-strong)' }}>Hao hụt</th>
+              <th style={{ borderRight: '1px solid var(--line-strong)' }}>Khoản phạt</th>
               <th style={{ textAlign: 'right' }}>Thực Lãnh</th>
             </tr>
           </thead>
