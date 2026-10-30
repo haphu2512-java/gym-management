@@ -133,8 +133,8 @@ export const memberService = {
       p_membership_category: memberData.membership_category || 'normal',
       p_fee: Number(memberData.fee || 0),
       p_payment_method: memberData.payment_method,
-      p_shift_id: memberData.shift_id,
-      p_staff_id: memberData.staff_id,
+      p_shift_id: memberData.shift_id ?? null,
+      p_staff_id: memberData.staff_id ?? null,
       p_fingerprint_status: Boolean(memberData.fingerprint_status),
       p_note: memberData.note || '',
       p_start_date: memberData.start_date || getLocalISODate(),
@@ -265,7 +265,7 @@ export const memberService = {
       p_fee: fee,
       p_payment_method: paymentMethod,
       p_shift_id: shiftId,
-      p_staff_id: staffId,
+      p_staff_id: staffId ?? null,
       p_start_date: renewalStart,
       p_idempotency_key: idempotencyKey,
       p_note: note || null
@@ -307,7 +307,7 @@ export const memberService = {
     const { data, error } = await supabase.rpc('delete_member', {
       p_member_id: id,
       p_shift_id: shiftId,
-      p_staff_id: staffId,
+      p_staff_id: staffId ?? null,
       p_refund_amount: Number(refundAmount || 0),
       p_refund_method: refundMethod,
       p_note: note || null
@@ -319,7 +319,7 @@ export const memberService = {
   async suspendMember(id, staffId, shiftId) {
     const { data, error } = await supabase.rpc('suspend_member', {
       p_member_id: id,
-      p_staff_id: staffId,
+      p_staff_id: staffId ?? null,
       p_shift_id: shiftId
     });
 
@@ -331,7 +331,7 @@ export const memberService = {
   async reactivateMember(id, staffId, shiftId) {
     const { data, error } = await supabase.rpc('reactivate_member', {
       p_member_id: id,
-      p_staff_id: staffId,
+      p_staff_id: staffId ?? null,
       p_shift_id: shiftId
     });
 
