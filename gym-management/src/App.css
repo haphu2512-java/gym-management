@@ -1,7 +1,7 @@
 /*
  * Max Power Gym — giao diện quản lý
  * Bộ màu lấy từ logo: đen + xanh điện (#00EBFF). Nền chính màu xám trăng (sáng, dịu mắt);
- * chỉ sidebar, thanh trên điện thoại và panel logo ở trang đăng nhập giữ nền tối.
+ * sidebar xám trăng nhạt (riêng khối logo giữ nền tối); thanh trên điện thoại và panel logo ở trang đăng nhập giữ nền tối.
  * Xanh điện chỉ dùng làm điểm nhấn trên nền tối; trên nền sáng dùng --brand-ink /
  * --primary (đậm hơn, đủ tương phản để đọc chữ).
  */
@@ -311,6 +311,82 @@ h1, h2, h3, h4 {
 
 .logout-btn-modern:hover {
   background: var(--ink-3);
+}
+
+/* Sidebar xám trăng nhạt: nền sáng, chữ tối; riêng khối logo giữ nền tối vì logo chữ trắng. */
+.modern-sidebar {
+  background: var(--surface-3);
+  color: var(--text);
+  border-right: 1px solid var(--line);
+}
+
+.modern-sidebar .sidebar-brand {
+  margin: -22px 0 12px;
+  padding: 22px 20px 20px;
+  background: var(--ink);
+  border-bottom: none;
+}
+
+.modern-sidebar .sidebar-section-label {
+  color: var(--muted);
+}
+
+.modern-sidebar .side-nav-item {
+  color: var(--text-2);
+}
+
+.modern-sidebar .side-nav-item svg {
+  color: var(--muted);
+}
+
+.modern-sidebar .side-nav-item:hover {
+  background: var(--line);
+  color: var(--text);
+}
+
+.modern-sidebar .side-nav-item.active {
+  background: var(--surface);
+  border-left-color: var(--primary);
+  color: var(--brand-ink);
+}
+
+.modern-sidebar .side-nav-item.active svg {
+  color: var(--primary);
+}
+
+.modern-sidebar .sidebar-footer {
+  border-top-color: var(--line-strong);
+}
+
+.modern-sidebar .user-box {
+  color: var(--text);
+}
+
+.modern-sidebar .user-box:hover,
+.modern-sidebar .user-box.open {
+  background: var(--line);
+}
+
+.modern-sidebar .user-box .user-initial {
+  background: var(--primary);
+  color: #fff;
+}
+
+.modern-sidebar .user-box p {
+  color: var(--muted);
+}
+
+.modern-sidebar .user-menu {
+  background: var(--surface);
+  border-color: var(--line-strong);
+}
+
+.modern-sidebar .logout-btn-modern {
+  color: var(--danger);
+}
+
+.modern-sidebar .logout-btn-modern:hover {
+  background: var(--danger-soft);
 }
 
 .modern-main {
