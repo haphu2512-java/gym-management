@@ -137,17 +137,25 @@ SET ROLE authenticated;
 SET request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
 CREATE TEMP TABLE ctx2 AS SELECT id AS shift_id FROM shifts WHERE status = 'open';
 
+-- Nhân viên nhập nhầm: chọn TM cho khoản chuyển khoản
 SELECT create_member_transaction('HV02', 'Chị B', 1, 'normal', 350000, 'TM', (SELECT shift_id FROM ctx2),
   '00000000-0000-0000-0000-0000000000f1', false, '', local_today(), NULL, 'k2');
 CREATE TEMP TABLE hv2 AS SELECT m.id AS member_id, l.id AS log_id FROM members m JOIN member_logs l ON l.member_id = m.id AND l.action = 'CREATE' WHERE m.member_code = 'HV02';
 
--- Chọn nhầm TM, đổi sang CK: tiền mặt ca giảm, hội viên chuyển sang chờ duyệt
+-- Nhân viên không tự sửa được, phải nhờ Admin
+SELECT pg_temp.expect_error($$SELECT change_payment_method((SELECT log_id FROM hv2), 'CK')$$, '%Chỉ Admin%');
+SELECT pg_temp.expect_error($$SELECT delete_member((SELECT member_id FROM hv2), (SELECT shift_id FROM ctx2), NULL, 0, 'TM', NULL, true)$$, '%Chỉ Admin%');
+SELECT pg_temp.check((SELECT payment_method = 'TM' FROM payment_logs WHERE member_id = (SELECT member_id FROM hv2)), 'nhân viên không đổi được');
+
+-- Admin đổi TM→CK: tiền mặt ca giảm, hội viên chuyển sang chờ duyệt
+SET request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
 SELECT change_payment_method((SELECT log_id FROM hv2), 'CK', '00000000-0000-0000-0000-0000000000f1');
 SELECT pg_temp.check((SELECT payment_method = 'CK' AND NOT is_verified FROM payment_logs WHERE member_id = (SELECT member_id FROM hv2)), 'đổi TM→CK trên payment_logs');
 SELECT pg_temp.check((SELECT payment_method = 'CK' AND NOT is_payment_verified FROM member_current_status WHERE id = (SELECT member_id FROM hv2)), 'hội viên chờ duyệt CK sau khi đổi');
 SELECT change_payment_method((SELECT log_id FROM hv2), 'TM', '00000000-0000-0000-0000-0000000000f1');
 SELECT pg_temp.check((SELECT payment_method = 'TM' AND is_verified FROM payment_logs WHERE member_id = (SELECT member_id FROM hv2)), 'đổi CK→TM');
 SELECT pg_temp.expect_error($$SELECT change_payment_method((SELECT log_id FROM hv2), 'XX')$$, '%không hợp lệ%');
+SELECT pg_temp.check((SELECT count(*) = 2 FROM staff_logs WHERE action = 'Đổi hình thức thanh toán'), 'ghi nhật ký đổi hình thức');
 
 -- Log cũ không có payment_id vẫn tìm được khoản thu
 RESET ROLE;
@@ -157,21 +165,17 @@ SELECT change_payment_method((SELECT log_id FROM hv2), 'CK');
 SELECT pg_temp.check((SELECT payment_method = 'CK' FROM payment_logs WHERE member_id = (SELECT member_id FROM hv2)), 'đổi được với log cũ');
 SELECT change_payment_method((SELECT log_id FROM hv2), 'TM');
 
--- Ca đã chốt: nhân viên không đổi được
-SELECT pg_temp.expect_error($$SELECT change_payment_method((SELECT id FROM member_logs WHERE action = 'CREATE' AND member_id <> (SELECT member_id FROM hv2)), 'TM')$$, '%ca thu tiền còn mở%');
-
--- Nhân viên xóa thường: bị chặn; xóa do nhập nhầm: được, tiền ca về 0
-SELECT pg_temp.expect_error($$SELECT delete_member((SELECT member_id FROM hv2), (SELECT shift_id FROM ctx2))$$, '%Chỉ Admin%');
+-- Admin xóa do nhập nhầm: tiền ca của hội viên về 0
 SELECT delete_member((SELECT member_id FROM hv2), (SELECT shift_id FROM ctx2), '00000000-0000-0000-0000-0000000000f1', 0, 'TM', NULL, true);
 SELECT pg_temp.check((SELECT SUM(amount) = 0 FROM payment_logs WHERE member_id = (SELECT member_id FROM hv2)), 'nhập nhầm: tổng thu của hội viên trong ca = 0');
 SELECT pg_temp.check((SELECT payment_method = 'TM' AND amount = -350000 FROM payment_logs WHERE member_id = (SELECT member_id FROM hv2) AND payment_type = 'refund'), 'hoàn cùng hình thức TM');
 SELECT pg_temp.check((SELECT deleted_at IS NOT NULL FROM members WHERE id = (SELECT member_id FROM hv2)), 'hội viên nhập nhầm đã xóa');
 
--- Hội viên có khoản thu ở ca khác: nhân viên không xóa kiểu nhập nhầm được
+-- Hội viên không có khoản thu trong ca đang mở: không dùng được chế độ nhập nhầm
 RESET ROLE;
 UPDATE members SET deleted_at = NULL WHERE member_code LIKE 'HV01%';
 SET ROLE authenticated;
-SELECT pg_temp.expect_error($$SELECT delete_member((SELECT id FROM members WHERE member_code LIKE 'HV01%'), (SELECT shift_id FROM ctx2), NULL, 0, 'TM', NULL, true)$$, '%ca khác%');
+SELECT pg_temp.expect_error($$SELECT delete_member((SELECT id FROM members WHERE member_code LIKE 'HV01%'), (SELECT shift_id FROM ctx2), NULL, 0, 'TM', NULL, true)$$, '%không có khoản thu nào trong ca này%');
 RESET ROLE;
 
 \echo 'TẤT CẢ KIỂM THỬ SQL ĐỀU QUA'

@@ -7,7 +7,6 @@ export default function DeleteConfirmModal({
   hasActiveShift,
   shiftPayments = [],
   paymentsLoading = false,
-  isAdmin = false,
   onConfirm,
   onCancel
 }) {
@@ -27,7 +26,7 @@ export default function DeleteConfirmModal({
   const invalidRefund = refund < 0 || (refund > 0 && !hasActiveShift);
   const disabled = paymentsLoading
     || (mode === 'mistake' && !canVoid)
-    || (mode === 'quit' && (!isAdmin || invalidRefund));
+    || (mode === 'quit' && invalidRefund);
 
   return (
     <div className="modal-backdrop" onClick={onCancel}>
@@ -63,23 +62,21 @@ export default function DeleteConfirmModal({
             </span>
           </label>
 
-          {isAdmin && (
-            <label style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', marginTop: '8px' }}>
-              <input
-                type="radio"
+          <label style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', marginTop: '8px' }}>
+            <input
+              type="radio"
               style={{ width: 'auto', flex: 'none', margin: '3px 0 0' }}
-                name="delete-reason"
-                checked={mode === 'quit'}
-                onChange={() => setReason('quit')}
-              />
-              <span>
-                <strong>Khách nghỉ / lý do khác</strong>
-                <div className="cell-sub">Các khoản đã thu giữ nguyên trong doanh thu. Có thể ghi hoàn tiền bên dưới.</div>
-              </span>
-            </label>
-          )}
+              name="delete-reason"
+              checked={mode === 'quit'}
+              onChange={() => setReason('quit')}
+            />
+            <span>
+              <strong>Khách nghỉ / lý do khác</strong>
+              <div className="cell-sub">Các khoản đã thu giữ nguyên trong doanh thu. Có thể ghi hoàn tiền bên dưới.</div>
+            </span>
+          </label>
 
-          {mode === 'quit' && isAdmin && (
+          {mode === 'quit' && (
             <>
               <label className="field-label" style={{ marginTop: '12px' }}>Số tiền hoàn lại cho khách (để trống nếu không hoàn)</label>
               <input

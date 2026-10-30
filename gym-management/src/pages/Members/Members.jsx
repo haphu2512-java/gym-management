@@ -248,7 +248,7 @@ export default function Members() {
     }
   };
 
-  // Đổi TM <-> CK cho một lượt đăng ký/gia hạn trong ca đang mở
+  // Admin đổi TM <-> CK cho một lượt đăng ký/gia hạn nhân viên chọn nhầm
   const handleChangePaymentMethod = (log) => {
     const newMethod = log.payment_method === 'CK' ? 'TM' : 'CK';
     showConfirm({
@@ -649,7 +649,6 @@ export default function Members() {
           onSuspendMember={openSuspendModal}
           onReactivateMember={handleReactivate}
           onDeleteMember={openDeleteModal}
-          activeShiftStart={activeShift?.start_time || null}
         />
       )}
 
@@ -665,7 +664,6 @@ export default function Members() {
           profile={profile}
           onLogVerification={handleLogVerification}
           onChangePaymentMethod={handleChangePaymentMethod}
-          activeShiftStart={activeShift?.start_time || null}
           submitting={submitting}
         />
       )}
@@ -687,7 +685,6 @@ export default function Members() {
           hasActiveShift={Boolean(activeShift?.id)}
           shiftPayments={deleteShiftPayments}
           paymentsLoading={deletePaymentsLoading}
-          isAdmin={profile?.role === 'admin'}
           onConfirm={handleConfirmDelete}
           onCancel={() => setDeletingMember(null)}
         />

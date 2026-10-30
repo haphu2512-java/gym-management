@@ -14,14 +14,11 @@ export default function MemberFormModal({
   profile,
   onLogVerification,
   onChangePaymentMethod,
-  activeShiftStart = null,
   submitting
 }) {
   const isAdmin = profile?.role === 'admin';
-  // Lượt thu trong ca đang mở: đổi được TM <-> CK (CK đã duyệt thì chỉ Admin)
-  const canChangeMethod = (log) =>
-    Boolean(onChangePaymentMethod && activeShiftStart && new Date(log.created_at) >= new Date(activeShiftStart) && log.payment_method)
-    && (isAdmin || !(log.payment_method === 'CK' && log.is_payment_verified));
+  // Admin sửa hình thức thanh toán nhân viên chọn nhầm
+  const canChangeMethod = (log) => Boolean(isAdmin && onChangePaymentMethod && log.payment_method);
 
   return (
     <div className="modal-backdrop">
@@ -199,14 +196,14 @@ export default function MemberFormModal({
                         <th>Hành động</th>
                         <th>Chi tiết gói</th>
                         {isAdmin && <th>Nhân viên</th>}
-                        <th>Thanh toán</th>
+                        {isAdmin && <th>Thanh toán</th>}
                       </tr>
                     </thead>
                     <tbody>
                       {historyLoading ? (
-                        <tr><td colSpan={isAdmin ? 5 : 4} className="table-empty-cell">Đang tải...</td></tr>
+                        <tr><td colSpan={isAdmin ? 5 : 3} className="table-empty-cell">Đang tải...</td></tr>
                       ) : historyLogs.length === 0 ? (
-                        <tr><td colSpan={isAdmin ? 5 : 4} className="table-empty-cell">Chưa có lịch sử</td></tr>
+                        <tr><td colSpan={isAdmin ? 5 : 3} className="table-empty-cell">Chưa có lịch sử</td></tr>
                       ) : historyLogs.map(log => (
                         <tr key={log.id} style={{ fontSize: '12px' }}>
                           <td>{formatDate(log.created_at)}</td>
@@ -227,34 +224,34 @@ export default function MemberFormModal({
                           {profile?.role === 'admin' && (
                             <td>{log.staff_members?.full_name || log.profiles?.full_name || 'Hệ thống'}</td>
                           )}
-                          <td>
-                            {isAdmin && log.payment_method === 'CK' && !log.is_payment_verified ? (
-                              <button
-                                className="primary-btn"
-                                style={{ background: 'var(--warn)', padding: '6px 10px', fontSize: '11px' }}
-                                onClick={() => onLogVerification(log)}
-                              >
-                                Duyệt CK
-                              </button>
-                            ) : log.payment_method === 'CK' && !log.is_payment_verified ? (
-                              <span style={{ color: 'var(--warn-ink)', fontWeight: 'bold' }}>CK chờ duyệt</span>
-                            ) : log.payment_method === 'CK' ? (
-                              <span style={{ color: 'var(--ok)', fontWeight: 'bold' }}>✓ Đã duyệt</span>
-                            ) : log.payment_method === 'TM' ? (
-                              <span style={{ color: 'var(--muted)' }}>Tiền mặt</span>
-                            ) : null}
-                            {canChangeMethod(log) && (
-                              <button
-                                type="button"
-                                className="ghost-btn-sm"
-                                style={{ display: 'block', marginTop: '4px', padding: '4px 8px', fontSize: '11px' }}
-                                onClick={() => onChangePaymentMethod(log)}
-                                title="Chọn nhầm hình thức thanh toán? Đổi lại khi ca còn mở"
-                              >
-                                Đổi sang {log.payment_method === 'CK' ? 'TM' : 'CK'}
-                              </button>
-                            )}
-                          </td>
+                          {isAdmin && (
+                            <td>
+                              {log.payment_method === 'CK' && !log.is_payment_verified ? (
+                                <button
+                                  className="primary-btn"
+                                  style={{ background: 'var(--warn)', padding: '6px 10px', fontSize: '11px' }}
+                                  onClick={() => onLogVerification(log)}
+                                >
+                                  Duyệt CK
+                                </button>
+                              ) : log.payment_method === 'CK' ? (
+                                <span style={{ color: 'var(--ok)', fontWeight: 'bold' }}>✓ Đã duyệt</span>
+                              ) : log.payment_method === 'TM' ? (
+                                <span style={{ color: 'var(--muted)' }}>Tiền mặt</span>
+                              ) : null}
+                              {canChangeMethod(log) && (
+                                <button
+                                  type="button"
+                                  className="ghost-btn-sm"
+                                  style={{ display: 'block', marginTop: '4px', padding: '4px 8px', fontSize: '11px' }}
+                                  onClick={() => onChangePaymentMethod(log)}
+                                  title="Nhân viên chọn nhầm hình thức thanh toán? Đổi lại tại đây"
+                                >
+                                  Đổi sang {log.payment_method === 'CK' ? 'TM' : 'CK'}
+                                </button>
+                              )}
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>

@@ -12,8 +12,7 @@ export default function MembersTable({
   onRenewMember,
   onSuspendMember,
   onReactivateMember,
-  onDeleteMember,
-  activeShiftStart = null
+  onDeleteMember
 }) {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 50;
@@ -168,7 +167,7 @@ export default function MembersTable({
                         <PauseCircle size={18} />
                       </button>
                     )}
-                    {(profile?.role === 'admin' || (activeShiftStart && new Date(m.created_at) >= new Date(activeShiftStart))) && (
+                    {profile?.role === 'admin' && (
                       <button
                         type="button"
                         className="ghost-btn-sm"

@@ -1,10 +1,10 @@
 -- ============================================================
 -- Sửa nhập nhầm trong ca (30/10/2026)
---   1. change_payment_method: đổi TM <-> CK cho một lần đăng ký/gia hạn khi ca còn mở
+--   1. change_payment_method: đổi TM <-> CK cho một lần đăng ký/gia hạn
 --      (nhân viên chọn nhầm tiền mặt cho khoản chuyển khoản làm lệch tiền két).
 --   2. delete_member thêm chế độ "nhập nhầm": tự hoàn đúng các khoản đã thu của hội viên
 --      trong ca đang mở (cùng số tiền, cùng hình thức), nên tiền ca về như chưa nhập.
---      Nhân viên dùng được khi mọi khoản thu của hội viên đều nằm trong ca đang mở.
+--   Cả hai chỉ Admin được dùng, để quản lý kiểm soát việc sửa tiền.
 -- Chạy được bất cứ lúc nào sau 0400; frontend cũ vẫn dùng được.
 -- ============================================================
 
@@ -23,11 +23,11 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_user UUID := require_login();
-  v_admin BOOLEAN := is_admin();
   v_log member_logs%ROWTYPE;
   v_pay payment_logs%ROWTYPE;
   v_member_name TEXT;
 BEGIN
+  IF NOT is_admin() THEN RAISE EXCEPTION 'Chỉ Admin mới được đổi hình thức thanh toán.'; END IF;
   IF p_new_method NOT IN ('TM', 'CK') THEN RAISE EXCEPTION 'Hình thức thanh toán không hợp lệ'; END IF;
 
   SELECT * INTO v_log FROM member_logs
@@ -52,15 +52,6 @@ BEGIN
 
   IF v_pay.payment_method = p_new_method THEN
     RETURN json_build_object('success', true, 'changed', false);
-  END IF;
-
-  IF NOT v_admin THEN
-    IF NOT EXISTS (SELECT 1 FROM shifts WHERE id = v_pay.shift_id AND status = 'open') THEN
-      RAISE EXCEPTION 'Chỉ đổi được khi ca thu tiền còn mở. Ca đã chốt cần Admin sửa.';
-    END IF;
-    IF v_pay.payment_method = 'CK' AND v_pay.is_verified THEN
-      RAISE EXCEPTION 'Khoản chuyển khoản đã được duyệt, cần Admin sửa.';
-    END IF;
   END IF;
 
   UPDATE payment_logs
@@ -111,13 +102,14 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE
   v_user UUID := require_login();
-  v_admin BOOLEAN := is_admin();
   v_member members%ROWTYPE;
   v_refund NUMERIC := COALESCE(p_refund_amount, 0);
   v_payment_id UUID;
   v_pay RECORD;
   v_voided INT := 0;
 BEGIN
+  IF NOT is_admin() THEN RAISE EXCEPTION 'Chỉ Admin mới có quyền xóa hội viên.'; END IF;
+
   SELECT * INTO v_member FROM members WHERE id = p_member_id AND deleted_at IS NULL FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Không tìm thấy hội viên (có thể đã bị xóa).'; END IF;
 
@@ -126,13 +118,6 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM shifts WHERE id = p_shift_id AND status = 'open') THEN
       RAISE EXCEPTION 'Cần có ca đang mở để hủy khoản nhập nhầm.';
     END IF;
-    IF NOT v_admin AND EXISTS (
-      SELECT 1 FROM payment_logs
-      WHERE member_id = p_member_id AND shift_id IS DISTINCT FROM p_shift_id
-    ) THEN
-      RAISE EXCEPTION 'Hội viên có khoản thu ở ca khác, chỉ Admin được xóa.';
-    END IF;
-
     v_refund := 0;
     FOR v_pay IN
       SELECT * FROM payment_logs
@@ -151,7 +136,6 @@ BEGIN
       RAISE EXCEPTION 'Hội viên không có khoản thu nào trong ca này.';
     END IF;
   ELSE
-    IF NOT v_admin THEN RAISE EXCEPTION 'Chỉ Admin mới có quyền xóa hội viên.'; END IF;
     IF v_refund < 0 THEN RAISE EXCEPTION 'Số tiền hoàn không hợp lệ'; END IF;
 
     IF v_refund > 0 THEN
