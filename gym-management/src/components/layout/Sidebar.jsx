@@ -98,7 +98,7 @@ export default function Sidebar({ isOpen, onClose }) {
             <p>{activeStaff ? 'Đang trực' : 'Đang đăng nhập'}</p>
             <strong>{displayName}</strong>
           </span>
-          <ChevronUp size={16} color="#a3a3a8" style={{ flexShrink: 0, transform: showLogout ? 'none' : 'rotate(180deg)' }} />
+          <ChevronUp size={16} color="var(--muted)" style={{ flexShrink: 0, transform: showLogout ? 'none' : 'rotate(180deg)' }} />
         </button>
       </div>
     </aside>
