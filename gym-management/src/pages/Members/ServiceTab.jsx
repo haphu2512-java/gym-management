@@ -299,11 +299,10 @@ export default function ServiceTab() {
             DT Dịch vụ: {drinkRevenue.toLocaleString('vi-VN')}đ
           </div>
 
-          <div className="tab-group" style={{ display: 'flex', background: 'var(--surface-3)', padding: '4px', borderRadius: 'var(--radius)' }}>
+          <div className="tab-group">
             <button 
               className={`tab-btn ${viewMode === 'sales' ? 'active' : ''}`}
               onClick={() => setViewMode('sales')}
-              style={{ padding: '6px 12px', border: 'none', borderRadius: 'var(--radius)', fontSize: '13px', cursor: 'pointer', background: viewMode === 'sales' ? 'var(--surface)' : 'transparent', fontWeight: viewMode === 'sales' ? '600' : 'normal', boxShadow: viewMode === 'sales' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
             >
               Bán hàng
             </button>
@@ -311,7 +310,6 @@ export default function ServiceTab() {
               <button 
                 className={`tab-btn ${viewMode === 'admin' ? 'active' : ''}`}
                 onClick={() => setViewMode('admin')}
-                style={{ padding: '6px 12px', border: 'none', borderRadius: 'var(--radius)', fontSize: '13px', cursor: 'pointer', background: viewMode === 'admin' ? 'var(--surface)' : 'transparent', fontWeight: viewMode === 'admin' ? '600' : 'normal', boxShadow: viewMode === 'admin' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
               >
                 Quản lý kho
               </button>
@@ -319,7 +317,6 @@ export default function ServiceTab() {
             <button 
               className={`tab-btn ${viewMode === 'stats' ? 'active' : ''}`}
               onClick={() => setViewMode('stats')}
-              style={{ padding: '6px 12px', border: 'none', borderRadius: 'var(--radius)', fontSize: '13px', cursor: 'pointer', background: viewMode === 'stats' ? 'var(--surface)' : 'transparent', fontWeight: viewMode === 'stats' ? '600' : 'normal', boxShadow: viewMode === 'stats' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
             >
               Thống kê
             </button>
