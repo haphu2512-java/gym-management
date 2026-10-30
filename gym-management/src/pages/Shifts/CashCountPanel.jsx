@@ -1,6 +1,6 @@
 import { DENOMINATIONS } from '../../utils/cashDenominations';
 
-// Lưới nhập số tờ theo từng mệnh giá khi kết ca.
+// Lưới nhập số tờ theo từng mệnh giá khi mở/kết ca.
 export default function CashCountPanel({ counts, onChange, total }) {
   return (
     <div style={{ margin: '8px 0 12px', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '12px' }}>

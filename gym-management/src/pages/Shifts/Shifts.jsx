@@ -95,7 +95,7 @@ export default function Shifts() {
     localStorage.setItem('gym_shift_form', JSON.stringify(form));
   }, [form]);
 
-  // Đếm tiền theo mệnh giá khi kết ca: lưu tạm để tải lại trang không mất số đã đếm
+  // Đếm tiền theo mệnh giá khi mở/kết ca: lưu tạm để tải lại trang không mất số đã đếm
   const [cashCount, setCashCount] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('gym_cash_count'));
@@ -111,15 +111,35 @@ export default function Shifts() {
     localStorage.setItem('gym_cash_count', JSON.stringify(cashCount));
   }, [cashCount]);
 
+  // Chưa có ca mở thì số đếm điền vào tiền đầu ca, ngược lại điền vào tiền kết ca
+  const cashField = activeShift ? 'ending_cash' : 'starting_cash';
+
   const handleCashCountChange = (counts) => {
     setCashCount((prev) => ({ ...prev, counts }));
-    setForm((prev) => ({ ...prev, ending_cash: String(sumDenominations(counts)) }));
+    setForm((prev) => ({ ...prev, [cashField]: String(sumDenominations(counts)) }));
   };
 
   const handleToggleCashCount = (enabled) => {
     setCashCount((prev) => ({ ...prev, enabled }));
-    if (enabled) setForm((prev) => ({ ...prev, ending_cash: String(sumDenominations(cashCount.counts)) }));
+    if (enabled) setForm((prev) => ({ ...prev, [cashField]: String(sumDenominations(cashCount.counts)) }));
   };
+
+  const cashCountToggle = (
+    <>
+      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0', cursor: 'pointer', fontWeight: 600 }}>
+        <input
+          type="checkbox"
+          checked={cashCount.enabled}
+          onChange={(e) => handleToggleCashCount(e.target.checked)}
+          style={{ width: '18px', height: '18px', margin: 0 }}
+        />
+        Đếm theo mệnh giá
+      </label>
+      {cashCount.enabled && (
+        <CashCountPanel counts={cashCount.counts} onChange={handleCashCountChange} total={countedTotal} />
+      )}
+    </>
+  );
 
   useEffect(() => {
     localStorage.setItem('gym_expense_form', JSON.stringify(expenseForm));
@@ -457,13 +477,34 @@ export default function Shifts() {
           throw new Error('Vui lòng nhập tiền đầu ca trước khi mở ca.');
         }
 
-        await shiftService.openShift({
+        const startingCash = Number(form.starting_cash);
+        const opened = await shiftService.openShift({
           shiftName: form.shift_name,
-          startingCash: Number(form.starting_cash),
+          startingCash,
           note: form.note,
           staffId: activeStaff.id,
           skipTimeCheck: profile?.role === 'admin' && skipTimeCheck,
         });
+
+        // Lưu chi tiết số tờ từng mệnh giá vào nhật ký, giống lúc kết ca
+        if (cashCount.enabled) {
+          await staffLogService.logAction({
+            staffId: user?.id,
+            staffMemberId: activeStaff.id,
+            action: 'Đếm tiền mở ca',
+            targetItem: form.shift_name,
+            details: {
+              shiftId: opened?.id ?? null,
+              denominations: compactDenominations(cashCount.counts),
+              countedTotal,
+              startingCash,
+              previousEndingCash,
+              difference: previousShift ? startingCash - previousEndingCash : null,
+            },
+            note: 'Đếm theo mệnh giá',
+          });
+        }
+        setCashCount({ enabled: false, counts: {} });
       }
 
       setForm({ ...form, starting_cash: '', ending_cash: '', note: '' });
@@ -569,12 +610,14 @@ export default function Shifts() {
                   <div style={{ marginBottom: '16px' }}>
                     {!activeShift ? (
                       <div>
+                        {cashCountToggle}
                         <label className="field-label">Tiền đầu ca (TM)</label>
                         <input
                           type="number"
                           value={form.starting_cash}
                           onChange={(e) => setForm({ ...form, starting_cash: e.target.value })}
                           placeholder={previousEndingCash > 0 ? `Gợi ý: ${previousEndingCash.toLocaleString('vi-VN')}` : "Ví dụ: 500000"}
+                          readOnly={cashCount.enabled}
                         />
                         {previousEndingCash > 0 && (
                           <small className="field-hint">
@@ -584,18 +627,7 @@ export default function Shifts() {
                       </div>
                     ) : (
                       <div>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0', cursor: 'pointer', fontWeight: 600 }}>
-                          <input
-                            type="checkbox"
-                            checked={cashCount.enabled}
-                            onChange={(e) => handleToggleCashCount(e.target.checked)}
-                            style={{ width: '18px', height: '18px', margin: 0 }}
-                          />
-                          Đếm theo mệnh giá
-                        </label>
-                        {cashCount.enabled && (
-                          <CashCountPanel counts={cashCount.counts} onChange={handleCashCountChange} total={countedTotal} />
-                        )}
+                        {cashCountToggle}
                         <label className="field-label">Tiền kết ca (TM)</label>
                         <input
                           type="number"
