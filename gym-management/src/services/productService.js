@@ -36,8 +36,8 @@ export const productService = {
     const { data, error } = await supabase.rpc('sell_bottle_transaction', {
       p_product_id: product.id,
       p_shift_id: shiftId,
-      p_auth_id: authId,
-      p_staff_id: staffId,
+      p_auth_id: authId ?? null,
+      p_staff_id: staffId ?? null, // undefined sẽ bị bỏ khỏi body, PostgREST báo không tìm thấy hàm
       p_quantity: qty,
       p_total_price: null, // server tự tính từ giá sản phẩm
       p_payment_method: paymentMethod,
