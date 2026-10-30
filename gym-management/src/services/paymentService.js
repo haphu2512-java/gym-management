@@ -37,6 +37,19 @@ export const paymentService = {
     return Number(data?.member || 0);
   },
 
+  // Các khoản thu (đăng ký/gia hạn) của một hội viên trong một ca
+  async getMemberPaymentsInShift(memberId, shiftId) {
+    const { data, error } = await supabase
+      .from(TABLE_NAME)
+      .select('id, amount, payment_method, payment_type, is_verified, created_at')
+      .eq('member_id', memberId)
+      .eq('shift_id', shiftId)
+      .in('payment_type', ['new', 'renew'])
+      .order('created_at');
+    if (error) throw error;
+    return data || [];
+  },
+
   async getPaymentsByShift(shiftId, paymentMethod = null, isVerified = null) {
     let query = supabase
       .from(TABLE_NAME)

@@ -303,14 +303,27 @@ export const memberService = {
 
   // Xóa mềm hội viên. Các khoản thu cũ giữ nguyên; nếu hoàn tiền cho khách thì
   // ghi một khoản hoàn tiền (số âm) vào ca đang mở.
-  async deleteMember(id, { shiftId = null, staffId = null, refundAmount = 0, refundMethod = 'TM', note = '' } = {}) {
+  // voidCurrentShift: xóa do nhập nhầm, server tự hoàn đúng các khoản đã thu trong ca đang mở
+  async deleteMember(id, { shiftId = null, staffId = null, refundAmount = 0, refundMethod = 'TM', note = '', voidCurrentShift = false } = {}) {
     const { data, error } = await supabase.rpc('delete_member', {
       p_member_id: id,
       p_shift_id: shiftId,
       p_staff_id: staffId ?? null,
-      p_refund_amount: Number(refundAmount || 0),
+      p_refund_amount: voidCurrentShift ? 0 : Number(refundAmount || 0),
       p_refund_method: refundMethod,
-      p_note: note || null
+      p_note: note || null,
+      p_void_current_shift: voidCurrentShift
+    });
+    if (error) throw new Error(error.message);
+    return data;
+  },
+
+  // Đổi TM <-> CK cho một lượt đăng ký/gia hạn (nhân viên: chỉ khi ca thu tiền còn mở)
+  async changePaymentMethod(memberLogId, newMethod, staffId = null) {
+    const { data, error } = await supabase.rpc('change_payment_method', {
+      p_member_log_id: memberLogId,
+      p_new_method: newMethod,
+      p_staff_id: staffId ?? null
     });
     if (error) throw new Error(error.message);
     return data;

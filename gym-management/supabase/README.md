@@ -9,6 +9,7 @@ Toàn bộ schema, hàm RPC và RLS nằm trong `migrations/`, chạy theo thứ
 | `20261029000200_server_side_logic.sql` | Hàm server cho bán hàng, ca, xóa hội viên, doanh thu; constraint | Trước khi deploy frontend mới |
 | `20261029000300_tighten_rls.sql` | Siết RLS: nhân viên chỉ ghi bảng tiền qua RPC | **Sau khi** frontend mới đã chạy |
 | `20261029000400_member_logs_insert_fix.sql` | Nhân viên sửa hội viên từ bản web cũ không bị RLS chặn | Sau `0300` |
+| `20261030000500_fix_mistaken_entries.sql` | Đổi TM/CK khi ca còn mở; xóa hội viên do nhập nhầm tự hoàn khoản thu trong ca | Trước khi deploy frontend có tính năng này |
 
 `0100` và `0200` tương thích với frontend cũ, nên web vẫn chạy bình thường trong lúc chờ deploy.
 `0300` sẽ chặn các thao tác ghi trực tiếp mà frontend cũ còn dùng, vì vậy phải chạy sau cùng.
