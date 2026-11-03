@@ -10,13 +10,15 @@ export default function Logs() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [filterDate, setFilterDate] = useState('');
+  const [filterAction, setFilterAction] = useState('');
+  const [actionOptions, setActionOptions] = useState([]);
   const itemsPerPage = 50;
 
-  const loadLogs = useCallback(async (page, date) => {
+  const loadLogs = useCallback(async (page, date, action) => {
     setLoading(true);
     setError('');
     try {
-      const { data, totalCount: count } = await staffLogService.getLogs(page, itemsPerPage, date);
+      const { data, totalCount: count } = await staffLogService.getLogs(page, itemsPerPage, date, action);
       setLogs(data);
       setTotalCount(count);
     } catch (e) {
@@ -26,12 +28,31 @@ export default function Logs() {
     }
   }, [itemsPerPage]);
 
+  const loadActions = useCallback(async () => {
+    try {
+      setActionOptions(await staffLogService.getActions());
+    } catch (e) {
+      // Thiếu danh sách hành động không chặn việc xem nhật ký
+      console.error('Tải danh sách hành động thất bại:', e.message);
+    }
+  }, []);
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      loadLogs(currentPage, filterDate);
+      loadLogs(currentPage, filterDate, filterAction);
     }, 0);
     return () => clearTimeout(timer);
-  }, [currentPage, filterDate, loadLogs]);
+  }, [currentPage, filterDate, filterAction, loadLogs]);
+
+  useEffect(() => {
+    const timer = setTimeout(loadActions, 0);
+    return () => clearTimeout(timer);
+  }, [loadActions]);
+
+  // Giữ lựa chọn hiện tại trong danh sách kể cả khi danh sách chưa tải xong
+  const actionChoices = filterAction && !actionOptions.includes(filterAction)
+    ? [filterAction, ...actionOptions]
+    : actionOptions;
 
   const totalPages = Math.ceil(totalCount / itemsPerPage);
 
@@ -42,7 +63,7 @@ export default function Logs() {
           <h3 className="modern-title">Nhật ký hoạt động</h3>
           <p className="muted-text">Theo dõi thao tác của tất cả nhân viên trên hệ thống.</p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <input
             type="date"
             value={filterDate}
@@ -53,7 +74,29 @@ export default function Logs() {
             style={{ padding: '8px', borderRadius: 'var(--radius)', border: '1px solid var(--line)', minWidth: '130px' }}
             title="Lọc theo ngày"
           />
-          <button type="button" className="ghost-btn" onClick={() => loadLogs(currentPage, filterDate)}>
+          <select
+            value={filterAction}
+            onChange={(e) => {
+              setFilterAction(e.target.value);
+              setCurrentPage(1);
+            }}
+            style={{ padding: '8px', borderRadius: 'var(--radius)', border: '1px solid var(--line)', flex: '1 1 160px', minWidth: 0, maxWidth: '240px' }}
+            title="Lọc theo hành động"
+            aria-label="Lọc theo hành động"
+          >
+            <option value="">Tất cả hành động</option>
+            {actionChoices.map((action) => (
+              <option key={action} value={action}>{action}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="ghost-btn"
+            onClick={() => {
+              loadLogs(currentPage, filterDate, filterAction);
+              loadActions();
+            }}
+          >
             Làm mới
           </button>
         </div>
