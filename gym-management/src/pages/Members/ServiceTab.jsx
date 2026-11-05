@@ -431,7 +431,7 @@ export default function ServiceTab() {
             </div>
           </div>
           <div className="modern-table-wrap">
-            <table className="modern-table">
+            <table className="modern-table stack-mobile">
               <thead>
                 <tr>
                   <th>Thời gian</th>
@@ -498,7 +498,7 @@ export default function ServiceTab() {
       ) : (
         /* Admin Table View */
         <div className="modern-table-wrap">
-          <table className="modern-table">
+          <table className="modern-table stack-mobile">
             <thead>
               <tr>
                 <th>Dịch vụ</th>

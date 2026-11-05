@@ -40,7 +40,7 @@ export default function MembersToolbar({
       </div>
 
       {activeTab !== 'services' && (
-        <div className="modern-toolbar">
+        <div className="modern-toolbar toolbar-grid-mobile">
           <div className="search-box">
             <Search size={16} />
             <input
@@ -111,7 +111,7 @@ export default function MembersToolbar({
               <FileSpreadsheet size={16} /> Xuất Excel
             </button>
           )}
-          <button type="button" className="primary-btn" onClick={onAddMember} style={{ marginLeft: 'auto' }}>
+          <button type="button" className="primary-btn toolbar-main-action" onClick={onAddMember} style={{ marginLeft: 'auto' }}>
             <Plus size={16} /> Thêm hội viên
           </button>
         </div>

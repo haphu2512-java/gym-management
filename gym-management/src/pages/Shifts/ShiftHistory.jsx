@@ -34,7 +34,7 @@ export default function ShiftHistory({ shifts, filterDate, onFilterDateChange, o
       </div>
 
       <div className="modern-table-wrap">
-        <table className="modern-table">
+        <table className="modern-table stack-mobile">
           <thead>
             <tr>
               <th>Ca</th>

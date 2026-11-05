@@ -220,7 +220,7 @@ export default function Statistics() {
         </div>
 
         <div className="modern-table-wrap">
-          <table className="modern-table">
+          <table className="modern-table stack-mobile">
             <thead>
               <tr>
                 <th>{pivotBy === 'date' ? 'Ngày' : pivotBy === 'shift' ? 'Ca làm' : 'Nhân viên'}</th>

@@ -376,7 +376,7 @@ export default function Dashboard() {
           ) : recentMembers.length === 0 ? (
             <p className="muted-text" style={{ padding: '20px' }}>Chưa có dữ liệu hội viên.</p>
           ) : (
-            <table className="modern-table">
+            <table className="modern-table stack-mobile">
               <thead>
                 <tr>
                   <th>Ngày</th>

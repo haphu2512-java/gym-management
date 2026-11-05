@@ -9,7 +9,7 @@ export default function StockTable({
 }) {
   return (
     <div className="modern-table-wrap">
-      <table className="modern-table">
+      <table className="modern-table stack-mobile">
         <thead>
           <tr>
             <th>Sản phẩm</th>
