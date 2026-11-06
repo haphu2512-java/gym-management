@@ -19,6 +19,7 @@ import ToastContainer from './components/common/ToastContainer';
 import ConfirmDialog from './components/common/ConfirmDialog';
 
 import { useAuthStore } from './store/useAuthStore';
+import useMobileTableLabels from './hooks/useMobileTableLabels';
 import supabase from './config/supabase';
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
   const [isSidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 768);
   const initializeAuth = useAuthStore((state) => state.initializeAuth);
   const profile = useAuthStore((state) => state.profile);
+  useMobileTableLabels();
 
   useEffect(() => {
     // 1. Khởi tạo auth lần đầu (đọc từ localStorage)

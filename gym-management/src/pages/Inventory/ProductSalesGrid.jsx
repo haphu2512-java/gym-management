@@ -1,4 +1,4 @@
-import { Minus, Plus, Search } from 'lucide-react';
+import { CupSoda, Minus, Plus, Search } from 'lucide-react';
 
 // Mốc để vẽ thanh tồn kho: từ 50 chai trở lên coi như đầy
 const STOCK_FULL = 50;
@@ -35,30 +35,36 @@ export default function ProductSalesGrid({
             const fill = Math.min(100, Math.round((stock / STOCK_FULL) * 100));
 
             return (
-              <div key={item.id} className={`pos-card ${isOutOfStock ? 'is-out' : ''}`}>
+              <div
+                key={item.id}
+                className={`pos-card ${isOutOfStock ? 'is-out' : isLowStock ? 'is-low' : ''}`}
+              >
                 <div className="pos-card-body">
                   <div className="pos-card-top">
-                    <h4 className="pos-name" title={item.name}>{item.name}</h4>
-                    {item.image_url && (
-                      <img
-                        src={item.image_url}
-                        alt=""
-                        onError={(e) => { e.target.style.display = 'none'; }}
-                      />
-                    )}
-                  </div>
-
-                  <p className="pos-price">
-                    {Number(item.price || 0).toLocaleString('vi-VN')}<small>đ</small>
-                  </p>
-
-                  <div className={`stock-meter ${isLowStock ? 'low' : ''}`}>
-                    <div className="stock-meter-row">
-                      <span>{isOutOfStock ? 'Hết hàng' : isLowStock ? 'Sắp hết' : 'Tồn kho'}</span>
-                      <strong>{stock}</strong>
+                    <div className="pos-thumb" aria-hidden="true">
+                      {item.image_url ? (
+                        <img
+                          src={item.image_url}
+                          alt=""
+                          onError={(e) => { e.target.style.display = 'none'; }}
+                        />
+                      ) : (
+                        <CupSoda size={22} />
+                      )}
                     </div>
-                    <div className="stock-meter-bar"><span style={{ width: `${fill}%` }} /></div>
+                    <h4 className="pos-name" title={item.name}>{item.name}</h4>
                   </div>
+
+                  <div className="pos-price-row">
+                    <p className="pos-price">
+                      {Number(item.price || 0).toLocaleString('vi-VN')}<small>đ</small>
+                    </p>
+                    <span className="pos-stock-pill">
+                      {isOutOfStock ? 'Hết hàng' : isLowStock ? `Sắp hết · ${stock}` : `Còn ${stock}`}
+                    </span>
+                  </div>
+
+                  <div className="stock-meter-bar" aria-hidden="true"><span style={{ width: `${fill}%` }} /></div>
                 </div>
 
                 <div className="pos-actions">

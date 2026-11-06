@@ -26,7 +26,7 @@ export default function MembersTable({
 
   return (
     <div className="modern-table-wrap" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <table className="modern-table">
+      <table className="modern-table stack-mobile">
         <thead>
           <tr>
             <th>Ngày hành động</th>

@@ -377,8 +377,8 @@ export default function Staff() {
           <h3 className="modern-title">Quản lý Ca làm & Bảng lương</h3>
           <p className="muted-text">Xếp ca tuần từ: <strong>{formatDate(weekStart)}</strong></p>
         </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <label style={{ fontSize: '13px', fontWeight: 600 }}>Chọn tuần (Thứ 2):</label>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <label style={{ fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap' }}>Chọn tuần (Thứ 2):</label>
           <input
             type="date"
             value={weekStart}

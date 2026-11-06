@@ -106,7 +106,7 @@ export default function Logs() {
       {loading && <div className="modern-info">Đang tải dữ liệu...</div>}
 
       <div className="modern-table-wrap" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        <table className="modern-table">
+        <table className="modern-table stack-mobile">
           <thead>
             <tr>
               <th>Thời gian</th>

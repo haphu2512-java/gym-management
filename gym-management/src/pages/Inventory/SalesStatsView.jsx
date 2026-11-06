@@ -53,7 +53,7 @@ export default function SalesStatsView({
         </div>
       </div>
       <div className="modern-table-wrap">
-        <table className="modern-table">
+        <table className="modern-table stack-mobile">
           <thead>
             <tr>
               <th>Thời gian</th>
