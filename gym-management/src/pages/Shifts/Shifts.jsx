@@ -561,7 +561,17 @@ export default function Shifts() {
           ) : (
             <>
               {activeTab === 'shift' && (
-                <form className="modern-form" onSubmit={handleSubmit}>
+                <form
+                  className="modern-form"
+                  onSubmit={(e) => {
+                    // Đang có ca mở: chặn Enter để tránh chốt ca nhầm, chỉ chốt khi bấm chuột vào nút
+                    if (activeShift) {
+                      e.preventDefault();
+                      return;
+                    }
+                    handleSubmit(e);
+                  }}
+                >
                   {/* Dropdown chọn nhân viên trực */}
                   <label className="field-label">Nhân viên trực</label>
                   {activeShift ? (
@@ -697,7 +707,16 @@ export default function Shifts() {
                     </div>
                   )}
 
-                  <button type="submit" className="primary-btn large" disabled={submitting}>
+                  <button
+                    type={activeShift ? 'button' : 'submit'}
+                    className="primary-btn large"
+                    disabled={submitting}
+                    onClick={activeShift ? (e) => {
+                      // Chốt ca chỉ khi bấm chuột thật: click do bàn phím (Enter/Space) có detail = 0
+                      if (e.detail === 0) return;
+                      handleSubmit(e);
+                    } : undefined}
+                  >
                     {submitting ? 'Đang xử lý...' : (activeShift ? 'Chốt Ca Trực' : 'Mở Ca Trực')}
                   </button>
                 </form>
